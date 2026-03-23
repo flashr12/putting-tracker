@@ -367,12 +367,23 @@
 
   <!-- HISTORY -->
   <div id="view-history" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div style="font-size:15px;font-weight:700;color:#1f2937">Round History</div>
       <button onclick="exportCSV()"
         style="background:#edf3fa;color:#002855;border:1.5px solid #003A72;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">
         ↓ Export CSV
       </button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button onclick="backupData()"
+        style="flex:1;background:#f0fdf4;color:#15803d;border:1.5px solid #16a34a;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
+        💾 Backup Data
+      </button>
+      <button onclick="triggerRestore()"
+        style="flex:1;background:#fff7ed;color:#c2410c;border:1.5px solid #ea580c;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
+        📥 Restore Backup
+      </button>
+      <input type="file" id="restore-input" accept=".json" style="display:none" onchange="restoreData(event)">
     </div>
     <div id="hist-empty" style="display:none;text-align:center;padding:48px 0;color:#9ca3af;font-size:13px">No rounds recorded yet.</div>
     <div id="hist-list" style="display:flex;flex-direction:column;gap:10px"></div>
@@ -1764,6 +1775,47 @@ function exportCSV() {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function backupData() {
+  const rounds = loadRounds();
+  if (!rounds.length) { alert('No rounds to backup yet.'); return; }
+  const payload = { version: 'putttrack_v3', exportDate: new Date().toISOString(), rounds };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `putts-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function triggerRestore() {
+  document.getElementById('restore-input').click();
+}
+
+function restoreData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      const rounds = Array.isArray(parsed) ? parsed : (parsed.rounds && Array.isArray(parsed.rounds) ? parsed.rounds : null);
+      if (!rounds) { alert('Invalid backup file. Please use a file exported from this app.'); return; }
+      if (!confirm(`Restore ${rounds.length} round(s)?\n\nThis will replace all current data.`)) return;
+      saveRounds(rounds);
+      renderHistory();
+      renderDashboard();
+      alert(`✅ ${rounds.length} round(s) restored successfully!`);
+    } catch(err) {
+      alert('Could not read the backup file. Make sure it is a valid .json backup.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function renderHistory() {
