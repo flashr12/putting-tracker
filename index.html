@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Putts"/>
+  <meta name="theme-color" content="#002855"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/icon.svg"/>
+  <title>Putting Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html { height: 100%; }
+    body {
+      height: 100%; margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f5fb;
+      display: flex; flex-direction: column;
+      overflow: hidden; /* body never scrolls */
+    }
+
+    /* ── Fixed chrome pieces ── */
+    #app-header {
+      flex-shrink: 0;
+      background: #002855;
+      color: #fff;
+      padding: env(safe-area-inset-top) 16px 0;
+      height: calc(48px + env(safe-area-inset-top));
+      display: flex; align-items: flex-end; padding-bottom: 6px;
+      gap: 10px;
+    }
+    #app-nav {
+      flex-shrink: 0;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      height: 44px;
+      z-index: 20;
+    }
+    .ntab {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500; color: #6b7280;
+      border-bottom: 2px solid transparent; cursor: pointer;
+    }
+    .ntab.on { color: #003A72; border-bottom-color: #003A72; font-weight: 700; }
+
+    /* ── Main scroll area (dashboard + history only) ── */
+    #scroll-main { flex: 1; overflow-y: auto; overflow-x: hidden; }
+
+    /* ── Round entry: fills remaining height without scrolling ── */
+    #round-shell {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    }
+    #round-info-bar {
+      flex-shrink: 0; height: 38px;
+      background: #fff; border-bottom: 1px solid #f3f4f6;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 14px; gap: 8px;
+    }
+    #hole-pills-strip {
+      flex-shrink: 0; height: 46px;
+      background: #fff; border-bottom: 1px solid #f3f4f6;
+      overflow-x: auto; overflow-y: hidden;
+      display: flex; align-items: center;
+      padding: 0 14px; gap: 6px;
+    }
+    #hole-pills-strip::-webkit-scrollbar { display: none; }
+    .hp {
+      flex-shrink: 0;
+      width: 30px; height: 30px; border-radius: 50%;
+      font-size: 11px; font-weight: 700;
+      border: 1.5px solid #d1d5db; background: #fff; color: #9ca3af;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: all .15s;
+    }
+    .hp.done { background: #dbe8f5; border-color: #003A72; color: #002855; }
+    .hp.cur  { background: #003A72; border-color: #003A72; color: #fff; }
+
+    /* ── Accordion hole list (form view) ── */
+    #accordion-area {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+    }
+    .hole-row {
+      border-bottom: 1px solid #f0f5fb;
+    }
+    /* Collapsed summary row */
+    .hole-summary {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; background: #fff; cursor: pointer;
+      min-height: 46px;
+    }
+    .hole-summary:active { background: #f9fafb; }
+    .hole-num-badge {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hole-quick { flex: 1; font-size: 12px; color: #6b7280; }
+    .hole-putt-badge {
+      padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 700;
+    }
+    /* Expanded hole form */
+    .hole-form-wrap {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height .22s ease;
+      background: #fafafa;
+    }
+    .hole-form-wrap.open { max-height: 820px; }
+    .hole-form-inner {
+      padding: 12px 14px 8px;
+    }
+
+    /* ── Chip system ── */
+    .fl { margin-bottom: 10px; }
+    .fl:last-child { margin-bottom: 0; }
+    .fl-label {
+      display: block; text-align: center;
+      font-size: 10px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .06em; color: #002855;
+      background: #dbe8f5; border-left: 3px solid #003A72;
+      padding: 3px 8px; border-radius: 0 4px 4px 0;
+      margin-bottom: 6px; line-height: 1.4;
+    }
+    /* Grid chips (4 per row) */
+    .cg4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; }
+    /* Grid chips (3 per row) */
+    .cg3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+    /* Grid chips (2 per row) */
+    .cg2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 5px; }
+    /* Side-by-side two panels */
+    .two-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    /* Three panels */
+    .three-panel { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    /* The chip button itself */
+    .ch {
+      height: 36px; border-radius: 9px;
+      border: 1.5px solid #e5e7eb;
+      background: #fff; color: #374151;
+      font-size: 12px; font-weight: 500;
+      cursor: pointer; outline: none;
+      display: flex; align-items: center; justify-content: center;
+      white-space: nowrap; padding: 0 4px;
+      transition: background .12s, border-color .12s, color .12s, transform .08s;
+      -webkit-user-select: none; user-select: none;
+    }
+    .ch:active { transform: scale(0.94); }
+    .ch.on      { background: #003A72; color: #fff; border-color: #003A72; }
+    .ch.on-warn { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+    .ch.on-bad  { background: #ef4444; color: #fff; border-color: #ef4444; }
+
+    /* ── Bottom nav buttons ── */
+    #round-bottom-nav {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      background: #fff; border-top: 1px solid #e5e7eb;
+      display: flex; gap: 8px;
+    }
+    .rnav-btn {
+      flex: 1; height: 42px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer; border: none; outline: none;
+      transition: opacity .15s, transform .1s;
+    }
+    .rnav-btn:active { transform: scale(0.97); }
+    .rnav-btn.secondary { background: #f3f4f6; color: #374151; }
+    .rnav-btn.primary   { background: #003A72; color: #fff; }
+    .rnav-btn.success   { background: #001d3d; color: #fff; }
+    .rnav-btn:disabled  { opacity: .35; pointer-events: none; }
+
+    /* ── Table view ── */
+    #table-area {
+      flex: 1; overflow: auto;
+    }
+    .htable { width: 100%; border-collapse: collapse; }
+    .htable th {
+      position: sticky; top: 0; background: #f9fafb; z-index: 5;
+      padding: 7px 5px; text-align: center;
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; color: #9ca3af;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .htable th:first-child { text-align: left; padding-left: 12px; }
+    .htable td {
+      padding: 7px 5px; text-align: center;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 12px; font-weight: 500; color: #374151;
+    }
+    .htable td:first-child { text-align: left; padding-left: 12px; color: #9ca3af; font-size: 11px; }
+    .htable tr.cur-row td { background: #f0f5fb; }
+    .htable tr:active td { background: #dbe8f5; }
+    .tc { display:inline-block; padding: 1px 6px; border-radius:5px; font-size:11px; font-weight:600; }
+    .tc-g { background:#dbe8f5; color:#002855; }
+    .tc-y { background:#fef9c3; color:#854d0e; }
+    .tc-r { background:#fee2e2; color:#991b1b; }
+    .tc-b { background:#dbeafe; color:#1e40af; }
+    .tc-d { background:#f3f4f6; color:#9ca3af; }
+    .tc-e { color:#d1d5db; font-size:10px; }
+
+    /* ── View toggle pill ── */
+    .vtoggle { display:flex; background:#f3f4f6; border-radius:8px; padding:2px; }
+    .vbtn {
+      padding: 3px 10px; border-radius:6px; font-size:11px; font-weight:600;
+      cursor:pointer; color:#6b7280; border:none; background:transparent; outline:none;
+    }
+    .vbtn.on { background:#fff; color:#003A72; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+
+    /* ── Completion pulse ── */
+    @keyframes pulse-green {
+      0%,100% { box-shadow: 0 0 0 0 rgba(13,148,136,.4); }
+      50%      { box-shadow: 0 0 0 8px rgba(13,148,136,0); }
+    }
+    .hole-form-wrap.complete-pulse { animation: pulse-green .5s ease; }
+
+    /* ── Dashboard / History ── */
+    .kpi { background:#fff; border-radius:14px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+    .kpi-v { font-size:26px; font-weight:800; line-height:1; }
+    .kpi-l { font-size:10px; color:#9ca3af; margin-top:3px; text-transform:uppercase; letter-spacing:.05em; }
+    .stab { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; color:#6b7280; background:#f3f4f6; white-space:nowrap; border:none; outline:none; }
+    .stab.on { background:#003A72; color:#fff; }
+    .brk { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f9fafb; }
+    .brk-l { min-width:72px; font-size:12px; color:#6b7280; }
+    .brk-bg { flex:1; height:7px; background:#f3f4f6; border-radius:99px; overflow:hidden; }
+    .brk-fill { height:100%; border-radius:99px; }
+    .brk-p { width:34px; text-align:right; font-size:12px; font-weight:700; }
+    .hcard { background:#fff; border-radius:16px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.07); cursor:pointer; border:1.5px solid transparent; }
+    .hcard:active { border-color:#003A72; }
+
+    /* Modal */
+    #modal-wrap { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; display:flex; align-items:flex-end; }
+    #modal-box {
+      background:#fff; border-radius:20px 20px 0 0; width:100%;
+      max-height:88dvh; overflow-y:scroll; -webkit-overflow-scrolling:touch;
+      padding: 0 18px calc(24px + env(safe-area-inset-bottom));
+    }
+    .mhandle { width:36px; height:4px; background:#e5e7eb; border-radius:99px; margin:12px auto 14px; }
+
+    /* ── Putt input grid tables ── */
+    .pgrid { border-collapse:collapse; font-size:10px; width:100%; table-layout:fixed; }
+    .pgrid th {
+      padding:3px 1px; text-align:center; font-weight:700; color:#6b7280;
+      background:#f0f5fb; border:1px solid #d1d5db; font-size:9px; white-space:nowrap;
+      overflow:hidden;
+    }
+    .pgrid td.row-head {
+      padding:3px 5px; text-align:left; font-size:10px; font-weight:600; color:#374151;
+      background:#f9fafb; border:1px solid #d1d5db; white-space:nowrap;
+    }
+    .pgrid td.gcell {
+      height:28px; text-align:center;
+      border:1px solid #d1d5db; cursor:pointer; background:#fff;
+      transition:background .08s; -webkit-tap-highlight-color:transparent;
+    }
+    .pgrid td.gcell:active { background:#dbe8f5; }
+    .pgrid td.gcell.on { background:#003A72; box-shadow:inset 0 0 0 1.5px #001d3d; }
+    .pgrid td.gcell.on::after { content:'✓'; font-size:11px; color:#fff; font-weight:800; line-height:1; }
+    .pgrid td.gcell.disabled { background:#f3f4f6; cursor:default; pointer-events:none; }
+
+    /* Setup card */
+    .setup-card { background:#fff; border-radius:16px; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+    .inp {
+      width:100%; border:1.5px solid #e5e7eb; border-radius:10px;
+      padding:10px 12px; font-size:14px; outline:none;
+      -webkit-appearance:none;
+    }
+    .inp:focus { border-color:#003A72; }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div id="app-header">
+  <span style="font-size:22px">⛳</span>
+  <div>
+    <div style="font-size:16px;font-weight:700;line-height:1.2">Putting Tracker</div>
+    <div style="font-size:11px;color:#5eead4">Hole-by-hole analysis</div>
+  </div>
+</div>
+
+<!-- ── NAV TABS ── -->
+<div id="app-nav" style="font-size:12px">
+  <div class="ntab on" id="tab-dashboard" onclick="showMain('dashboard')">Dashboard</div>
+  <div class="ntab"    id="tab-round"     onclick="showMain('round')">New Round</div>
+  <div class="ntab"    id="tab-history"   onclick="showMain('history')">History</div>
+  <div class="ntab"    id="tab-insights"  onclick="showMain('insights')">💡 Insights</div>
+</div>
+
+<!-- ════════════════════════════════════
+     DASHBOARD + HISTORY  (scrollable)
+════════════════════════════════════ -->
+<div id="scroll-main" style="display:none">
+
+  <!-- DASHBOARD -->
+  <div id="view-dashboard" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))">
+    <div id="db-empty" style="display:none; text-align:center; padding:60px 0">
+      <div style="font-size:52px">⛳</div>
+      <p style="font-weight:600;color:#374151;margin:8px 0 4px">No rounds yet</p>
+      <p style="font-size:13px;color:#9ca3af;margin-bottom:16px">Start a round to see your stats</p>
+      <button onclick="showMain('round')" style="background:#003A72;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
+    </div>
+    <div id="db-content" style="display:none">
+      <!-- KPIs -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-v" id="kpi-ppr" style="color:#003A72">—</div>
+          <div class="kpi-l">Putts/Round</div>
+        </div>
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-v" id="kpi-3p" style="color:#f59e0b">—</div>
+          <div class="kpi-l">3-Putt %</div>
+        </div>
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-v" id="kpi-gir" style="color:#3b82f6">—</div>
+          <div class="kpi-l">Putts/GIR</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="kpi">
+          <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-avg">—</div>
+          <div class="kpi-l">Avg Putts / Hole</div>
+        </div>
+        <div class="kpi">
+          <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-rounds">—</div>
+          <div class="kpi-l">Rounds / Holes</div>
+        </div>
+      </div>
+
+      <!-- Breakdown card -->
+      <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+        <div style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #f3f4f6;overflow-x:auto">
+          <button class="stab on" onclick="setStab(this,'dist')">Distance</button>
+          <button class="stab"    onclick="setStab(this,'slope')">Slope</button>
+          <button class="stab"    onclick="setStab(this,'dir')">Direction</button>
+          <button class="stab"    onclick="setStab(this,'miss')">Miss</button>
+          <button class="stab"    onclick="setStab(this,'var')">Variance</button>
+        </div>
+        <div style="padding:12px">
+          <div id="stab-dist">
+            <div style="height:170px"><canvas id="chart-dist"></canvas></div>
+            <div id="tbl-dist" style="margin-top:8px"></div>
+          </div>
+          <div id="stab-slope"  style="display:none"></div>
+          <div id="stab-dir"    style="display:none"></div>
+          <div id="stab-miss"   style="display:none"></div>
+          <div id="stab-var"    style="display:none">
+            <div style="height:150px"><canvas id="chart-var"></canvas></div>
+            <div id="tbl-var"  style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trend -->
+      <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Putts / Round Trend</div>
+        <div style="height:140px"><canvas id="chart-trend"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div id="view-insights" style="display:none"></div>
+
+  <!-- HISTORY -->
+  <div id="view-history" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:700;color:#1f2937">Round History</div>
+      <button onclick="exportCSV()"
+        style="background:#edf3fa;color:#002855;border:1.5px solid #003A72;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">
+        ↓ Export CSV
+      </button>
+    </div>
+    <div id="hist-empty" style="display:none;text-align:center;padding:48px 0;color:#9ca3af;font-size:13px">No rounds recorded yet.</div>
+    <div id="hist-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+
+</div><!-- /scroll-main -->
+
+
+<!-- ════════════════════════════════════
+     ROUND ENTRY (no scroll on body)
+════════════════════════════════════ -->
+<div id="round-shell" style="display:none">
+
+  <!-- SETUP STEP -->
+  <div id="step-setup" style="flex:1;overflow-y:auto;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))">
+    <div style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:12px">New Round</div>
+    <div class="setup-card" style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Date</div>
+        <input type="date" id="inp-date" class="inp"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Course (optional)</div>
+        <input type="text" id="inp-course" class="inp" placeholder="e.g. Pebble Beach"
+          autocomplete="off" list="course-suggestions"/>
+        <datalist id="course-suggestions"></datalist>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Holes</div>
+        <div class="cg2" style="max-width:220px">
+          <div class="ch on" data-grp="setup-holes" data-val="18" onclick="selChip(this)">18 Holes</div>
+          <div class="ch"    data-grp="setup-holes" data-val="9"  onclick="selChip(this)">9 Holes</div>
+        </div>
+      </div>
+      <button onclick="startRound()"
+        style="background:#003A72;color:#fff;border:none;border-radius:10px;height:46px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-top:4px">
+        Start Entering Putts →
+      </button>
+    </div>
+  </div>
+
+  <!-- HOLES ENTRY STEP -->
+  <div id="step-holes" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+
+    <!-- Round info + view toggle -->
+    <div id="round-info-bar">
+      <div style="font-size:12px;color:#6b7280;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
+        <span id="ri-course" style="font-weight:700;color:#1f2937"></span>
+        <span id="ri-date"   style="color:#9ca3af;margin-left:4px"></span>
+      </div>
+      <div class="vtoggle">
+        <button class="vbtn on" id="vbtn-form"  onclick="setRoundView('form')">Form</button>
+        <button class="vbtn"    id="vbtn-table" onclick="setRoundView('table')">Table</button>
+      </div>
+    </div>
+
+    <!-- Hole pill strip -->
+    <div id="hole-pills-strip">
+      <div id="hole-pills" style="display:flex;gap:6px"></div>
+    </div>
+
+    <!-- FORM VIEW: accordion -->
+    <div id="form-area" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div id="accordion-area"></div>
+      <!-- Bottom nav -->
+      <div id="round-bottom-nav">
+        <button class="rnav-btn secondary" id="btn-prev" onclick="navHole(-1)">← Prev</button>
+        <button class="rnav-btn primary"   id="btn-next" onclick="navHole(1)">Next →</button>
+        <button class="rnav-btn success"   id="btn-save" onclick="saveRound()" style="display:none">✓ Save</button>
+      </div>
+    </div>
+
+    <!-- TABLE VIEW -->
+    <div id="table-area" style="display:none;flex:1;overflow:auto">
+      <table class="htable">
+        <thead>
+          <tr>
+            <th style="text-align:left">H</th>
+            <th>Len</th><th>Slp</th><th>Dir</th>
+            <th>Pts</th><th>Var</th><th>Miss</th><th>GIR</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /step-holes -->
+</div><!-- /round-shell -->
+
+
+<!-- ── MODAL ── -->
+<div id="modal-wrap" style="display:none" onclick="closeModal(event)">
+  <div id="modal-box">
+    <div class="mhandle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:700;color:#1f2937" id="modal-title"></div>
+      <button onclick="closeModalBtn()" style="border:none;background:none;font-size:20px;color:#9ca3af;cursor:pointer">✕</button>
+    </div>
+    <div id="modal-body"></div>
+    <button onclick="confirmDelete()"
+      style="margin-top:16px;width:100%;border:1.5px solid #fca5a5;color:#dc2626;border-radius:10px;padding:10px;font-size:13px;font-weight:600;background:#fff;cursor:pointer">
+      Delete this round
+    </button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════
+const LEN_BUCKETS = ['1-3','4-6','7-10','11-15','16-20','21-30','30-50','50+'];
+const VAR_OPTS    = ['<-6','-5','-3','-1','+1','+3','+5','>+6'];
+const SHORT_VAR   = ['<-6','>-7','-5','-3','-1'];  // stopped short of hole
+const LONG_VAR    = ['+1','+3','+5','>+6','>+7'];   // ran past hole
+const SLOPE_OPTS  = [{v:'flat',l:'— Flat'},{v:'up',l:'⬆ Up'},{v:'down',l:'⬇ Down'}];
+const DIR_OPTS    = [{v:'straight',l:'↑ Str'},{v:'l-to-r',l:'↗ L→R'},{v:'r-to-l',l:'↖ R→L'}];
+const NUM_OPTS    = ['1','2','3','4+'];
+const MISS_OPTS   = [{v:'left',l:'◀ Left'},{v:'short',l:'▼ Short'},{v:'made',l:'✓ Made'},{v:'right',l:'▶ Right'}];
+const GIR_OPTS    = [{v:'yes',l:'✓ Yes'},{v:'no',l:'✗ No'}];
+const STORAGE_KEY = 'putttrack_v3';
+
+// ═══════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════
+function loadRounds()   { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]; } catch { return []; } }
+function saveRounds(r)  { localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
+
+// Draft round (auto-saved after every chip tap so Safari crashes don't lose data)
+const DRAFT_KEY = 'putttrack_draft';
+function saveDraft()  { if (AR) localStorage.setItem(DRAFT_KEY, JSON.stringify({AR, AH})); }
+function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
+function loadDraft()  { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch { return null; } }
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let AR   = null;  // active round object
+let AH   = 0;     // active hole index (0-based)
+let RVIEW = 'form'; // 'form' | 'table'
+
+function blankHole(n) {
+  return { n, length:null, slope:null, direction:null, numPutts:null,
+           variance:null, missDirection:null, gir:null };
+}
+
+function isHoleDone(h) {
+  if (!h.length || !h.slope || !h.direction || !h.numPutts || !h.gir) return false;
+  if (h.numPutts === '1') return true;   // 1-putt: variance/miss optional (old compat)
+  return !!(h.variance && h.missDirection); // 2+ putts need variance + miss direction
+}
+
+function varDisplay(v) {
+  if (!v || v === '0') return null; // 1-putt: no variance to show
+  return v; // signed value ('<-6', '-1', '+3', etc.)
+}
+
+function missIcon(v) {
+  return v==='left'?'◀':v==='right'?'▶':v==='short'?'▼':v==='long'?'▲':v==='made'?'✓':'—';
+}
+
+// ═══════════════════════════════════════
+//  MAIN VIEW ROUTING
+// ═══════════════════════════════════════
+function showMain(name) {
+  const scrollViews = ['dashboard','history','insights'];
+  document.getElementById('scroll-main').style.display  = scrollViews.includes(name) ? 'block' : 'none';
+  document.getElementById('round-shell').style.display  = (name==='round') ? 'flex' : 'none';
+  document.getElementById('view-dashboard').style.display = (name==='dashboard') ? 'block' : 'none';
+  document.getElementById('view-history').style.display   = (name==='history') ? 'block' : 'none';
+  document.getElementById('view-insights').style.display  = (name==='insights') ? 'block' : 'none';
+  ['dashboard','round','history','insights'].forEach(v => {
+    document.getElementById('tab-'+v).classList.toggle('on', v===name);
+  });
+  if (name==='dashboard') renderDashboard();
+  if (name==='history')   renderHistory();
+  if (name==='insights')  renderInsights();
+  if (name==='round' && !AR) {
+    const draft = loadDraft();
+    if (draft?.AR) {
+      const saved = draft.AR.holes.filter(h => isHoleDone(h)).length;
+      if (confirm(`Resume in-progress round?\n${draft.AR.course||'Round'} · ${saved} hole${saved!==1?'s':''} entered`)) {
+        AR = draft.AR; AH = draft.AH;
+        document.getElementById('step-setup').style.display = 'none';
+        document.getElementById('step-holes').style.display = 'flex';
+        document.getElementById('ri-course').textContent = AR.course || 'New Round';
+        document.getElementById('ri-date').textContent = new Date(AR.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        setRoundView('form'); renderPills(); renderAccordion();
+      } else { clearDraft(); initSetup(); }
+    } else { initSetup(); }
+  }
+}
+
+// ═══════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════
+function initSetup() {
+  document.getElementById('step-setup').style.display = 'flex';
+  document.getElementById('step-holes').style.display = 'none';
+  document.getElementById('inp-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('inp-course').value = '';
+  // reset hole count chip
+  document.querySelectorAll('[data-grp="setup-holes"]').forEach(c => c.classList.toggle('on', c.dataset.val==='18'));
+  // populate course autocomplete from past rounds (sorted alphabetically, deduplicated)
+  const past = [...new Set(
+    loadRounds().map(r => r.course).filter(Boolean)
+  )].sort((a,b) => a.localeCompare(b));
+  const dl = document.getElementById('course-suggestions');
+  dl.innerHTML = past.map(c => `<option value="${c.replace(/"/g,'&quot;')}">`).join('');
+}
+
+function startRound() {
+  const date   = document.getElementById('inp-date').value;
+  const course = document.getElementById('inp-course').value.trim();
+  const hc     = parseInt(document.querySelector('[data-grp="setup-holes"].on')?.dataset.val || '18');
+  if (!date) { alert('Please select a date.'); return; }
+  clearDraft(); // discard any previous incomplete round
+  AR = { id: Date.now().toString(), date, course, holeCount:hc,
+         holes: Array.from({length:hc}, (_,i) => blankHole(i+1)) };
+  AH = 0;
+  document.getElementById('step-setup').style.display = 'none';
+  document.getElementById('step-holes').style.display = 'flex';
+  // info bar
+  document.getElementById('ri-course').textContent = course || 'New Round';
+  document.getElementById('ri-date').textContent   = new Date(date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  setRoundView('form');
+  renderPills();
+  renderAccordion();
+}
+
+// ═══════════════════════════════════════
+//  ROUND VIEW TOGGLE
+// ═══════════════════════════════════════
+function setRoundView(v) {
+  RVIEW = v;
+  document.getElementById('form-area').style.display  = v==='form'  ? 'flex' : 'none';
+  document.getElementById('table-area').style.display = v==='table' ? 'block': 'none';
+  document.getElementById('vbtn-form').classList.toggle('on', v==='form');
+  document.getElementById('vbtn-table').classList.toggle('on', v==='table');
+  if (v==='table') renderTable();
+}
+
+// ═══════════════════════════════════════
+//  HOLE PILLS
+// ═══════════════════════════════════════
+function renderPills() {
+  const strip = document.getElementById('hole-pills');
+  strip.innerHTML = AR.holes.map((h,i) => {
+    const cls = i===AH ? 'hp cur' : isHoleDone(h) ? 'hp done' : 'hp';
+    return `<div class="${cls}" onclick="jumpHole(${i})" id="pill-${i}">${h.n}</div>`;
+  }).join('');
+  // scroll active pill into view
+  setTimeout(()=>{
+    const p = document.getElementById('pill-'+AH);
+    if (p) p.scrollIntoView({inline:'center',behavior:'smooth',block:'nearest'});
+  }, 50);
+}
+
+// ═══════════════════════════════════════
+//  ACCORDION
+// ═══════════════════════════════════════
+function renderAccordion() {
+  const area = document.getElementById('accordion-area');
+  area.innerHTML = AR.holes.map((h,i) => buildHoleAccordionHTML(h,i)).join('');
+  updateBottomNav();
+  // open active hole
+  openHoleForm(AH, false);
+  // Scroll active hole into view
+  setTimeout(() => {
+    const el = document.getElementById(`hr-${AH}`);
+    if (el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }, 50);
+}
+
+function buildHoleAccordionHTML(h, i) {
+  const done = isHoleDone(h);
+  const missed = h.numPutts && parseInt(h.numPutts) >= 2;
+  const puttNum = h.numPutts ? parseInt(h.numPutts) : null;
+  const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
+  const summaryChips = done ? [
+    h.length, slopeIcon(h.slope), dirIcon(h.direction),
+    `${h.numPutts}pt`, varDisplay(h.variance),
+    h.missDirection && h.missDirection !== 'made' ? missIcon(h.missDirection) : null,
+    h.gir==='yes'?'GIR':''
+  ].filter(Boolean).join(' · ') : '—';
+
+  return `
+  <div class="hole-row" id="hr-${i}">
+    <div class="hole-summary" onclick="jumpHole(${i})">
+      <div class="hole-num-badge ${done?'tc-g':'tc-d'}" style="font-size:11px;font-weight:700">${h.n}</div>
+      <div class="hole-quick">${done ? summaryChips : '<span style="color:#d1d5db">tap to enter</span>'}</div>
+      ${done ? `<span class="tc ${badgeCls}" style="min-width:28px;text-align:center">${h.numPutts}</span>` : ''}
+    </div>
+    <div class="hole-form-wrap" id="hfw-${i}">
+      <div class="hole-form-inner" id="hfi-${i}">
+        ${buildHoleFormHTML(h, i)}
+      </div>
+    </div>
+  </div>`;
+}
+
+function slopeIcon(v) { return v==='up'?'⬆':v==='down'?'⬇':'—'; }
+function dirIcon(v)   { return v==='l-to-r'?'↗':v==='r-to-l'?'↖':'→'; }
+
+function buildHoleFormHTML(h, i) {
+  // ── Table 1: Putt Characteristics (distance × slope+direction) ──────────
+  // 9 columns: [Down L→R, Down Str, Down R→L, Flat L→R, Flat Str, Flat R→L, Up L→R, Up Str, Up R→L]
+  const COLS1 = [
+    {slope:'down',dir:'l-to-r'},{slope:'down',dir:'straight'},{slope:'down',dir:'r-to-l'},
+    {slope:'flat',dir:'l-to-r'},{slope:'flat',dir:'straight'},{slope:'flat',dir:'r-to-l'},
+    {slope:'up',  dir:'l-to-r'},{slope:'up',  dir:'straight'},{slope:'up',  dir:'r-to-l'},
+  ];
+  const grid1 = `
+  <div class="fl">
+    <div class="fl-label">🎯 Tap a cell → sets Distance + Slope + Break in one tap</div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table class="pgrid" id="grid1-${i}">
+        <thead>
+          <tr>
+            <th rowspan="2" style="min-width:28px;border-right:2px solid #6b7280">Feet</th>
+            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#4a7c59">⬇ Downhill</th>
+            <th colspan="3" style="border-left:2px solid #6b7280;color:#374151">— Flat</th>
+            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#c2692a">⬆ Uphill</th>
+          </tr>
+          <tr>
+            <th style="border-left:2px solid #003A72">L-R ↗</th><th>Str ↑</th><th>R-L ↖</th>
+            <th style="border-left:2px solid #6b7280">L-R ↗</th><th>Str ↑</th><th>R-L ↖</th>
+            <th style="border-left:2px solid #003A72">L-R ↗</th><th>Str ↑</th><th>R-L ↖</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${LEN_BUCKETS.map(len => `
+          <tr>
+            <td class="row-head" style="border-right:2px solid #6b7280">${len}</td>
+            ${COLS1.map((c,ci) => {
+              const sel = h.length===len && h.slope===c.slope && h.direction===c.dir;
+              const bdr = ci===3 ? 'border-left:2px solid #6b7280;' : ci===6 ? 'border-left:2px solid #003A72;' : '';
+              return `<td class="gcell${sel?' on':''}" id="gc1-${i}-${len}-${c.slope}-${c.dir}"
+                          style="${bdr}" onclick="onGrid1(${i},'${len}','${c.slope}','${c.dir}')"></td>`;
+            }).join('')}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  // ── Table 2: # Putts × 1st-putt variance ────────────────────────────────
+  // '0' (middle col) only valid for row '1'.  Rows 2+: all other columns valid.
+  const PUTTS_ROWS = ['1','2','3','4+'];
+  const VAR_COLS   = ['>-7','-5','-3','-1','0','+1','+3','+5','>+7'];
+  const grid2 = `
+  <div class="fl">
+    <div class="fl-label">🏌️ # Putts × 1st-putt variance</div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table class="pgrid" id="grid2-${i}">
+        <thead>
+          <tr>
+            <th style="min-width:30px">Putts</th>
+            ${VAR_COLS.map((v,vi) => {
+              const isZero = v === '0';
+              const bdr = vi===4 ? 'border-left:2px solid #c5d8ef;' : '';
+              const bg  = isZero ? 'background:#edf3fa;color:#002855;' : '';
+              const label = isZero ? '0' : v + "'";
+              return `<th style="${bdr}${bg}">${label}</th>`;
+            }).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${PUTTS_ROWS.map(pts => {
+            const safePts = pts.replace(/\+/g,'_');
+            return `<tr>
+            <td class="row-head">${pts}</td>
+            ${VAR_COLS.map((v,vi) => {
+              const isZero = v === '0';
+              const disabled = (pts==='1' && !isZero) || (pts!=='1' && isZero);
+              const sel = h.numPutts===pts && h.variance===v;
+              const safeV = v.replace(/[<>+]/g,'_');
+              const bdr = vi===4 ? 'border-left:2px solid #c5d8ef;' : '';
+              if (disabled) return `<td class="gcell disabled" style="${bdr}"></td>`;
+              return `<td class="gcell${sel?' on':''}" id="gc2-${i}-${safePts}-${safeV}"
+                          style="${bdr}" onclick="onGrid2(${i},'${pts}','${v}')"></td>`;
+            }).join('')}
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  // ── Table 3: GIR? × Miss direction ──────────────────────────────────────
+  // Rows = GIR Yes / No;  Columns = Left / Short / Made / Right
+  // 'Made' only selectable when numPutts = '1'
+  const MISS_COLS = [{v:'left',l:'◀ Left'},{v:'short',l:'▼ Short'},{v:'made',l:'✓ Made'},{v:'right',l:'▶ Right'}];
+  const GIR_ROWS  = [{v:'yes',l:'🟢 GIR'},{v:'no',l:'✗ No GIR'}];
+  const grid3 = `
+  <div class="fl" style="margin-bottom:4px">
+    <div class="fl-label">📍 GIR? / Miss Side</div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table class="pgrid" id="grid3-${i}">
+        <thead>
+          <tr>
+            <th style="min-width:52px"></th>
+            ${MISS_COLS.map(m => `<th>${m.l}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${GIR_ROWS.map(g => `
+          <tr>
+            <td class="row-head">${g.l}</td>
+            ${MISS_COLS.map(m => {
+              const isMade = m.v === 'made';
+              const madeDisabled = isMade && h.numPutts && h.numPutts !== '1';
+              const sel = !madeDisabled && h.missDirection===m.v && h.gir===g.v;
+              const cls = `gcell${sel?' on':''}${madeDisabled?' disabled':''}`;
+              const click = madeDisabled ? '' : ` onclick="onGrid3(${i},'${m.v}','${g.v}')"`;
+              return `<td class="${cls}" id="gc3-${i}-${m.v}-${g.v}"${click}></td>`;
+            }).join('')}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  return grid1 + grid2 + grid3;
+}
+
+// Refresh a single hole's accordion row without re-rendering everything
+function refreshHoleRow(i) {
+  const h = AR.holes[i];
+  const row = document.getElementById(`hr-${i}`);
+  if (!row) return;
+  const newHTML = buildHoleAccordionHTML(h, i);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = newHTML;
+  const newRow = tmp.firstElementChild;
+  // preserve open state
+  const wasOpen = document.getElementById(`hfw-${i}`)?.classList.contains('open');
+  row.replaceWith(newRow);
+  if (wasOpen) {
+    const fw = document.getElementById(`hfw-${i}`);
+    if (fw) fw.classList.add('open');
+  }
+}
+
+function openHoleForm(i, animate=true) {
+  // Close all
+  document.querySelectorAll('.hole-form-wrap.open').forEach(el => el.classList.remove('open'));
+  const fw = document.getElementById(`hfw-${i}`);
+  if (fw) fw.classList.add('open');
+  // Scroll into view
+  if (animate) {
+    setTimeout(() => {
+      const el = document.getElementById(`hr-${i}`);
+      if (el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }, 80);
+  }
+}
+
+function jumpHole(i) {
+  AH = i;
+  openHoleForm(i);
+  renderPills();
+  updateBottomNav();
+}
+
+function navHole(dir) {
+  const newIdx = AH + dir;
+  if (newIdx < 0 || newIdx >= AR.holeCount) return;
+  jumpHole(newIdx);
+}
+
+function updateBottomNav() {
+  document.getElementById('btn-prev').disabled = AH === 0;
+  const isLast = AH === AR.holeCount - 1;
+  document.getElementById('btn-next').style.display = isLast ? 'none' : 'block';
+  document.getElementById('btn-save').style.display = isLast ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════
+//  CHIP SELECTION (setup chips only)
+// ═══════════════════════════════════════
+function selChip(el) {
+  const grp = el.dataset.grp;
+  document.querySelectorAll(`.ch[data-grp="${grp}"]`).forEach(c => c.classList.remove('on','on-warn','on-bad'));
+  el.classList.add('on');
+}
+
+// ═══════════════════════════════════════
+//  GRID CELL HANDLERS
+// ═══════════════════════════════════════
+
+// Table 1: Putt Characteristics — sets length + slope + direction
+function onGrid1(hi, length, slope, dir) {
+  const h = AR.holes[hi];
+  h.length = length; h.slope = slope; h.direction = dir;
+  const tbl = document.getElementById(`grid1-${hi}`);
+  if (tbl) {
+    tbl.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+    const cell = document.getElementById(`gc1-${hi}-${length}-${slope}-${dir}`);
+    if (cell) cell.classList.add('on');
+  }
+  if (isHoleDone(h)) onHoleDone(hi);
+  saveDraft();
+}
+
+// Table 2: Putts × Distance — sets numPutts + variance
+function onGrid2(hi, numPutts, variance) {
+  const h = AR.holes[hi];
+  h.numPutts = numPutts; h.variance = variance;
+  // If switching away from 1-putt and 'made' was set, clear missDirection
+  if (numPutts !== '1' && h.missDirection === 'made') {
+    h.missDirection = null; h.gir = null;
+    const tbl3 = document.getElementById(`grid3-${hi}`);
+    if (tbl3) tbl3.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+  }
+  // Toggle Made cell disabled state in Table 3
+  ['yes','no'].forEach(g => {
+    const madeCell = document.getElementById(`gc3-${hi}-made-${g}`);
+    if (madeCell) {
+      if (numPutts !== '1') madeCell.classList.add('disabled');
+      else madeCell.classList.remove('disabled');
+    }
+  });
+  const tbl = document.getElementById(`grid2-${hi}`);
+  if (tbl) {
+    tbl.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+    const safePts = numPutts.replace(/\+/g,'_');
+    const safeVar = variance.replace(/[<>+]/g,'_');
+    const cell = document.getElementById(`gc2-${hi}-${safePts}-${safeVar}`);
+    if (cell) cell.classList.add('on');
+  }
+  if (isHoleDone(h)) onHoleDone(hi);
+  saveDraft();
+}
+
+// Table 3: Result × GIR — sets missDirection + gir
+function onGrid3(hi, missDir, gir) {
+  const h = AR.holes[hi];
+  // Guard: 'made' only allowed when numPutts is unset or '1'
+  if (missDir === 'made' && h.numPutts && h.numPutts !== '1') return;
+  h.missDirection = missDir; h.gir = gir;
+  // If 'made' selected and numPutts not yet set, auto-fill 1-putt
+  if (missDir === 'made' && !h.numPutts) {
+    h.numPutts = '1'; h.variance = '0';
+    const tbl2 = document.getElementById(`grid2-${hi}`);
+    if (tbl2) {
+      tbl2.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+      const c2 = document.getElementById(`gc2-${hi}-1-0`); // '0' has no special chars
+      if (c2) c2.classList.add('on');
+    }
+  }
+  const tbl = document.getElementById(`grid3-${hi}`);
+  if (tbl) {
+    tbl.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+    const cell = document.getElementById(`gc3-${hi}-${missDir}-${gir}`);
+    if (cell) cell.classList.add('on');
+  }
+  if (isHoleDone(h)) onHoleDone(hi);
+  saveDraft();
+}
+
+function onHoleDone(i) {
+  // Refresh the summary row text (without disrupting open state)
+  const h = AR.holes[i];
+  const summaryEl = document.querySelector(`#hr-${i} .hole-quick`);
+  const puttNum = parseInt(h.numPutts);
+  const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
+  if (summaryEl) {
+    summaryEl.textContent = [
+      h.length, slopeIcon(h.slope), dirIcon(h.direction), `${h.numPutts}pt`,
+      varDisplay(h.variance),
+      h.missDirection && h.missDirection !== 'made' ? missIcon(h.missDirection) : null,
+      h.gir==='yes'?'GIR':''
+    ].filter(Boolean).join(' · ');
+  }
+  // Update badge in summary row
+  const summaryRow = document.querySelector(`#hr-${i} .hole-summary`);
+  if (summaryRow) {
+    const numBadge = document.querySelector(`#hr-${i} .hole-num-badge`);
+    if (numBadge) numBadge.className = `hole-num-badge tc-g`;
+    // Add/update putt count badge
+    let pBadge = summaryRow.querySelector('.tc');
+    if (!pBadge) {
+      pBadge = document.createElement('span');
+      summaryRow.appendChild(pBadge);
+    }
+    pBadge.className = `tc ${badgeCls}`;
+    pBadge.style.minWidth = '28px';
+    pBadge.style.textAlign = 'center';
+    pBadge.textContent = h.numPutts;
+  }
+  // Update pill
+  const pill = document.getElementById(`pill-${i}`);
+  if (pill) pill.className = i===AH ? 'hp cur' : 'hp done';
+  // Auto-advance to next hole after short delay
+  if (i < AR.holeCount - 1) {
+    setTimeout(() => {
+      if (AH === i) { // only auto-advance if still on this hole
+        AH = i + 1;
+        openHoleForm(AH);
+        renderPills();
+        updateBottomNav();
+      }
+    }, 600);
+  }
+}
+
+// ═══════════════════════════════════════
+//  TABLE VIEW
+// ═══════════════════════════════════════
+function renderTable() {
+  const body = document.getElementById('table-body');
+  body.innerHTML = AR.holes.map((h,i) => {
+    const d = isHoleDone(h);
+    const p = d ? parseInt(h.numPutts) : null;
+    const pc = p===1?'tc-g':p>=3?'tc-r':p?'tc-y':'tc-e';
+    function cell(v, cls='tc-d') {
+      return v ? `<span class="tc ${cls}">${v}</span>` : `<span style="color:#e5e7eb">·</span>`;
+    }
+    return `
+    <tr class="${i===AH?'cur-row':''}" onclick="jumpHole(${i});setRoundView('form')">
+      <td>H${h.n}</td>
+      <td>${cell(h.length)}</td>
+      <td>${cell(h.slope ? slopeIcon(h.slope) : null)}</td>
+      <td>${cell(h.direction ? dirIcon(h.direction) : null)}</td>
+      <td>${cell(h.numPutts, pc)}</td>
+      <td>${cell(varDisplay(h.variance))}</td>
+      <td>${cell(h.missDirection ? missIcon(h.missDirection) : (p&&p>=2?'—':null))}</td>
+      <td>${cell(h.gir ? (h.gir==='yes'?'Y':'N') : null, h.gir==='yes'?'tc-g':'tc-d')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  SAVE ROUND
+// ═══════════════════════════════════════
+function saveRound() {
+  const done = AR.holes.filter(isHoleDone);
+  if (!done.length) { alert('Fill in at least one hole before saving.'); return; }
+  const round = { ...AR, holes: done };
+  const rounds = loadRounds();
+  rounds.unshift(round);
+  saveRounds(rounds);
+  clearDraft(); // round properly saved, discard draft
+  AR = null; AH = 0; RVIEW = 'form';
+  showMain('dashboard');
+}
+
+// ═══════════════════════════════════════
+//  STATS ENGINE
+// ═══════════════════════════════════════
+function pct(n,d)  { return d ? Math.round(n/d*100) : null; }
+function colorForPct(p) {
+  if (p===null) return '#d1d5db';
+  return p>=70?'#003A72':p>=40?'#f59e0b':'#ef4444';
+}
+
+function computeStats(holes) {
+  if (!holes.length) return null;
+  const n       = holes.length;
+  const makes   = holes.filter(h=>h.numPutts==='1').length;
+  const three   = holes.filter(h=>parseInt(h.numPutts)>=3).length;
+  const girH    = holes.filter(h=>h.gir==='yes');
+  const girPuts = girH.reduce((s,h)=>s+parseInt(h.numPutts),0);
+  const total   = holes.reduce((s,h)=>s+parseInt(h.numPutts),0);
+  const misses  = holes.filter(h=>parseInt(h.numPutts)>=2);
+
+  const byDist = LEN_BUCKETS.map(b => {
+    const bh = holes.filter(h=>h.length===b);
+    return { b, n:bh.length, m:bh.filter(h=>h.numPutts==='1').length,
+             tp:bh.filter(h=>parseInt(h.numPutts)>=3).length,
+             mp:pct(bh.filter(h=>h.numPutts==='1').length, bh.length) };
+  });
+
+  const bySlope = SLOPE_OPTS.map(s => {
+    const sh = holes.filter(h=>h.slope===s.v);
+    return { ...s, n:sh.length, mp:pct(sh.filter(h=>h.numPutts==='1').length,sh.length),
+             tp:pct(sh.filter(h=>parseInt(h.numPutts)>=3).length,sh.length) };
+  });
+
+  const byDir = DIR_OPTS.map(d => {
+    const dh = holes.filter(h=>h.direction===d.v);
+    return { ...d, n:dh.length, mp:pct(dh.filter(h=>h.numPutts==='1').length,dh.length),
+             tp:pct(dh.filter(h=>parseInt(h.numPutts)>=3).length,dh.length) };
+  });
+
+  const mL    = misses.filter(h=>h.missDirection==='left').length;
+  const mS    = misses.filter(h=>h.missDirection==='short').length;
+  const mR    = misses.filter(h=>h.missDirection==='right').length;
+
+  const byMissByDir = DIR_OPTS.map(d => {
+    const dm = misses.filter(h=>h.direction===d.v);
+    return { ...d, total:dm.length, left:dm.filter(h=>h.missDirection==='left').length,
+             right:dm.filter(h=>h.missDirection==='right').length };
+  });
+
+  const byVar = VAR_OPTS.map(v => {
+    const vh = holes.filter(h=>h.variance===v);
+    return { v, n:vh.length, mp:pct(vh.filter(h=>h.numPutts==='1').length,vh.length) };
+  });
+
+  // Variance cross-analysis: short vs long by distance, slope, direction
+  const varHoles = holes.filter(h=>h.variance);
+  const varByDist = LEN_BUCKETS.map(b => {
+    const bh = varHoles.filter(h=>h.length===b);
+    const sc = bh.filter(h=>SHORT_VAR.includes(h.variance)).length;
+    const lo = bh.filter(h=>LONG_VAR.includes(h.variance)).length;
+    return { b, n:bh.length, short:sc, long:lo,
+             shortPct:pct(sc,bh.length), longPct:pct(lo,bh.length) };
+  });
+  const varBySlope = SLOPE_OPTS.map(s => {
+    const sh = varHoles.filter(h=>h.slope===s.v);
+    const sc = sh.filter(h=>SHORT_VAR.includes(h.variance)).length;
+    const lo = sh.filter(h=>LONG_VAR.includes(h.variance)).length;
+    return { ...s, n:sh.length, short:sc, long:lo,
+             shortPct:pct(sc,sh.length), longPct:pct(lo,sh.length) };
+  });
+  const varByDir = DIR_OPTS.map(d => {
+    const dh = varHoles.filter(h=>h.direction===d.v);
+    const sc = dh.filter(h=>SHORT_VAR.includes(h.variance)).length;
+    const lo = dh.filter(h=>LONG_VAR.includes(h.variance)).length;
+    return { ...d, n:dh.length, short:sc, long:lo,
+             shortPct:pct(sc,dh.length), longPct:pct(lo,dh.length) };
+  });
+
+  return {
+    n, makes, makesPct:pct(makes,n), three, threePct:pct(three,n),
+    girCount:girH.length, puttsPerGir: girH.length?(girPuts/girH.length).toFixed(2):null,
+    avgPutts:(total/n).toFixed(2),
+    byDist, bySlope, byDir, misses:misses.length, mL, mS, mR, byMissByDir, byVar,
+    varByDist, varBySlope, varByDir,
+    rounds: null // filled in by caller
+  };
+}
+
+// ═══════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════
+let charts = {};
+
+function varCrossHTML(label, shortPct, longPct, n) {
+  if (!n) return '';
+  return `<div style="margin-bottom:10px">
+    <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:4px">${label} <span style="font-size:10px;font-weight:400;color:#9ca3af">(${n})</span></div>
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:3px">
+      <span style="font-size:9px;color:#6b7280;width:30px;flex-shrink:0">Short</span>
+      <div style="flex:1;height:7px;background:#f3f4f6;border-radius:4px">
+        <div style="height:100%;border-radius:4px;background:#3b82f6;width:${shortPct??0}%"></div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:#3b82f6;width:32px;text-align:right">${shortPct!==null?shortPct+'%':'—'}</span>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <span style="font-size:9px;color:#6b7280;width:30px;flex-shrink:0">Long</span>
+      <div style="flex:1;height:7px;background:#f3f4f6;border-radius:4px">
+        <div style="height:100%;border-radius:4px;background:#f97316;width:${longPct??0}%"></div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:#f97316;width:32px;text-align:right">${longPct!==null?longPct+'%':'—'}</span>
+    </div>
+  </div>`;
+}
+
+function brkHTML(label, mp, n) {
+  const c = colorForPct(mp);
+  return `<div class="brk">
+    <div class="brk-l">${label}</div>
+    <div class="brk-bg"><div class="brk-fill" style="width:${mp??0}%;background:${c}"></div></div>
+    <div class="brk-p" style="color:${c}">${mp!==null?mp+'%':'—'}</div>
+    <div style="font-size:10px;color:#d1d5db;margin-left:2px">(${n})</div>
+  </div>`;
+}
+
+let activeStab = 'dist';
+function setStab(el, name) {
+  document.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  ['dist','slope','dir','miss','var'].forEach(t => {
+    document.getElementById('stab-'+t).style.display = t===name?'block':'none';
+  });
+  activeStab = name;
+}
+
+function renderDashboard() {
+  const rounds = loadRounds();
+  const allHoles = rounds.flatMap(r=>r.holes);
+  const s = computeStats(allHoles);
+
+  if (!s) {
+    document.getElementById('db-empty').style.display = 'block';
+    document.getElementById('db-content').style.display = 'none';
+    return;
+  }
+  document.getElementById('db-empty').style.display = 'none';
+  document.getElementById('db-content').style.display = 'block';
+
+  const puttsPerRound = rounds.length ? (rounds.reduce((sum,r)=>sum+r.holes.reduce((a,h)=>a+parseInt(h.numPutts),0),0)/rounds.length).toFixed(1) : null;
+  document.getElementById('kpi-ppr').textContent    = puttsPerRound ?? '—';
+  document.getElementById('kpi-3p').textContent     = s.threePct!==null  ? s.threePct+'%' : '—';
+  document.getElementById('kpi-gir').textContent    = s.puttsPerGir ?? '—';
+  document.getElementById('kpi-avg').textContent    = s.avgPutts;
+  document.getElementById('kpi-rounds').textContent = `${rounds.length} / ${s.n}`;
+
+  // Distance chart + table
+  const ad = s.byDist.filter(d=>d.n>0);
+  if (charts.dist) charts.dist.destroy();
+  charts.dist = new Chart(document.getElementById('chart-dist').getContext('2d'),{
+    type:'bar',
+    data:{ labels:ad.map(d=>d.b),
+      datasets:[{label:'Make%',data:ad.map(d=>d.mp??0),
+        backgroundColor:ad.map(d=>colorForPct(d.mp)),borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%',font:{size:10}},grid:{color:'#f3f4f6'}},
+              x:{ticks:{font:{size:10}},grid:{display:false}}}}
+  });
+  document.getElementById('tbl-dist').innerHTML = `
+    <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <thead><tr style="color:#9ca3af">
+        <th style="text-align:left;padding:4px 2px">Range</th>
+        <th style="text-align:center;padding:4px 2px">Tries</th>
+        <th style="text-align:center;padding:4px 2px">Makes</th>
+        <th style="text-align:center;padding:4px 2px">Make%</th>
+        <th style="text-align:right;padding:4px 2px">3-Putt%</th>
+      </tr></thead>
+      <tbody>
+        ${s.byDist.filter(d=>d.n>0).map(d=>`
+          <tr style="border-top:1px solid #f3f4f6">
+            <td style="padding:5px 2px;font-weight:600;color:#374151">${d.b}</td>
+            <td style="text-align:center;color:#9ca3af">${d.n}</td>
+            <td style="text-align:center;color:#9ca3af">${d.m}</td>
+            <td style="text-align:center;font-weight:700;color:${colorForPct(d.mp)}">${d.mp!==null?d.mp+'%':'—'}</td>
+            <td style="text-align:right;font-weight:700;color:${colorForPct(d.tp!==null?100-d.tp:null)}">${pct(d.tp,d.n)!==null?pct(d.tp,d.n)+'%':'—'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  // Slope tab
+  document.getElementById('stab-slope').innerHTML = `
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Make % by Slope</div>
+    ${s.bySlope.map(sl=>brkHTML(sl.l,sl.mp,sl.n)).join('')}
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">3-Putt % by Slope</div>
+    ${s.bySlope.map(sl=>brkHTML(sl.l,sl.tp,sl.n)).join('')}`;
+
+  // Direction tab
+  document.getElementById('stab-dir').innerHTML = `
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Make % by Break</div>
+    ${s.byDir.map(d=>brkHTML(d.l,d.mp,d.n)).join('')}
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">3-Putt % by Break</div>
+    ${s.byDir.map(d=>brkHTML(d.l,d.tp,d.n)).join('')}`;
+
+  // Miss tab
+  const mt = s.mL+s.mS+s.mR;
+  document.getElementById('stab-miss').innerHTML = `
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Miss Side</div>
+    ${mt?brkHTML('◀ Left',pct(s.mL,mt),s.mL)+brkHTML('▶ Right',pct(s.mR,mt),s.mR)+brkHTML('▼ Short',pct(s.mS,mt),s.mS)
+       :'<p style="font-size:12px;color:#9ca3af">No miss data yet</p>'}
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">Miss by Break Direction</div>
+    ${s.byMissByDir.filter(d=>d.total>0).map(d=>`
+      <div class="brk">
+        <div class="brk-l" style="font-size:11px">${d.l}</div>
+        <div style="display:flex;gap:6px;flex:1">
+          <span class="tc tc-r" style="font-size:11px">◀${d.left}</span>
+          <span class="tc tc-y" style="font-size:11px">▶${d.right}</span>
+        </div>
+        <div style="font-size:10px;color:#d1d5db">(${d.total})</div>
+      </div>`).join('') || '<p style="font-size:12px;color:#9ca3af">No data yet</p>'}`;
+
+  // Variance tab
+  const av = s.byVar.filter(v=>v.n>0);
+  if (charts.var) charts.var.destroy();
+  charts.var = new Chart(document.getElementById('chart-var').getContext('2d'),{
+    type:'bar',
+    data:{labels:av.map(v=>v.v),
+      datasets:[{data:av.map(v=>v.n),backgroundColor:'#5eead4',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
+              x:{ticks:{font:{size:10}},grid:{display:false}}}}
+  });
+  document.getElementById('tbl-var').innerHTML = `
+    <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <thead><tr style="color:#9ca3af">
+        <th style="text-align:left;padding:3px 2px">Variance</th>
+        <th style="text-align:center;padding:3px 2px">Count</th>
+        <th style="text-align:right;padding:3px 2px">Make%</th>
+      </tr></thead>
+      <tbody>
+        ${s.byVar.filter(v=>v.n>0).map(v=>`
+          <tr style="border-top:1px solid #f3f4f6">
+            <td style="padding:4px 2px;font-weight:600;color:#374151">${v.v}</td>
+            <td style="text-align:center;color:#9ca3af">${v.n}</td>
+            <td style="text-align:right;font-weight:700;color:${colorForPct(v.mp)}">${v.mp!==null?v.mp+'%':'—'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:16px 0 10px;letter-spacing:.05em">Short vs Long by Distance</div>
+    ${s.varByDist.filter(d=>d.n>0).map(d=>varCrossHTML(d.b,d.shortPct,d.longPct,d.n)).join('')||'<p style="font-size:12px;color:#9ca3af">No variance data yet</p>'}
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:14px 0 10px;letter-spacing:.05em">Short vs Long by Slope</div>
+    ${s.varBySlope.filter(d=>d.n>0).map(d=>varCrossHTML(d.l,d.shortPct,d.longPct,d.n)).join('')||'<p style="font-size:12px;color:#9ca3af">No variance data yet</p>'}
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:14px 0 10px;letter-spacing:.05em">Short vs Long by Break</div>
+    ${s.varByDir.filter(d=>d.n>0).map(d=>varCrossHTML(d.l,d.shortPct,d.longPct,d.n)).join('')||'<p style="font-size:12px;color:#9ca3af">No variance data yet</p>'}`;
+
+  // Trend
+  if (charts.trend) charts.trend.destroy();
+  const td = rounds.slice().reverse().map((r,i)=>({
+    l: r.course||(r.date.slice(5)),
+    v: r.holes.reduce((s,h)=>s+parseInt(h.numPutts),0)
+  }));
+  charts.trend = new Chart(document.getElementById('chart-trend').getContext('2d'),{
+    type:'line',
+    data:{labels:td.map(t=>t.l),
+      datasets:[{data:td.map(t=>t.v),borderColor:'#003A72',backgroundColor:'rgba(0,58,114,.1)',
+        tension:.3,fill:true,pointBackgroundColor:'#003A72',pointRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
+              x:{ticks:{font:{size:10},maxRotation:30},grid:{display:false}}}}
+  });
+}
+
+// ═══════════════════════════════════════
+//  INSIGHTS ENGINE
+// ═══════════════════════════════════════
+
+function generateInsights(rounds) {
+  const MIN_N  = 5;    // min putts in a subset to flag
+  const MIN_Z  = 0.75; // min z-score threshold
+
+  const allHoles  = rounds.flatMap(r => (r.holes||[]).filter(h => h.numPutts));
+  const misses    = allHoles.filter(h => parseInt(h.numPutts) >= 2 && h.missDirection && h.missDirection !== 'made');
+  const varHoles    = allHoles.filter(h => h.variance && parseInt(h.numPutts) >= 2);
+  const varOldHoles = varHoles.filter(h => SHORT_VAR.includes(h.variance) || LONG_VAR.includes(h.variance));
+
+  const SHORT_DIST = new Set(['1-3','4-6']);
+  const MID_DIST   = new Set(['7-10','11-15']);
+  const LONG_DIST  = new Set(['16-20','21-30','30-50','50+']);
+  const distGroups = [
+    { label:'short putts (≤6ft)',       set:SHORT_DIST, key:'short' },
+    { label:'mid-range putts (7–15ft)', set:MID_DIST,   key:'mid'   },
+    { label:'long putts (16ft+)',        set:LONG_DIST,  key:'long'  },
+  ];
+
+  // One-sample z-test (used for overall-bias analyses with theoretical base rates)
+  function zt(subCount, subN, baseRate) {
+    if (subN < MIN_N || baseRate <= 0.01 || baseRate >= 0.99) return 0;
+    const se = Math.sqrt(baseRate * (1-baseRate) / subN);
+    return se === 0 ? 0 : (subCount/subN - baseRate) / se;
+  }
+
+  // Two-sample z-test: is group A's rate significantly higher than group B's?
+  // Used for category comparisons (subset vs complement) to avoid baseline contamination.
+  function zt2(n1, N1, n2, N2) {
+    if (N1 < MIN_N || N2 < 3) return 0;
+    const pPool = (n1+n2)/(N1+N2);
+    if (pPool <= 0.01 || pPool >= 0.99) return 0;
+    const se = Math.sqrt(pPool*(1-pPool)*(1/N1+1/N2));
+    return se === 0 ? 0 : (n1/N1 - n2/N2) / se;
+  }
+
+  // Complement helper: rate + count for everything in pool NOT matching excludeFn.
+  function comp(pool, excludeFn, countFn) {
+    const c = pool.filter(h => !excludeFn(h));
+    if (!c.length) return { rate: 0, n: 0, count: 0 };
+    const count = c.filter(countFn).length;
+    return { rate: count / c.length, n: c.length, count };
+  }
+
+  const insights = [];
+  function add(z, emoji, title, stat, rec, breakdown = []) {
+    if (z < MIN_Z) return;   // only flag when subset is meaningfully WORSE than average
+    insights.push({ z, emoji, title, stat, rec, breakdown });
+  }
+
+  // ── Breakdown helper ────────────────────────────────────
+  // For any insight on a sub-pool, split further by slope / distance / direction.
+  // Each sub-split is z-tested against parentRate so only statistically meaningful
+  // differences surface. Returns ≤4 items sorted by |z|.
+  function bd(pool, testFn, parentRate) {
+    // Two-gate filter: z ≥ MIN_BD_Z AND |delta| ≥ MIN_BD_DELTA.
+    // z threshold is lower than main insights so secondary splits surface with small n.
+    const MIN_BD_N = 3, MIN_BD_Z = 0.4, MIN_BD_DELTA = 0.08;
+    const bdZt = (n, N, base) => {
+      if (N < MIN_BD_N || base <= 0.01 || base >= 0.99) return 0;
+      const se = Math.sqrt(base*(1-base)/N);
+      return se === 0 ? 0 : (n/N - base)/se;
+    };
+    const items = [];
+    const tryAdd = (sub, label) => {
+      if (sub.length < MIN_BD_N) return;
+      const n = sub.filter(testFn).length;
+      const rate = n / sub.length, delta = rate - parentRate;
+      const z = bdZt(n, sub.length, parentRate);
+      if (Math.abs(z) < MIN_BD_Z || Math.abs(delta) < MIN_BD_DELTA) return;
+      items.push({ label, rate, n: sub.length, delta, z: Math.abs(z) });
+    };
+    SLOPE_OPTS.forEach(s =>
+      tryAdd(pool.filter(h => h.slope === s.v), s.l.replace(' putts','')));
+    distGroups.forEach(dg => {
+      const lbl = dg.key==='short' ? 'Short ≤6ft' : dg.key==='mid' ? 'Mid 7-15ft' : 'Long 16ft+';
+      tryAdd(pool.filter(h => dg.set.has(h.length)), lbl);
+    });
+    DIR_OPTS.forEach(dir =>
+      tryAdd(pool.filter(h => h.direction === dir.v), dir.l.replace(' putts','')));
+    return items.sort((a,b) => b.z - a.z).slice(0,4); // top 4 by significance
+  }
+
+  // ── MISS DIRECTION ANALYSES ────────────────────────────
+  if (misses.length >= MIN_N) {
+    const bL = misses.filter(h=>h.missDirection==='left').length  / misses.length;
+    const bR = misses.filter(h=>h.missDirection==='right').length / misses.length;
+    const bS = misses.filter(h=>h.missDirection==='short').length / misses.length;
+
+    // Overall bias (needs more data to be meaningful)
+    if (misses.length >= 10) {
+      const nL=misses.filter(h=>h.missDirection==='left').length;
+      const nR=misses.filter(h=>h.missDirection==='right').length;
+      const nS=misses.filter(h=>h.missDirection==='short').length;
+      if (nL/misses.length > 0.55) add(zt(nL,misses.length,0.33),'◀',
+        'Overall miss tendency: left',
+        `${pct(nL,misses.length)}% of all missed putts go left (${nL}/${misses.length})`,
+        'A consistent left miss points to a closed putter face at impact. Check your grip pressure and ensure the face is square at address. Drill: practice with a coin just outside your right edge.');
+
+      if (nR/misses.length > 0.55) add(zt(nR,misses.length,0.33),'▶',
+        'Overall miss tendency: right',
+        `${pct(nR,misses.length)}% of all missed putts go right (${nR}/${misses.length})`,
+        'A consistent right miss often means an open face or a push stroke. Focus on keeping the putter face square through impact and your follow-through on line.');
+
+      if (nS/misses.length > 0.45) add(zt(nS,misses.length,0.25),'▼',
+        'Frequently leaving putts short',
+        `${pct(nS,misses.length)}% of missed putts don\'t reach the hole (${nS}/${misses.length})`,
+        '"Never up, never in." Add 10–15% more pace to your stroke. On the practice green, aim to finish every putt at least 12 inches past the hole.');
+    }
+
+    // By SLOPE (compare each slope against all OTHER slopes)
+    SLOPE_OPTS.forEach(s => {
+      const sub = misses.filter(h=>h.slope===s.v);
+      if (sub.length < MIN_N) return;
+      const nL=sub.filter(h=>h.missDirection==='left').length;
+      const nR=sub.filter(h=>h.missDirection==='right').length;
+      const nS=sub.filter(h=>h.missDirection==='short').length;
+      const cL=comp(misses,h=>h.slope===s.v,h=>h.missDirection==='left');
+      const cR=comp(misses,h=>h.slope===s.v,h=>h.missDirection==='right');
+      const cS=comp(misses,h=>h.slope===s.v,h=>h.missDirection==='short');
+
+      add(zt2(nL,sub.length,cL.count,cL.n),'◀',
+        `Missing left on ${s.l} putts`,
+        `${pct(nL,sub.length)}% miss-left on ${s.v} putts (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
+        s.v==='down' ? 'Downhill putts break more aggressively — the slope pulls the ball further than it looks. Aim further right and trust the slope to bring it back.'
+        : s.v==='up' ? 'Check your alignment on uphill putts — you may be setting up slightly left without realising.'
+        : 'Your stroke is pulling left on flat putts. Focus on keeping the putter face square through impact.',
+        bd(sub, h=>h.missDirection==='left', nL/sub.length));
+
+      add(zt2(nR,sub.length,cR.count,cR.n),'▶',
+        `Missing right on ${s.l} putts`,
+        `${pct(nR,sub.length)}% miss-right on ${s.v} putts (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
+        s.v==='up' ? 'Uphill putts played firmly can push the face right. Aim slightly left and maintain smooth acceleration.'
+        : s.v==='down' ? 'Decelerating on downhill putts often causes a push-right. Commit to a smooth, controlled stroke.'
+        : 'Your stroke is pushing right on flat putts. Check your stroke path and face angle at impact.',
+        bd(sub, h=>h.missDirection==='right', nR/sub.length));
+
+      add(zt2(nS,sub.length,cS.count,cS.n),'▼',
+        `Leaving ${s.l} putts short of the hole`,
+        `${pct(nS,sub.length)}% short misses on ${s.v} putts (${nS}/${sub.length}) vs ${Math.round(cS.rate*100)}% on all other putts`,
+        s.v==='up' ? 'Uphill putts need more pace than they look — the slope kills momentum. Aim 18 inches past the hole.'
+        : s.v==='down' ? 'Leaving downhill putts short suggests deceleration — trust the slope and commit to the stroke.'
+        : 'Add a bit more pace on flat putts — aim for 12 inches past the hole minimum.',
+        bd(sub, h=>h.missDirection==='short', nS/sub.length));
+    });
+
+    // By BREAK DIRECTION (compare each direction vs all other directions)
+    DIR_OPTS.forEach(d => {
+      const sub = misses.filter(h=>h.direction===d.v);
+      if (sub.length < MIN_N) return;
+      const nL=sub.filter(h=>h.missDirection==='left').length;
+      const nR=sub.filter(h=>h.missDirection==='right').length;
+      const cL=comp(misses,h=>h.direction===d.v,h=>h.missDirection==='left');
+      const cR=comp(misses,h=>h.direction===d.v,h=>h.missDirection==='right');
+
+      // "Missing with the break" (very common pattern)
+      if (d.v==='r-to-l') {
+        add(zt2(nL,sub.length,cL.count,cL.n),'↖',
+          'Missing with the break on R→L putts',
+          `${pct(nL,sub.length)}% miss left on R→L putts (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
+          'You\'re over-playing the break on right-to-left putts. Try firming up your stroke — a more aggressive pace reduces how much the ball moves off line.',
+          bd(sub, h=>h.missDirection==='left', nL/sub.length));
+        add(zt2(nR,sub.length,cR.count,cR.n),'↖',
+          'Missing against the break on R→L putts',
+          `${pct(nR,sub.length)}% miss right on R→L putts (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
+          'You\'re under-reading the break on right-to-left putts. Play more break than feels natural — aim further left and let the slope do the work.',
+          bd(sub, h=>h.missDirection==='right', nR/sub.length));
+      }
+      if (d.v==='l-to-r') {
+        add(zt2(nR,sub.length,cR.count,cR.n),'↗',
+          'Missing with the break on L→R putts',
+          `${pct(nR,sub.length)}% miss right on L→R putts (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
+          'You\'re over-playing the break on left-to-right putts. Firm up your stroke — more pace holds the line and reduces the break effect.',
+          bd(sub, h=>h.missDirection==='right', nR/sub.length));
+        add(zt2(nL,sub.length,cL.count,cL.n),'↗',
+          'Missing against the break on L→R putts',
+          `${pct(nL,sub.length)}% miss left on L→R putts (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
+          'You\'re under-reading the break on left-to-right putts. Play more break — aim further right than feels comfortable.',
+          bd(sub, h=>h.missDirection==='left', nL/sub.length));
+      }
+    });
+
+    // By DISTANCE GROUP (compare each band vs all other distances)
+    distGroups.forEach(dg => {
+      const sub = misses.filter(h=>dg.set.has(h.length));
+      if (sub.length < MIN_N) return;
+      const nL=sub.filter(h=>h.missDirection==='left').length;
+      const nR=sub.filter(h=>h.missDirection==='right').length;
+      const nS=sub.filter(h=>h.missDirection==='short').length;
+      const cL=comp(misses,h=>dg.set.has(h.length),h=>h.missDirection==='left');
+      const cR=comp(misses,h=>dg.set.has(h.length),h=>h.missDirection==='right');
+      const cS=comp(misses,h=>dg.set.has(h.length),h=>h.missDirection==='short');
+
+      add(zt2(nL,sub.length,cL.count,cL.n),'◀',
+        `Missing left on ${dg.label}`,
+        `${pct(nL,sub.length)}% miss left on ${dg.label} (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
+        dg.key==='short' ? 'On short putts a tiny degree of face angle matters enormously. Slow down, align carefully, and make a controlled stroke with no hand action.'
+        : dg.key==='long' ? 'On long putts the stroke naturally pulls left when tired. Focus on a balanced stance and a straight-back, straight-through path.'
+        : 'Check your aim routine on mid-range putts — you may be misaligning without realising.',
+        bd(sub, h=>h.missDirection==='left', nL/sub.length));
+
+      add(zt2(nR,sub.length,cR.count,cR.n),'▶',
+        `Missing right on ${dg.label}`,
+        `${pct(nR,sub.length)}% miss right on ${dg.label} (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
+        dg.key==='short' ? 'Short right misses often come from decelerating through the stroke. Commit to a smooth, firm finish — the putter should reach at least as far as the backswing.'
+        : 'Check your stroke path — you may be cutting across the ball on these lengths. Practice with an alignment stick as a gate.',
+        bd(sub, h=>h.missDirection==='right', nR/sub.length));
+
+      if (dg.key!=='short') add(zt2(nS,sub.length,cS.count,cS.n),'▼',
+        `Leaving ${dg.label} short`,
+        `${pct(nS,sub.length)}% short on ${dg.label} (${nS}/${sub.length}) vs ${Math.round(cS.rate*100)}% on all other putts`,
+        dg.key==='long' ? 'On long putts aim to roll the ball 12–18 inches past the hole. Short lag putts leave you difficult second putts — be more aggressive with pace.'
+        : 'On mid-range putts be more committed — these should reach the hole minimum. A short putt can\'t go in.',
+        bd(sub, h=>h.missDirection==='short', nS/sub.length));
+    });
+  }
+
+  // ── VARIANCE (PACE) ANALYSES ───────────────────────────
+
+  // Old format: short/long directional analysis
+  if (varOldHoles.length >= MIN_N) {
+    SLOPE_OPTS.forEach(s => {
+      const sub = varOldHoles.filter(h=>h.slope===s.v);
+      if (sub.length < MIN_N) return;
+      const nS=sub.filter(h=>SHORT_VAR.includes(h.variance)).length;
+      const nL=sub.filter(h=>LONG_VAR.includes(h.variance)).length;
+      const cSh=comp(varOldHoles,h=>h.slope===s.v,h=>SHORT_VAR.includes(h.variance));
+      const cLo=comp(varOldHoles,h=>h.slope===s.v,h=>LONG_VAR.includes(h.variance));
+      add(zt2(nS,sub.length,cSh.count,cSh.n),'📉',
+        `Consistently short on ${s.l} putts`,
+        `${pct(nS,sub.length)}% of ${s.v} putts end up short (${nS}/${sub.length}) vs ${Math.round(cSh.rate*100)}% on all other putts`,
+        s.v==='up' ? 'Uphill putts die quickly — add noticeably more pace; aim for 18 inches past.'
+        : s.v==='down' ? 'Leaving downhill putts short means you\'re decelerating. Trust the slope through the ball.'
+        : 'Add a little more pace and aim for the ball to finish 12 inches past.',
+        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length));
+      add(zt2(nL,sub.length,cLo.count,cLo.n),'📈',
+        `Running past the hole on ${s.l} putts`,
+        `${pct(nL,sub.length)}% of ${s.v} putts run long (${nL}/${sub.length}) vs ${Math.round(cLo.rate*100)}% on all other putts`,
+        s.v==='down' ? 'Shorter backswing, let gravity do the work. Think "dead weight" — just reach the hole.'
+        : 'Ease off the pace — aim to finish 12 inches past maximum.',
+        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length));
+    });
+    distGroups.forEach(dg => {
+      const sub = varOldHoles.filter(h=>dg.set.has(h.length));
+      if (sub.length < MIN_N) return;
+      const nS=sub.filter(h=>SHORT_VAR.includes(h.variance)).length;
+      const nL=sub.filter(h=>LONG_VAR.includes(h.variance)).length;
+      const cSh=comp(varOldHoles,h=>dg.set.has(h.length),h=>SHORT_VAR.includes(h.variance));
+      const cLo=comp(varOldHoles,h=>dg.set.has(h.length),h=>LONG_VAR.includes(h.variance));
+      if (dg.key!=='short') add(zt2(nS,sub.length,cSh.count,cSh.n),'📉',
+        `Leaving ${dg.label} short`,
+        `${pct(nS,sub.length)}% of ${dg.label} end up short (${nS}/${sub.length}) vs ${Math.round(cSh.rate*100)}% on all other putts`,
+        dg.key==='long' ? 'Focus purely on speed from long range — not direction.'
+        : 'Be more committed — aim for 12 inches past the hole minimum.',
+        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length));
+      add(zt2(nL,sub.length,cLo.count,cLo.n),'📈',
+        `Running ${dg.label} well past the hole`,
+        `${pct(nL,sub.length)}% of ${dg.label} run long (${nL}/${sub.length}) vs ${Math.round(cLo.rate*100)}% on all other putts`,
+        dg.key==='long' ? 'Running long lag putts past leaves difficult come-backers. Practice "die at the hole" pace.'
+        : 'You may be over-accelerating. Focus on smooth, controlled tempo.',
+        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length));
+    });
+  }
+
+  // ── 3-PUTT RATE ANALYSES ───────────────────────────────
+  if (allHoles.length >= MIN_N) {
+    const base3 = allHoles.filter(h=>parseInt(h.numPutts)>=3).length / allHoles.length;
+    if (base3 > 0.02) {
+      const is3putt = h => parseInt(h.numPutts) >= 3;
+      // 3-putt: compare each category vs all other putts in that dimension
+      SLOPE_OPTS.forEach(s => {
+        const sub = allHoles.filter(h=>h.slope===s.v);
+        if (sub.length < MIN_N) return;
+        const n3 = sub.filter(is3putt).length;
+        const c3 = comp(allHoles,h=>h.slope===s.v,is3putt);
+        add(zt2(n3,sub.length,c3.count,c3.n),'🎯',
+          `High 3-putt rate on ${s.l} putts`,
+          `${pct(n3,sub.length)}% 3-putt rate on ${s.v} putts (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
+          s.v==='down' ? 'Downhill 3-putts are painful. Treat every long downhill putt as a "guaranteed 2-putt challenge" — speed first, get it close, then make the short one.'
+          : s.v==='up'   ? 'Uphill 3-putts suggest your lag pace is off. Focus on getting uphill lag putts within a 3-foot circle — direction matters less than distance.'
+          : 'Work on lag putting on flat surfaces. Set a 3-foot circle target and practice getting every putt inside it.',
+          bd(sub, is3putt, n3/sub.length));
+      });
+
+      distGroups.forEach(dg => {
+        const sub = allHoles.filter(h=>dg.set.has(h.length));
+        if (sub.length < MIN_N) return;
+        const n3 = sub.filter(is3putt).length;
+        const c3 = comp(allHoles,h=>dg.set.has(h.length),is3putt);
+        add(zt2(n3,sub.length,c3.count,c3.n),'🎯',
+          `High 3-putt rate on ${dg.label}`,
+          `${pct(n3,sub.length)}% 3-putt rate on ${dg.label} (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
+          dg.key==='long' ? 'Long-range 3-putts are mostly a pace problem. Practice "speed golf" — from 30ft, putt 10 balls with eyes closed to feel the distance. Speed before direction.'
+          : dg.key==='mid' ? 'Mid-range 3-putts are costly and avoidable. These should be conversion putts — focus on smooth tempo, centred face contact and a committed line.'
+          : 'Three-putting from close range points to a mental or technical issue. Slow down your routine on short putts and make sure you\'re aligned correctly.',
+          bd(sub, is3putt, n3/sub.length));
+      });
+
+      DIR_OPTS.forEach(d => {
+        const sub = allHoles.filter(h=>h.direction===d.v);
+        if (sub.length < MIN_N) return;
+        const n3 = sub.filter(is3putt).length;
+        const c3 = comp(allHoles,h=>h.direction===d.v,is3putt);
+        add(zt2(n3,sub.length,c3.count,c3.n),'🎯',
+          `High 3-putt rate on ${d.l} putts`,
+          `${pct(n3,sub.length)}% 3-putt rate on ${d.v} putts (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
+          `Lag putting on ${d.v==='l-to-r'?'L→R':d.v==='r-to-l'?'R→L':'straight'} putts needs work. Focus on pace control to leave yourself inside 3 feet — think about where the ball will end up, not the hole.`,
+          bd(sub, is3putt, n3/sub.length));
+      });
+    }
+  }
+
+  // Sort by z-score (highest first), de-duplicate very similar titles, take top 8
+  insights.sort((a,b) => b.z - a.z);
+  const seen = new Set();
+  const deduped = insights.filter(ins => {
+    const key = ins.title.slice(0,30);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return {
+    insights: deduped.slice(0, 8),
+    totalHoles: allHoles.length,
+    totalRounds: rounds.length,
+    totalMisses: misses.length,
+  };
+}
+
+function renderInsights() {
+  const container = document.getElementById('view-insights');
+  const rounds = loadRounds();
+
+  if (!rounds.length) {
+    container.innerHTML = `
+    <div style="text-align:center;padding:60px 16px;color:#9ca3af">
+      <div style="font-size:52px">💡</div>
+      <p style="font-weight:600;color:#374151;margin:8px 0 4px">No data yet</p>
+      <p style="font-size:13px">Complete a round to start getting insights</p>
+      <button onclick="showMain('round')" style="margin-top:16px;background:#003A72;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
+    </div>`;
+    return;
+  }
+
+  const result = generateInsights(rounds);
+
+  if (result.totalHoles < 15) {
+    container.innerHTML = `
+    <div style="padding:16px">
+      <div style="background:#fff;border-radius:16px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+        <div style="font-size:40px;margin-bottom:10px">📊</div>
+        <p style="font-weight:700;color:#374151;margin-bottom:6px">Building your profile…</p>
+        <p style="font-size:13px;color:#9ca3af;line-height:1.5">${result.totalHoles} putts tracked across ${result.totalRounds} round${result.totalRounds!==1?'s':''}.<br>Need around 30+ putts for meaningful patterns.</p>
+      </div>
+    </div>`;
+    return;
+  }
+
+  const { insights, totalHoles, totalRounds, totalMisses } = result;
+
+  if (!insights.length) {
+    container.innerHTML = `
+    <div style="padding:16px">
+      <div style="background:#fff;border-radius:16px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+        <div style="font-size:40px;margin-bottom:10px">✅</div>
+        <p style="font-weight:700;color:#374151;margin-bottom:6px">No significant patterns found</p>
+        <p style="font-size:13px;color:#9ca3af;line-height:1.5">Your putting is consistent across all conditions — great sign! Keep adding rounds for more granular analysis.</p>
+      </div>
+    </div>`;
+    return;
+  }
+
+  function impactStyle(z) {
+    if (z >= 2.5) return { label:'HIGH IMPACT', bg:'#fef2f2', border:'#fca5a5', badgeBg:'#dc2626', badgeText:'#fff' };
+    if (z >= 1.5) return { label:'MEDIUM',      bg:'#fffbeb', border:'#fcd34d', badgeBg:'#d97706', badgeText:'#fff' };
+    return              { label:'NOTE',          bg:'#eff6ff', border:'#bfdbfe', badgeBg:'#3b82f6', badgeText:'#fff' };
+  }
+
+  container.innerHTML = `
+  <div style="padding:14px;padding-bottom:calc(20px + env(safe-area-inset-bottom))">
+
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:14px">
+      Based on ${totalHoles} putts · ${totalRounds} round${totalRounds!==1?'s':''} · sorted by statistical weight
+    </div>
+
+    ${insights.map((ins, i) => {
+      const st = impactStyle(ins.z);
+      const pctBar = Math.min(100, Math.round((ins.z / 4) * 100));
+      return `
+      <div style="background:${st.bg};border-radius:16px;padding:16px;margin-bottom:12px;
+                  border:1.5px solid ${st.border};box-shadow:0 1px 4px rgba(0,0,0,.06)">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="background:${st.badgeBg};color:${st.badgeText};border-radius:6px;
+                        padding:3px 9px;font-size:10px;font-weight:800;letter-spacing:.05em">${st.label}</div>
+            <div style="font-size:10px;color:#9ca3af">#${i+1} of ${insights.length}</div>
+          </div>
+          <div style="font-size:10px;color:#9ca3af">sig: ${ins.z.toFixed(1)}σ</div>
+        </div>
+
+        <div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:8px;line-height:1.3">
+          ${ins.emoji} ${ins.title}
+        </div>
+
+        <div style="background:rgba(255,255,255,0.7);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+          <div style="font-size:12px;color:#374151;line-height:1.5;margin-bottom:6px">${ins.stat}</div>
+          <div style="height:4px;background:#e5e7eb;border-radius:2px">
+            <div style="height:100%;border-radius:2px;background:${st.badgeBg};width:${pctBar}%;transition:width .4s"></div>
+          </div>
+        </div>
+
+        ${ins.breakdown && ins.breakdown.length ? `
+        <div style="margin-bottom:10px">
+          <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase">Where it's worst / best</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${ins.breakdown.map(b => `
+            <div style="background:${b.delta > 0 ? '#fff1f2' : '#f0f5fb'};
+                        border:1.5px solid ${b.delta > 0 ? '#fecaca' : '#c5d8ef'};
+                        border-radius:8px;padding:5px 10px;
+                        display:flex;flex-direction:column;align-items:center;min-width:0">
+              <span style="font-size:9px;color:#6b7280;text-align:center;line-height:1.3;white-space:nowrap">${b.label}</span>
+              <span style="font-size:13px;font-weight:800;color:${b.delta > 0 ? '#dc2626' : '#16a34a'};line-height:1.4">
+                ${Math.round(b.rate*100)}%${b.delta > 0 ? '▲' : '▼'}
+              </span>
+              <span style="font-size:9px;color:#9ca3af">${b.n} putts</span>
+            </div>`).join('')}
+          </div>
+        </div>` : ''}
+
+        <div style="font-size:12px;color:#1f2937;line-height:1.6">
+          <span style="font-weight:800;color:#002855">💡 Fix: </span>${ins.rec}
+        </div>
+      </div>`;
+    }).join('')}
+
+    <div style="font-size:11px;color:#9ca3af;text-align:center;line-height:1.6;margin-top:4px">
+      Patterns with fewer than 5 observations are excluded.<br>
+      σ = standard deviations from your baseline (higher = more significant).
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════
+//  HISTORY
+// ═══════════════════════════════════════
+let modalRoundId = null;
+
+function exportCSV() {
+  const rounds = loadRounds();
+  if (!rounds.length) { alert('No rounds to export yet.'); return; }
+  const headers = ['Date','Course','Hole','Length','Slope','Direction','Putts','Variance','Miss','GIR'];
+  const rows = rounds.flatMap(r => r.holes.map(h => [
+    r.date, r.course||'', h.n, h.length ? h.length+'ft' : '', h.slope||'', h.direction||'',
+    h.numPutts||'', varDisplay(h.variance)||h.variance||'', h.missDirection||'', h.gir||''
+  ]));
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
+    .join('\n');
+  // Use Blob download (works iOS 13+); Safari opens in viewer where user can Share → Files
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `putts-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function renderHistory() {
+  const rounds = loadRounds();
+  document.getElementById('hist-empty').style.display = rounds.length ? 'none' : 'block';
+  document.getElementById('hist-list').innerHTML = rounds.map(r=>{
+    const s = computeStats(r.holes);
+    if (!s) return '';
+    const dt = new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return `
+    <div class="hcard" onclick="openModal('${r.id}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#1f2937">${r.course||'Round'}</div>
+          <div style="font-size:11px;color:#9ca3af;margin-top:2px">${dt} · ${s.n} holes</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:22px;font-weight:800;color:#003A72">${s.makesPct}%</div>
+          <div style="font-size:10px;color:#9ca3af">make rate</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:12px;color:#6b7280">
+        <span>🏌️ ${s.avgPutts}/hole</span>
+        <span style="color:${parseInt(s.threePct)>15?'#f59e0b':'#6b7280'}">⚠ 3-putt ${s.threePct}%</span>
+        ${s.puttsPerGir?`<span>🟢 ${s.puttsPerGir}/GIR</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openModal(id) {
+  const rounds = loadRounds();
+  const r = rounds.find(r=>r.id===id);
+  if (!r) return;
+  modalRoundId = id;
+  const s = computeStats(r.holes);
+  const dt = new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('modal-title').textContent = r.course||dt;
+  document.getElementById('modal-body').innerHTML = `
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">${dt} · ${s.n} holes</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:#003A72">${s.makesPct}%</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase">Make</div>
+      </div>
+      <div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:#f59e0b">${s.threePct}%</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase">3-Putt</div>
+      </div>
+      <div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:#3b82f6">${s.puttsPerGir??'—'}</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase">P/GIR</div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Hole Detail</div>
+    <div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="color:#9ca3af;border-bottom:1px solid #f3f4f6">
+          <th style="text-align:left;padding:4px 2px">H</th>
+          <th style="padding:4px 3px">Len</th><th style="padding:4px 3px">Slp</th>
+          <th style="padding:4px 3px">Dir</th><th style="padding:4px 3px">Pts</th>
+          <th style="padding:4px 3px">Var</th><th style="padding:4px 3px">Miss</th>
+          <th style="padding:4px 3px">GIR</th>
+        </tr></thead>
+        <tbody>
+          ${r.holes.map(h=>{
+            const p=parseInt(h.numPutts);
+            const pc=p===1?'tc-g':p>=3?'tc-r':'tc-y';
+            return `<tr style="border-bottom:1px solid #f9fafb">
+              <td style="padding:4px 2px;color:#9ca3af;font-weight:600">H${h.n}</td>
+              <td style="text-align:center;padding:4px 3px"><span class="tc tc-d">${h.length||'·'}</span></td>
+              <td style="text-align:center;padding:4px 3px">${slopeIcon(h.slope)}</td>
+              <td style="text-align:center;padding:4px 3px">${dirIcon(h.direction)}</td>
+              <td style="text-align:center;padding:4px 3px"><span class="tc ${pc}">${h.numPutts}</span></td>
+              <td style="text-align:center;padding:4px 3px"><span class="tc tc-b">${varDisplay(h.variance)||'·'}</span></td>
+              <td style="text-align:center;padding:4px 3px">${h.missDirection ? missIcon(h.missDirection) : (p>=2?'—':'·')}</td>
+              <td style="text-align:center;padding:4px 3px"><span class="tc ${h.gir==='yes'?'tc-g':'tc-d'}">${h.gir==='yes'?'Y':'N'}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  document.getElementById('modal-wrap').style.display = 'flex';
+}
+
+function closeModal(e) { if(e.target===document.getElementById('modal-wrap')) closeModalBtn(); }
+function closeModalBtn() { document.getElementById('modal-wrap').style.display='none'; modalRoundId=null; }
+function confirmDelete() {
+  if (!modalRoundId) return;
+  if (!confirm('Delete this round?')) return;
+  saveRounds(loadRounds().filter(r=>r.id!==modalRoundId));
+  closeModalBtn(); renderHistory();
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+showMain('dashboard');
+
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
