@@ -1394,22 +1394,22 @@ function generateInsights(rounds) {
     const bR = misses.filter(h=>h.missDirection==='right').length / misses.length;
     const bS = misses.filter(h=>h.missDirection==='short').length / misses.length;
 
-    // Overall bias (needs more data to be meaningful)
+    // Overall bias
     if (misses.length >= 10) {
       const nL=misses.filter(h=>h.missDirection==='left').length;
       const nR=misses.filter(h=>h.missDirection==='right').length;
       const nS=misses.filter(h=>h.missDirection==='short').length;
-      if (nL/misses.length > 0.55) add(zt(nL,misses.length,0.33),'◀',
+      add(zt(nL,misses.length,0.33),'◀',
         'Overall miss tendency: left',
         `${pct(nL,misses.length)}% of all missed putts go left (${nL}/${misses.length})`,
         'A consistent left miss points to a closed putter face at impact. Check your grip pressure and ensure the face is square at address. Drill: practice with a coin just outside your right edge.');
 
-      if (nR/misses.length > 0.55) add(zt(nR,misses.length,0.33),'▶',
+      add(zt(nR,misses.length,0.33),'▶',
         'Overall miss tendency: right',
         `${pct(nR,misses.length)}% of all missed putts go right (${nR}/${misses.length})`,
         'A consistent right miss often means an open face or a push stroke. Focus on keeping the putter face square through impact and your follow-through on line.');
 
-      if (nS/misses.length > 0.45) add(zt(nS,misses.length,0.25),'▼',
+      add(zt(nS,misses.length,0.25),'▼',
         'Frequently leaving putts short',
         `${pct(nS,misses.length)}% of missed putts don\'t reach the hole (${nS}/${misses.length})`,
         '"Never up, never in." Add 10–15% more pace to your stroke. On the practice green, aim to finish every putt at least 12 inches past the hole.');
