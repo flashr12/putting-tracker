@@ -501,14 +501,24 @@ const LONG_VAR    = ['+1','+3','+5','>+6','>+7'];   // ran past hole
 const SLOPE_OPTS  = [{v:'flat',l:'— Flat'},{v:'up',l:'⬆ Up'},{v:'down',l:'⬇ Down'}];
 const DIR_OPTS    = [{v:'straight',l:'↑ Str'},{v:'l-to-r',l:'↗ L→R'},{v:'r-to-l',l:'↖ R→L'}];
 const NUM_OPTS    = ['1','2','3','4+'];
-const MISS_OPTS   = [{v:'left',l:'◀ Left'},{v:'short',l:'▼ Short'},{v:'made',l:'✓ Made'},{v:'right',l:'▶ Right'}];
+const MISS_OPTS   = [{v:'left',l:'◀ Left'},{v:'right',l:'▶ Right'},{v:'short',l:'▼ Short'},{v:'long',l:'▲ Long'},{v:'made',l:'✓ Made'}];
 const GIR_OPTS    = [{v:'yes',l:'✓ Yes'},{v:'no',l:'✗ No'}];
 const STORAGE_KEY = 'putttrack_v3';
 
 // ═══════════════════════════════════════
 //  STORAGE
 // ═══════════════════════════════════════
-function loadRounds()   { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]; } catch { return []; } }
+function loadRounds()   {
+  try {
+    const rounds = JSON.parse(localStorage.getItem(STORAGE_KEY))||[];
+    // Migrate any 'straight' records written during a brief schema change back to 'short'
+    // (short = on the right line but under-hit; long = on the right line but over-hit)
+    rounds.forEach(r => (r.holes||[]).forEach(h => {
+      if (h.missDirection === 'straight') h.missDirection = 'short';
+    }));
+    return rounds;
+  } catch { return []; }
+}
 function saveRounds(r)  { localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
 
 // Draft round (auto-saved after every chip tap so Safari crashes don't lose data)
@@ -535,8 +545,9 @@ function isHoleDone(h) {
   return !!(h.variance && h.missDirection); // 2+ putts need variance + miss direction
 }
 
-function varDisplay(v) {
-  if (!v || v === '0') return null; // 1-putt: no variance to show
+function varDisplay(v, missDirection) {
+  if (!v) return null;
+  if (v === '0') return (missDirection && missDirection !== 'made') ? '±0' : null;
   return v; // signed value ('<-6', '-1', '+3', etc.)
 }
 
@@ -664,7 +675,7 @@ function buildHoleAccordionHTML(h, i) {
   const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
   const summaryChips = done ? [
     h.length, slopeIcon(h.slope), dirIcon(h.direction),
-    `${h.numPutts}pt`, varDisplay(h.variance),
+    `${h.numPutts}pt`, varDisplay(h.variance, h.missDirection),
     h.missDirection && h.missDirection !== 'made' ? missIcon(h.missDirection) : null,
     h.gir==='yes'?'GIR':''
   ].filter(Boolean).join(' · ') : '—';
@@ -773,10 +784,12 @@ function buildHoleFormHTML(h, i) {
   </div>`;
 
   // ── Table 3: GIR? × Miss direction ──────────────────────────────────────
-  // Rows = GIR Yes / No;  Columns = Left / Short / Made / Right
-  // 'Made' only selectable when numPutts = '1'
-  const MISS_COLS = [{v:'left',l:'◀ Left'},{v:'short',l:'▼ Short'},{v:'made',l:'✓ Made'},{v:'right',l:'▶ Right'}];
+  // Rows = GIR Yes / No;  Columns = Left | Right | Short | Long | Made
+  // 'Made' only selectable when numPutts=1. When variance='0' (pin-high miss), only Left/Right selectable.
+  const MISS_COLS = [{v:'left',l:'◀ Left'},{v:'right',l:'▶ Right'},{v:'short',l:'▼ Short'},{v:'long',l:'▲ Long'},{v:'made',l:'✓ Made'}];
   const GIR_ROWS  = [{v:'yes',l:'🟢 GIR'},{v:'no',l:'✗ No GIR'}];
+  const isPuttHoled   = h.numPutts === '1';
+  const isPacePerfect = h.variance === '0' && !isPuttHoled; // pin-high miss: only L/R valid
   const grid3 = `
   <div class="fl" style="margin-bottom:4px">
     <div class="fl-label">📍 GIR? / Miss Side</div>
@@ -794,10 +807,14 @@ function buildHoleFormHTML(h, i) {
             <td class="row-head">${g.l}</td>
             ${MISS_COLS.map(m => {
               const isMade = m.v === 'made';
-              const madeDisabled = isMade && h.numPutts && h.numPutts !== '1';
-              const sel = !madeDisabled && h.missDirection===m.v && h.gir===g.v;
-              const cls = `gcell${sel?' on':''}${madeDisabled?' disabled':''}`;
-              const click = madeDisabled ? '' : ` onclick="onGrid3(${i},'${m.v}','${g.v}')"`;
+              // 'Made' only valid for 1-putts
+              const madeDisabled = isMade && !isPuttHoled;
+              // Short/Long disabled when pin-high (variance=0); all miss dirs disabled when holed
+              const missDisabled = !isMade && (isPuttHoled || (isPacePerfect && (m.v==='short'||m.v==='long')));
+              const isDisabled = madeDisabled || missDisabled;
+              const sel = !isDisabled && h.missDirection===m.v && h.gir===g.v;
+              const cls = `gcell${sel?' on':''}${isDisabled?' disabled':''}`;
+              const click = isDisabled ? '' : ` onclick="onGrid3(${i},'${m.v}','${g.v}')"`;
               return `<td class="${cls}" id="gc3-${i}-${m.v}-${g.v}"${click}></td>`;
             }).join('')}
           </tr>`).join('')}
@@ -892,19 +909,38 @@ function onGrid1(hi, length, slope, dir) {
 function onGrid2(hi, numPutts, variance) {
   const h = AR.holes[hi];
   h.numPutts = numPutts; h.variance = variance;
-  // If switching away from 1-putt and 'made' was set, clear missDirection
-  if (numPutts !== '1' && h.missDirection === 'made') {
+  const isPuttHoled   = numPutts === '1';
+  const isPacePerfect = variance === '0' && !isPuttHoled; // pin-high miss: L/R only
+  // If switching to a missed putt and 'made' was set, clear missDirection
+  if (!isPuttHoled && h.missDirection === 'made') {
     h.missDirection = null; h.gir = null;
     const tbl3 = document.getElementById(`grid3-${hi}`);
     if (tbl3) tbl3.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
   }
-  // Toggle Made cell disabled state in Table 3
+  // If switching to a 1-putt and a miss direction was set, clear it
+  if (isPuttHoled && h.missDirection && h.missDirection !== 'made') {
+    h.missDirection = null; h.gir = null;
+    const tbl3 = document.getElementById(`grid3-${hi}`);
+    if (tbl3) tbl3.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+  }
+  // If switching to pin-high (variance=0, multi-putt) and short/long was selected, clear it
+  if (isPacePerfect && (h.missDirection === 'short' || h.missDirection === 'long')) {
+    h.missDirection = null; h.gir = null;
+    const tbl3 = document.getElementById(`grid3-${hi}`);
+    if (tbl3) tbl3.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+  }
+  // Sync disabled states in Table 3
   ['yes','no'].forEach(g => {
     const madeCell = document.getElementById(`gc3-${hi}-made-${g}`);
-    if (madeCell) {
-      if (numPutts !== '1') madeCell.classList.add('disabled');
-      else madeCell.classList.remove('disabled');
-    }
+    if (madeCell) madeCell.classList.toggle('disabled', !isPuttHoled);
+    ['left','right'].forEach(d => {
+      const cell = document.getElementById(`gc3-${hi}-${d}-${g}`);
+      if (cell) cell.classList.toggle('disabled', isPuttHoled);
+    });
+    ['short','long'].forEach(d => {
+      const cell = document.getElementById(`gc3-${hi}-${d}-${g}`);
+      if (cell) cell.classList.toggle('disabled', isPuttHoled || isPacePerfect);
+    });
   });
   const tbl = document.getElementById(`grid2-${hi}`);
   if (tbl) {
@@ -921,8 +957,12 @@ function onGrid2(hi, numPutts, variance) {
 // Table 3: Result × GIR — sets missDirection + gir
 function onGrid3(hi, missDir, gir) {
   const h = AR.holes[hi];
-  // Guard: 'made' only allowed when numPutts is unset or '1'
-  if (missDir === 'made' && h.numPutts && h.numPutts !== '1') return;
+  const isPuttHoled   = h.numPutts === '1';
+  const isPacePerfect = h.variance === '0' && !isPuttHoled; // pin-high miss: L/R only
+  // Guard: 'made' only when 1-putt; miss dirs only when not 1-putt; short/long not valid when pin-high
+  if (missDir === 'made' && !isPuttHoled) return;
+  if (missDir !== 'made' && isPuttHoled) return;
+  if ((missDir === 'short' || missDir === 'long') && isPacePerfect) return;
   h.missDirection = missDir; h.gir = gir;
   // If 'made' selected and numPutts not yet set, auto-fill 1-putt
   if (missDir === 'made' && !h.numPutts) {
@@ -953,7 +993,7 @@ function onHoleDone(i) {
   if (summaryEl) {
     summaryEl.textContent = [
       h.length, slopeIcon(h.slope), dirIcon(h.direction), `${h.numPutts}pt`,
-      varDisplay(h.variance),
+      varDisplay(h.variance, h.missDirection),
       h.missDirection && h.missDirection !== 'made' ? missIcon(h.missDirection) : null,
       h.gir==='yes'?'GIR':''
     ].filter(Boolean).join(' · ');
@@ -1009,7 +1049,7 @@ function renderTable() {
       <td>${cell(h.slope ? slopeIcon(h.slope) : null)}</td>
       <td>${cell(h.direction ? dirIcon(h.direction) : null)}</td>
       <td>${cell(h.numPutts, pc)}</td>
-      <td>${cell(varDisplay(h.variance))}</td>
+      <td>${cell(varDisplay(h.variance, h.missDirection))}</td>
       <td>${cell(h.missDirection ? missIcon(h.missDirection) : (p&&p>=2?'—':null))}</td>
       <td>${cell(h.gir ? (h.gir==='yes'?'Y':'N') : null, h.gir==='yes'?'tc-g':'tc-d')}</td>
     </tr>`;
@@ -1071,6 +1111,7 @@ function computeStats(holes) {
 
   const mL    = misses.filter(h=>h.missDirection==='left').length;
   const mS    = misses.filter(h=>h.missDirection==='short').length;
+  const mLo   = misses.filter(h=>h.missDirection==='long').length;
   const mR    = misses.filter(h=>h.missDirection==='right').length;
 
   const byMissByDir = DIR_OPTS.map(d => {
@@ -1112,7 +1153,7 @@ function computeStats(holes) {
     n, makes, makesPct:pct(makes,n), three, threePct:pct(three,n),
     girCount:girH.length, puttsPerGir: girH.length?(girPuts/girH.length).toFixed(2):null,
     avgPutts:(total/n).toFixed(2),
-    byDist, bySlope, byDir, misses:misses.length, mL, mS, mR, byMissByDir, byVar,
+    byDist, bySlope, byDir, misses:misses.length, mL, mS, mLo, mR, byMissByDir, byVar,
     varByDist, varBySlope, varByDir,
     rounds: null // filled in by caller
   };
@@ -1233,10 +1274,10 @@ function renderDashboard() {
     ${s.byDir.map(d=>brkHTML(d.l,d.tp,d.n)).join('')}`;
 
   // Miss tab
-  const mt = s.mL+s.mS+s.mR;
+  const mt = s.mL+s.mS+s.mLo+s.mR;
   document.getElementById('stab-miss').innerHTML = `
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Miss Side</div>
-    ${mt?brkHTML('◀ Left',pct(s.mL,mt),s.mL)+brkHTML('▶ Right',pct(s.mR,mt),s.mR)+brkHTML('▼ Short',pct(s.mS,mt),s.mS)
+    ${mt?brkHTML('◀ Left',pct(s.mL,mt),s.mL)+brkHTML('▶ Right',pct(s.mR,mt),s.mR)+brkHTML('▼ Short',pct(s.mS,mt),s.mS)+brkHTML('▲ Long',pct(s.mLo,mt),s.mLo)
        :'<p style="font-size:12px;color:#9ca3af">No miss data yet</p>'}
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">Miss by Break Direction</div>
     ${s.byMissByDir.filter(d=>d.total>0).map(d=>`
@@ -1324,6 +1365,15 @@ function generateInsights(rounds) {
     { label:'long putts (16ft+)',        set:LONG_DIST,  key:'long'  },
   ];
 
+  // Variance magnitude groups — 5 buckets preserving how far off pace the 1st putt was
+  const VAR_MAG_GROUPS = [
+    { key:'big_short',  label:'≥3ft short', fn: h => ['-3','-5','>-7'].includes(h.variance) },
+    { key:'near_short', label:'1ft short',  fn: h => h.variance === '-1' },
+    { key:'pace',       label:'On pace',    fn: h => h.variance === '0'  },
+    { key:'near_long',  label:'1ft long',   fn: h => h.variance === '+1' },
+    { key:'big_long',   label:'≥3ft long',  fn: h => ['+3','+5','>+7'].includes(h.variance) },
+  ];
+
   // One-sample z-test (used for overall-bias analyses with theoretical base rates)
   function zt(subCount, subN, baseRate) {
     if (subN < MIN_N || baseRate <= 0.01 || baseRate >= 0.99) return 0;
@@ -1350,9 +1400,10 @@ function generateInsights(rounds) {
   }
 
   const insights = [];
-  function add(z, emoji, title, stat, rec, breakdown = []) {
-    if (z < MIN_Z) return;   // only flag when subset is meaningfully WORSE than average
-    insights.push({ z, emoji, title, stat, rec, breakdown });
+  function add(z, emoji, title, stat, rec, breakdown = [], pool = null, testFn = null) {
+    if (z < MIN_Z) return;
+    const fb = (pool && testFn) ? fullBd(pool, testFn) : null;
+    insights.push({ z, emoji, title, stat, rec, breakdown, fullBreakdown: fb });
   }
 
   // ── Breakdown helper ────────────────────────────────────
@@ -1377,15 +1428,80 @@ function generateInsights(rounds) {
       if (Math.abs(z) < MIN_BD_Z || Math.abs(delta) < MIN_BD_DELTA) return;
       items.push({ label, rate, n: sub.length, delta, z: Math.abs(z) });
     };
-    SLOPE_OPTS.forEach(s =>
-      tryAdd(pool.filter(h => h.slope === s.v), s.l.replace(' putts','')));
+    SLOPE_OPTS.forEach(s => {
+      const lbl = s.v==='flat'?'Flat':s.v==='up'?'⬆ Uphill':'⬇ Downhill';
+      tryAdd(pool.filter(h => h.slope === s.v), lbl);
+    });
     distGroups.forEach(dg => {
       const lbl = dg.key==='short' ? 'Short ≤6ft' : dg.key==='mid' ? 'Mid 7-15ft' : 'Long 16ft+';
       tryAdd(pool.filter(h => dg.set.has(h.length)), lbl);
     });
-    DIR_OPTS.forEach(dir =>
-      tryAdd(pool.filter(h => h.direction === dir.v), dir.l.replace(' putts','')));
+    DIR_OPTS.forEach(dir => {
+      const lbl = dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'Straight';
+      tryAdd(pool.filter(h => h.direction === dir.v), lbl);
+    });
+    // Cross-dimensional: slope × direction combinations
+    SLOPE_OPTS.forEach(s => DIR_OPTS.forEach(dir => {
+      const sLabel = s.v==='flat'?'Flat':s.v==='up'?'⬆ Uphill':'⬇ Downhill';
+      const dLabel = dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'Straight';
+      tryAdd(pool.filter(h => h.slope===s.v && h.direction===dir.v), `${sLabel} ${dLabel}`);
+    }));
     return items.sort((a,b) => b.z - a.z).slice(0,4); // top 4 by significance
+  }
+
+  // ── Contextual recommendation for combinatorial miss insights ──────────
+  function comboRec(slope, dg, dir, miss) {
+    if (miss === 'left') {
+      if (dir.v === 'r-to-l') return 'You\'re over-reading the break. A firmer stroke holds the ball on line and reduces the R→L pull — aim closer to the hole than feels natural.';
+      if (slope.v === 'down') return 'On downhill putts a slightly closed face pulls left and the slope amplifies the error. Double-check face angle at address before every downhill putt.';
+      if (slope.v === 'up') return 'Check your alignment on uphill putts — the tendency is to set up slightly left without realising. Use an intermediate target to confirm your aim.';
+      return 'A left miss points to a closed putter face or pull-stroke path. Focus on squaring the face at impact and keeping the path straight through the ball.';
+    }
+    if (miss === 'right') {
+      if (dir.v === 'l-to-r') return 'You\'re over-reading the L→R break. A firmer stroke reduces the effective break and keeps the ball on line — aim less right than feels natural.';
+      if (slope.v === 'up') return 'Uphill putts hit too hard can push the face right through over-acceleration. Commit to smooth tempo and a square face rather than forcing pace.';
+      if (slope.v === 'down') return 'Decelerating on downhill putts often causes a push-right. Commit to a smooth controlled stroke — don\'t steer it.';
+      return 'A right miss suggests an open face or push path. Check face angle at address and keep the putter tracking straight through the ball.';
+    }
+    if (miss === 'short') {
+      if (slope.v === 'up') return 'Uphill putts need significantly more pace — the slope kills momentum fast. Aim 18 inches past the hole, not the front edge.';
+      if (dg.key === 'long') return 'From long range commit to pace. Aim 12–18 inches past the hole — a dying ball on the right line never drops.';
+      if (dg.key === 'mid') return 'Mid-range putts that die short usually mean deceleration. Commit to accelerating through the ball — your read is good, trust it.';
+      return 'Deceleration through impact causes short misses. Commit to a smooth, positive stroke that accelerates through the ball to at least 12 inches past.';
+    }
+    if (miss === 'long') {
+      if (slope.v === 'down') return 'Downhill putts are easy to over-hit — the slope does the work for you. Use a shorter backswing and let gravity carry the ball naturally.';
+      if (dir.v !== 'straight') return 'On breaking putts, over-hitting kills the break and lips out on the far side. Play the correct break with softer pace — let the slope do the work.';
+      if (dg.key === 'short') return 'Short putts hit too hard jab past the hole. Slow the stroke down — smooth acceleration, not a jab.';
+      return 'Ease off the pace — aim to finish 6–12 inches past the hole rather than charging the back of the cup.';
+    }
+    return 'Focus on consistent pace and face angle for this specific combination.';
+  }
+
+  // ── Full breakdown: all categories, raw counts, no significance filter ──
+  function fullBd(pool, testFn) {
+    const base = pool.length ? pool.filter(testFn).length / pool.length : 0;
+    const calc = sub => ({ n: sub.filter(testFn).length, N: sub.length });
+    return {
+      base,
+      rows: [
+        { lbl:'Slope', cells: SLOPE_OPTS.map(s => ({
+            k: s.v==='flat'?'Flat':s.v==='up'?'⬆ Uphill':'⬇ Downhill',
+            ...calc(pool.filter(h=>h.slope===s.v))
+          })).filter(c=>c.N>=2) },
+        { lbl:'Dist', cells: distGroups.map(dg => ({
+            k: dg.key==='short'?'≤6ft':dg.key==='mid'?'7–15ft':'16ft+',
+            ...calc(pool.filter(h=>dg.set.has(h.length)))
+          })).filter(c=>c.N>=2) },
+        { lbl:'Break', cells: DIR_OPTS.map(dir => ({
+            k: dir.v==='straight'?'Str':dir.v==='l-to-r'?'L→R':'R→L',
+            ...calc(pool.filter(h=>h.direction===dir.v))
+          })).filter(c=>c.N>=2) },
+        { lbl:'1st Putt', cells: VAR_MAG_GROUPS.map(vg => ({
+            k: vg.label, ...calc(pool.filter(vg.fn))
+          })).filter(c=>c.N>=2) },
+      ].filter(row=>row.cells.length>=2),
+    };
   }
 
   // ── MISS DIRECTION ANALYSES ────────────────────────────
@@ -1396,130 +1512,89 @@ function generateInsights(rounds) {
 
     // Overall bias
     if (misses.length >= 10) {
-      const nL=misses.filter(h=>h.missDirection==='left').length;
-      const nR=misses.filter(h=>h.missDirection==='right').length;
-      const nS=misses.filter(h=>h.missDirection==='short').length;
-      add(zt(nL,misses.length,0.33),'◀',
+      const nL =misses.filter(h=>h.missDirection==='left').length;
+      const nR =misses.filter(h=>h.missDirection==='right').length;
+      const nS =misses.filter(h=>h.missDirection==='short').length;
+      const nLo=misses.filter(h=>h.missDirection==='long').length;
+      add(zt(nL,misses.length,0.25),'◀',
         'Overall miss tendency: left',
         `${pct(nL,misses.length)}% of all missed putts go left (${nL}/${misses.length})`,
-        'A consistent left miss points to a closed putter face at impact. Check your grip pressure and ensure the face is square at address. Drill: practice with a coin just outside your right edge.');
+        'A consistent left miss points to a closed putter face at impact. Check your grip pressure and ensure the face is square at address. Drill: practice with a coin just outside your right edge.',
+        [], misses, h=>h.missDirection==='left');
 
-      add(zt(nR,misses.length,0.33),'▶',
+      add(zt(nR,misses.length,0.25),'▶',
         'Overall miss tendency: right',
         `${pct(nR,misses.length)}% of all missed putts go right (${nR}/${misses.length})`,
-        'A consistent right miss often means an open face or a push stroke. Focus on keeping the putter face square through impact and your follow-through on line.');
+        'A consistent right miss often means an open face or a push stroke. Focus on keeping the putter face square through impact and your follow-through on line.',
+        [], misses, h=>h.missDirection==='right');
 
       add(zt(nS,misses.length,0.25),'▼',
         'Frequently leaving putts short',
-        `${pct(nS,misses.length)}% of missed putts don\'t reach the hole (${nS}/${misses.length})`,
-        '"Never up, never in." Add 10–15% more pace to your stroke. On the practice green, aim to finish every putt at least 12 inches past the hole.');
+        `${pct(nS,misses.length)}% of missed putts were on the right line but under-hit (${nS}/${misses.length})`,
+        '"Never up, never in." Your read is good — just add pace. Aim to finish every putt at least 12 inches past the hole on the practice green.',
+        [], misses, h=>h.missDirection==='short');
+
+      add(zt(nLo,misses.length,0.25),'▲',
+        'Frequently lipping out long',
+        `${pct(nLo,misses.length)}% of missed putts were on the right line but over-hit (${nLo}/${misses.length})`,
+        'Your read is good but you\'re attacking too hard. Ease off the pace slightly — aim to finish 6–12 inches past the hole rather than charging the back of the cup.',
+        [], misses, h=>h.missDirection==='long');
     }
 
-    // By SLOPE (compare each slope against all OTHER slopes)
-    SLOPE_OPTS.forEach(s => {
-      const sub = misses.filter(h=>h.slope===s.v);
-      if (sub.length < MIN_N) return;
-      const nL=sub.filter(h=>h.missDirection==='left').length;
-      const nR=sub.filter(h=>h.missDirection==='right').length;
-      const nS=sub.filter(h=>h.missDirection==='short').length;
-      const cL=comp(misses,h=>h.slope===s.v,h=>h.missDirection==='left');
-      const cR=comp(misses,h=>h.slope===s.v,h=>h.missDirection==='right');
-      const cS=comp(misses,h=>h.slope===s.v,h=>h.missDirection==='short');
+    // ── COMBINATORIAL MISS ANALYSIS ──────────────────────────────────────
+    // 81 condition combos (slope × distance × break × 1st-putt variance) × 4 miss directions
+    // = up to 270 candidates (redundant same-pace combos excluded: short miss+under-hit, long miss+over-hit)
+    // Each tested: does this combo miss in that direction more than all other putts?
+    // Ranked by z-score; overall dedup/sort picks the top across all insight types.
+    {
+      const MISS_DIRS = [
+        { v:'left', emoji:'◀' }, { v:'right', emoji:'▶' },
+        { v:'short', emoji:'▼' }, { v:'long', emoji:'▲' },
+      ];
+      // 5 magnitude buckets + an unfiltered fallback so 3D patterns still surface when variance data is thin
+      const MISS_VAR_GROUPS = [
+        ...VAR_MAG_GROUPS.map(vg => ({ key: vg.key, vLabel: vg.label, fn: vg.fn })),
+        { key:'any', vLabel: null, fn: h => true },
+      ];
+      const comboCands = [];
+      SLOPE_OPTS.forEach(slope => distGroups.forEach(dg => DIR_OPTS.forEach(dir => {
+        const base3d = misses.filter(h =>
+          h.slope === slope.v && dg.set.has(h.length) && h.direction === dir.v
+        );
+        const sLabel   = slope.v==='flat'?'Flat':slope.v==='up'?'⬆ Uphill':'⬇ Downhill';
+        const dirLabel = dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'Straight';
+        const distLabel= dg.key==='short'?'≤6ft':dg.key==='mid'?'7–15ft':'16ft+';
+        MISS_VAR_GROUPS.forEach(vg => {
+          const sub = vg.key === 'any' ? base3d
+            : base3d.filter(h => vg.fn(h));
+          if (sub.length < MIN_N) return;
+          MISS_DIRS.forEach(miss => {
+            // Skip trivially redundant combos: pace error in same direction as miss
+            if (miss.v === 'short' && (vg.key === 'big_short' || vg.key === 'near_short')) return;
+            if (miss.v === 'long'  && (vg.key === 'big_long'  || vg.key === 'near_long'))  return;
+            const n = sub.filter(h => h.missDirection === miss.v).length;
+            if (n === 0) return;
+            const c = comp(misses,
+              h => h.slope===slope.v && dg.set.has(h.length) && h.direction===dir.v && vg.fn(h),
+              h => h.missDirection===miss.v);
+            const z = zt2(n, sub.length, c.count, c.n);
+            if (z < MIN_Z) return;
+            const vLabel = vg.vLabel ? ` · ${vg.vLabel}` : '';
+            comboCands.push({ z, slope, dg, dir, miss, vg, n, N: sub.length,
+              rate: n/sub.length, compRate: c.rate, sLabel, dirLabel, distLabel, vLabel, sub });
+          });
+        });
+      })));
+      comboCands.sort((a, b) => b.z - a.z);
+      comboCands.forEach(({ z, slope, dg, dir, miss, vg, n, N, compRate, sLabel, dirLabel, distLabel, vLabel, sub }) => {
+        add(z, miss.emoji,
+          `${sLabel} · ${dirLabel} · ${distLabel}${vLabel}: missing ${miss.v}`,
+          `${pct(n, N)}% miss ${miss.v} — ${slope.v} ${dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'straight'} ${dg.label}${vLabel} (${n}/${N}) vs ${Math.round(compRate*100)}% on all other putts`,
+          comboRec(slope, dg, dir, miss.v),
+          [], sub, h => h.missDirection === miss.v);
+      });
+    }
 
-      add(zt2(nL,sub.length,cL.count,cL.n),'◀',
-        `Missing left on ${s.l} putts`,
-        `${pct(nL,sub.length)}% miss-left on ${s.v} putts (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
-        s.v==='down' ? 'Downhill putts break more aggressively — the slope pulls the ball further than it looks. Aim further right and trust the slope to bring it back.'
-        : s.v==='up' ? 'Check your alignment on uphill putts — you may be setting up slightly left without realising.'
-        : 'Your stroke is pulling left on flat putts. Focus on keeping the putter face square through impact.',
-        bd(sub, h=>h.missDirection==='left', nL/sub.length));
-
-      add(zt2(nR,sub.length,cR.count,cR.n),'▶',
-        `Missing right on ${s.l} putts`,
-        `${pct(nR,sub.length)}% miss-right on ${s.v} putts (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
-        s.v==='up' ? 'Uphill putts played firmly can push the face right. Aim slightly left and maintain smooth acceleration.'
-        : s.v==='down' ? 'Decelerating on downhill putts often causes a push-right. Commit to a smooth, controlled stroke.'
-        : 'Your stroke is pushing right on flat putts. Check your stroke path and face angle at impact.',
-        bd(sub, h=>h.missDirection==='right', nR/sub.length));
-
-      add(zt2(nS,sub.length,cS.count,cS.n),'▼',
-        `Leaving ${s.l} putts short of the hole`,
-        `${pct(nS,sub.length)}% short misses on ${s.v} putts (${nS}/${sub.length}) vs ${Math.round(cS.rate*100)}% on all other putts`,
-        s.v==='up' ? 'Uphill putts need more pace than they look — the slope kills momentum. Aim 18 inches past the hole.'
-        : s.v==='down' ? 'Leaving downhill putts short suggests deceleration — trust the slope and commit to the stroke.'
-        : 'Add a bit more pace on flat putts — aim for 12 inches past the hole minimum.',
-        bd(sub, h=>h.missDirection==='short', nS/sub.length));
-    });
-
-    // By BREAK DIRECTION (compare each direction vs all other directions)
-    DIR_OPTS.forEach(d => {
-      const sub = misses.filter(h=>h.direction===d.v);
-      if (sub.length < MIN_N) return;
-      const nL=sub.filter(h=>h.missDirection==='left').length;
-      const nR=sub.filter(h=>h.missDirection==='right').length;
-      const cL=comp(misses,h=>h.direction===d.v,h=>h.missDirection==='left');
-      const cR=comp(misses,h=>h.direction===d.v,h=>h.missDirection==='right');
-
-      // "Missing with the break" (very common pattern)
-      if (d.v==='r-to-l') {
-        add(zt2(nL,sub.length,cL.count,cL.n),'↖',
-          'Missing with the break on R→L putts',
-          `${pct(nL,sub.length)}% miss left on R→L putts (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
-          'You\'re over-playing the break on right-to-left putts. Try firming up your stroke — a more aggressive pace reduces how much the ball moves off line.',
-          bd(sub, h=>h.missDirection==='left', nL/sub.length));
-        add(zt2(nR,sub.length,cR.count,cR.n),'↖',
-          'Missing against the break on R→L putts',
-          `${pct(nR,sub.length)}% miss right on R→L putts (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
-          'You\'re under-reading the break on right-to-left putts. Play more break than feels natural — aim further left and let the slope do the work.',
-          bd(sub, h=>h.missDirection==='right', nR/sub.length));
-      }
-      if (d.v==='l-to-r') {
-        add(zt2(nR,sub.length,cR.count,cR.n),'↗',
-          'Missing with the break on L→R putts',
-          `${pct(nR,sub.length)}% miss right on L→R putts (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
-          'You\'re over-playing the break on left-to-right putts. Firm up your stroke — more pace holds the line and reduces the break effect.',
-          bd(sub, h=>h.missDirection==='right', nR/sub.length));
-        add(zt2(nL,sub.length,cL.count,cL.n),'↗',
-          'Missing against the break on L→R putts',
-          `${pct(nL,sub.length)}% miss left on L→R putts (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
-          'You\'re under-reading the break on left-to-right putts. Play more break — aim further right than feels comfortable.',
-          bd(sub, h=>h.missDirection==='left', nL/sub.length));
-      }
-    });
-
-    // By DISTANCE GROUP (compare each band vs all other distances)
-    distGroups.forEach(dg => {
-      const sub = misses.filter(h=>dg.set.has(h.length));
-      if (sub.length < MIN_N) return;
-      const nL=sub.filter(h=>h.missDirection==='left').length;
-      const nR=sub.filter(h=>h.missDirection==='right').length;
-      const nS=sub.filter(h=>h.missDirection==='short').length;
-      const cL=comp(misses,h=>dg.set.has(h.length),h=>h.missDirection==='left');
-      const cR=comp(misses,h=>dg.set.has(h.length),h=>h.missDirection==='right');
-      const cS=comp(misses,h=>dg.set.has(h.length),h=>h.missDirection==='short');
-
-      add(zt2(nL,sub.length,cL.count,cL.n),'◀',
-        `Missing left on ${dg.label}`,
-        `${pct(nL,sub.length)}% miss left on ${dg.label} (${nL}/${sub.length}) vs ${Math.round(cL.rate*100)}% on all other putts`,
-        dg.key==='short' ? 'On short putts a tiny degree of face angle matters enormously. Slow down, align carefully, and make a controlled stroke with no hand action.'
-        : dg.key==='long' ? 'On long putts the stroke naturally pulls left when tired. Focus on a balanced stance and a straight-back, straight-through path.'
-        : 'Check your aim routine on mid-range putts — you may be misaligning without realising.',
-        bd(sub, h=>h.missDirection==='left', nL/sub.length));
-
-      add(zt2(nR,sub.length,cR.count,cR.n),'▶',
-        `Missing right on ${dg.label}`,
-        `${pct(nR,sub.length)}% miss right on ${dg.label} (${nR}/${sub.length}) vs ${Math.round(cR.rate*100)}% on all other putts`,
-        dg.key==='short' ? 'Short right misses often come from decelerating through the stroke. Commit to a smooth, firm finish — the putter should reach at least as far as the backswing.'
-        : 'Check your stroke path — you may be cutting across the ball on these lengths. Practice with an alignment stick as a gate.',
-        bd(sub, h=>h.missDirection==='right', nR/sub.length));
-
-      if (dg.key!=='short') add(zt2(nS,sub.length,cS.count,cS.n),'▼',
-        `Leaving ${dg.label} short`,
-        `${pct(nS,sub.length)}% short on ${dg.label} (${nS}/${sub.length}) vs ${Math.round(cS.rate*100)}% on all other putts`,
-        dg.key==='long' ? 'On long putts aim to roll the ball 12–18 inches past the hole. Short lag putts leave you difficult second putts — be more aggressive with pace.'
-        : 'On mid-range putts be more committed — these should reach the hole minimum. A short putt can\'t go in.',
-        bd(sub, h=>h.missDirection==='short', nS/sub.length));
-    });
   }
 
   // ── VARIANCE (PACE) ANALYSES ───────────────────────────
@@ -1539,13 +1614,13 @@ function generateInsights(rounds) {
         s.v==='up' ? 'Uphill putts die quickly — add noticeably more pace; aim for 18 inches past.'
         : s.v==='down' ? 'Leaving downhill putts short means you\'re decelerating. Trust the slope through the ball.'
         : 'Add a little more pace and aim for the ball to finish 12 inches past.',
-        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length));
+        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length), sub, h=>SHORT_VAR.includes(h.variance));
       add(zt2(nL,sub.length,cLo.count,cLo.n),'📈',
         `Running past the hole on ${s.l} putts`,
         `${pct(nL,sub.length)}% of ${s.v} putts run long (${nL}/${sub.length}) vs ${Math.round(cLo.rate*100)}% on all other putts`,
         s.v==='down' ? 'Shorter backswing, let gravity do the work. Think "dead weight" — just reach the hole.'
         : 'Ease off the pace — aim to finish 12 inches past maximum.',
-        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length));
+        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length), sub, h=>LONG_VAR.includes(h.variance));
     });
     distGroups.forEach(dg => {
       const sub = varOldHoles.filter(h=>dg.set.has(h.length));
@@ -1559,15 +1634,49 @@ function generateInsights(rounds) {
         `${pct(nS,sub.length)}% of ${dg.label} end up short (${nS}/${sub.length}) vs ${Math.round(cSh.rate*100)}% on all other putts`,
         dg.key==='long' ? 'Focus purely on speed from long range — not direction.'
         : 'Be more committed — aim for 12 inches past the hole minimum.',
-        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length));
+        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length), sub, h=>SHORT_VAR.includes(h.variance));
       add(zt2(nL,sub.length,cLo.count,cLo.n),'📈',
         `Running ${dg.label} well past the hole`,
         `${pct(nL,sub.length)}% of ${dg.label} run long (${nL}/${sub.length}) vs ${Math.round(cLo.rate*100)}% on all other putts`,
         dg.key==='long' ? 'Running long lag putts past leaves difficult come-backers. Practice "die at the hole" pace.'
         : 'You may be over-accelerating. Focus on smooth, controlled tempo.',
-        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length));
+        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length), sub, h=>LONG_VAR.includes(h.variance));
     });
   }
+
+  // ── PACE DOMINANCE BY DISTANCE (variance-based) ───────
+  // One-sample z-test: for each distance band, is over-hit or under-hit the dominant pace error?
+  distGroups.forEach(dg => {
+    const paceHoles = allHoles.filter(h =>
+      dg.set.has(h.length) &&
+      parseInt(h.numPutts) >= 2 &&
+      (SHORT_VAR.includes(h.variance) || LONG_VAR.includes(h.variance))
+    );
+    if (paceHoles.length < MIN_N) return;
+    const nOver  = paceHoles.filter(h => LONG_VAR.includes(h.variance)).length;
+    const nUnder = paceHoles.filter(h => SHORT_VAR.includes(h.variance)).length;
+    const nTotal = nOver + nUnder;
+    if (nTotal < MIN_N) return;
+    const distLbl = dg.key==='short' ? 'short putts (≤6ft)' : dg.key==='mid' ? 'mid-range putts (7–15ft)' : 'long putts (16ft+)';
+    add(zt(nOver, nTotal, 0.5), '📈',
+      `Hitting ${distLbl} too hard`,
+      `${pct(nOver, nTotal)}% of pace errors on ${distLbl} are over-hit (${nOver}/${nTotal}) — variance data`,
+      dg.key==='short'
+        ? 'On short putts, charging through the hole means a tricky come-backer if you miss. Ease off and focus on a smooth, controlled stroke that just reaches the back of the cup.'
+        : dg.key==='mid'
+        ? 'Mid-range putts hit too hard lip out and leave tough second putts. Commit to a smooth tempo — aim to finish 6–12 inches past, not charge the back of the cup.'
+        : 'Your long-range pace is too aggressive. Focus on "dying the ball at the hole" — a soft lag that leaves a tap-in beats a charge that runs 6ft past. Practice: lag to a towel 30ft away, not the hole.',
+      [], paceHoles, h=>LONG_VAR.includes(h.variance));
+    add(zt(nUnder, nTotal, 0.5), '📉',
+      `Leaving ${distLbl} short (pace)`,
+      `${pct(nUnder, nTotal)}% of pace errors on ${distLbl} are under-hit (${nUnder}/${nTotal}) — variance data`,
+      dg.key==='short'
+        ? 'Timid strokes on short putts are a confidence problem. Commit fully — a bold, smooth stroke on the right line will go in; a dying one won\'t.'
+        : dg.key==='mid'
+        ? 'Mid-range putts that die short are a pace problem. Add a touch more weight — aim for 6 inches past the hole minimum to give the ball a chance.'
+        : 'Your lag pace is too timid. Commit to rolling the ball 12–18 inches past the hole. A bold putt that misses can still go in; a short one never can.',
+      [], paceHoles, h=>SHORT_VAR.includes(h.variance));
+  });
 
   // ── 3-PUTT RATE ANALYSES ───────────────────────────────
   if (allHoles.length >= MIN_N) {
@@ -1580,13 +1689,14 @@ function generateInsights(rounds) {
         if (sub.length < MIN_N) return;
         const n3 = sub.filter(is3putt).length;
         const c3 = comp(allHoles,h=>h.slope===s.v,is3putt);
+        const sLbl = s.v==='flat'?'flat':s.v==='up'?'uphill':'downhill';
         add(zt2(n3,sub.length,c3.count,c3.n),'🎯',
-          `High 3-putt rate on ${s.l} putts`,
-          `${pct(n3,sub.length)}% 3-putt rate on ${s.v} putts (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
+          `High 3-putt rate on ${sLbl} putts`,
+          `${pct(n3,sub.length)}% 3-putt rate on ${sLbl} putts (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
           s.v==='down' ? 'Downhill 3-putts are painful. Treat every long downhill putt as a "guaranteed 2-putt challenge" — speed first, get it close, then make the short one.'
           : s.v==='up'   ? 'Uphill 3-putts suggest your lag pace is off. Focus on getting uphill lag putts within a 3-foot circle — direction matters less than distance.'
           : 'Work on lag putting on flat surfaces. Set a 3-foot circle target and practice getting every putt inside it.',
-          bd(sub, is3putt, n3/sub.length));
+          bd(sub, is3putt, n3/sub.length), sub, is3putt);
       });
 
       distGroups.forEach(dg => {
@@ -1600,7 +1710,7 @@ function generateInsights(rounds) {
           dg.key==='long' ? 'Long-range 3-putts are mostly a pace problem. Practice "speed golf" — from 30ft, putt 10 balls with eyes closed to feel the distance. Speed before direction.'
           : dg.key==='mid' ? 'Mid-range 3-putts are costly and avoidable. These should be conversion putts — focus on smooth tempo, centred face contact and a committed line.'
           : 'Three-putting from close range points to a mental or technical issue. Slow down your routine on short putts and make sure you\'re aligned correctly.',
-          bd(sub, is3putt, n3/sub.length));
+          bd(sub, is3putt, n3/sub.length), sub, is3putt);
       });
 
       DIR_OPTS.forEach(d => {
@@ -1608,12 +1718,54 @@ function generateInsights(rounds) {
         if (sub.length < MIN_N) return;
         const n3 = sub.filter(is3putt).length;
         const c3 = comp(allHoles,h=>h.direction===d.v,is3putt);
+        const dLbl = d.v==='l-to-r'?'L→R':d.v==='r-to-l'?'R→L':'straight';
         add(zt2(n3,sub.length,c3.count,c3.n),'🎯',
-          `High 3-putt rate on ${d.l} putts`,
-          `${pct(n3,sub.length)}% 3-putt rate on ${d.v} putts (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
+          `High 3-putt rate on ${dLbl} putts`,
+          `${pct(n3,sub.length)}% 3-putt rate on ${dLbl} putts (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
           `Lag putting on ${d.v==='l-to-r'?'L→R':d.v==='r-to-l'?'R→L':'straight'} putts needs work. Focus on pace control to leave yourself inside 3 feet — think about where the ball will end up, not the hole.`,
-          bd(sub, is3putt, n3/sub.length));
+          bd(sub, is3putt, n3/sub.length), sub, is3putt);
       });
+
+      // ── Worst combination: slope × distance × direction × 1st-putt variance (81 combos) ──────
+      {
+        const VAR_GROUPS = VAR_MAG_GROUPS.map(vg => ({
+          key: vg.key, vLabel: vg.label + ' 1st', fn: vg.fn,
+        }));
+        const quadCombos = [];
+        SLOPE_OPTS.forEach(s => distGroups.forEach(dg => DIR_OPTS.forEach(dir => {
+          VAR_GROUPS.forEach(vg => {
+            const sub = allHoles.filter(h =>
+              h.slope===s.v && dg.set.has(h.length) && h.direction===dir.v && vg.fn(h)
+            );
+            if (sub.length < MIN_N) return;
+            const n3 = sub.filter(is3putt).length;
+            if (n3 === 0) return;
+            const c3 = comp(allHoles,
+              h => h.slope===s.v && dg.set.has(h.length) && h.direction===dir.v && vg.fn(h),
+              is3putt);
+            const z = zt2(n3, sub.length, c3.count, c3.n);
+            if (z >= MIN_Z) quadCombos.push({ s, dg, dir, vg, sub, n3, z, c3 });
+          });
+        })));
+        quadCombos.sort((a,b) => b.z - a.z);
+        if (quadCombos.length) {
+          const { s, dg, dir, vg, sub, n3, z, c3 } = quadCombos[0];
+          const sLabel   = s.v==='flat'?'Flat':s.v==='up'?'⬆ Uphill':'⬇ Downhill';
+          const dirLabel = dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'Straight';
+          // Pool for display: slope+dist+dir only (no variance filter) so the
+          // "By condition" 1st Putt row shows 3-putt rate across all variance magnitudes,
+          // and the main stat denominator matches the breakdown totals.
+          const displayPool = allHoles.filter(h =>
+            h.slope===s.v && dg.set.has(h.length) && h.direction===dir.v
+          );
+          const n3_display = displayPool.filter(is3putt).length;
+          add(z, '⚠️',
+            `Danger zone: ${sLabel} ${dirLabel} ${dg.label}`,
+            `${pct(n3_display,displayPool.length)}% 3-putt rate on ${sLabel} ${dirLabel} ${dg.label} (${n3_display}/${displayPool.length}); spikes to ${pct(n3,sub.length)}% when ${vg.vLabel} (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
+            `This is your single most costly combination. Before these putts: read from behind the hole, commit to speed first then line, and aim to leave the ball inside 3 feet. Practise this exact scenario.`,
+            [], displayPool, is3putt);
+        }
+      }
     }
   }
 
@@ -1736,6 +1888,24 @@ function renderInsights() {
           </div>
         </div>` : ''}
 
+        ${ins.fullBreakdown && ins.fullBreakdown.rows.length ? `
+        <div style="margin-bottom:10px">
+          <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.06em;margin-bottom:5px;text-transform:uppercase">By condition <span style="font-weight:400;text-transform:none;letter-spacing:0">(% ${ {'◀':'miss left','▶':'miss right','▼':'miss short','▲':'miss long / over-hit','🎯':'3-putted','⚠️':'3-putted'}[ins.emoji] || 'rate' })</span></div>
+          ${ins.fullBreakdown.rows.map(row => `
+          <div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">
+            <span style="font-size:9px;color:#9ca3af;min-width:36px;font-weight:700;flex-shrink:0">${row.lbl}</span>
+            ${row.cells.map(c => {
+              const rate = c.N ? c.n/c.N : 0;
+              const col = rate > ins.fullBreakdown.base + 0.05 ? '#dc2626' : rate < ins.fullBreakdown.base - 0.05 ? '#16a34a' : '#374151';
+              return '<div style="flex:1;background:rgba(255,255,255,0.55);border-radius:6px;padding:3px 4px;text-align:center;min-width:0">'
+                + '<div style="font-size:8px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + c.k + '</div>'
+                + '<div style="font-size:11px;font-weight:800;color:' + col + '">' + Math.round(rate*100) + '%</div>'
+                + '<div style="font-size:8px;color:#6b7280">' + c.n + '/' + c.N + '</div>'
+                + '</div>';
+            }).join('')}
+          </div>`).join('')}
+        </div>` : ''}
+
         <div style="font-size:12px;color:#1f2937;line-height:1.6">
           <span style="font-weight:800;color:#002855">💡 Fix: </span>${ins.rec}
         </div>
@@ -1760,7 +1930,7 @@ function exportCSV() {
   const headers = ['Date','Course','Hole','Length','Slope','Direction','Putts','Variance','Miss','GIR'];
   const rows = rounds.flatMap(r => r.holes.map(h => [
     r.date, r.course||'', h.n, h.length ? h.length+'ft' : '', h.slope||'', h.direction||'',
-    h.numPutts||'', varDisplay(h.variance)||h.variance||'', h.missDirection||'', h.gir||''
+    h.numPutts||'', varDisplay(h.variance, h.missDirection)||h.variance||'', h.missDirection||'', h.gir||''
   ]));
   const csv = [headers, ...rows]
     .map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
