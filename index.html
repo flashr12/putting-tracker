@@ -121,9 +121,9 @@
     .fl-label {
       display: block; text-align: center;
       font-size: 10px; font-weight: 800; text-transform: uppercase;
-      letter-spacing: .06em; color: #002855;
-      background: #dbe8f5; border-left: 3px solid #003A72;
-      padding: 3px 8px; border-radius: 0 4px 4px 0;
+      letter-spacing: .06em; color: #e8f0f8;
+      background: #1a4f8a; border-left: 3px solid #003A72;
+      padding: 7px 8px; border-radius: 0 4px 4px 0;
       margin-bottom: 6px; line-height: 1.4;
     }
     /* Grid chips (4 per row) */
@@ -716,9 +716,9 @@ function buildHoleFormHTML(h, i) {
         <thead>
           <tr>
             <th rowspan="2" style="min-width:28px;border-right:2px solid #6b7280">Feet</th>
-            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#4a7c59">⬇ Downhill</th>
-            <th colspan="3" style="border-left:2px solid #6b7280;color:#374151">— Flat</th>
-            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#c2692a">⬆ Uphill</th>
+            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#1e4d2b;padding:6px 1px;font-size:10px;letter-spacing:.3px">⬇ Downhill</th>
+            <th colspan="3" style="border-left:2px solid #6b7280;color:#fff;background:#374151;padding:6px 1px;font-size:10px;letter-spacing:.3px">— Flat</th>
+            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#7c3010;padding:6px 1px;font-size:10px;letter-spacing:.3px">⬆ Uphill</th>
           </tr>
           <tr>
             <th style="border-left:2px solid #003A72">L-R ↗</th><th>Str ↑</th><th>R-L ↖</th>
@@ -757,10 +757,9 @@ function buildHoleFormHTML(h, i) {
             <th style="min-width:30px">Putts</th>
             ${VAR_COLS.map((v,vi) => {
               const isZero = v === '0';
-              const bdr = vi===4 ? 'border-left:2px solid #c5d8ef;' : '';
               const bg  = isZero ? 'background:#edf3fa;color:#002855;' : '';
               const label = isZero ? '0' : v + "'";
-              return `<th style="${bdr}${bg}">${label}</th>`;
+              return `<th style="${bg}">${label}</th>`;
             }).join('')}
           </tr>
         </thead>
@@ -775,10 +774,9 @@ function buildHoleFormHTML(h, i) {
               const disabled = pts==='1' && !isZero;
               const sel = h.numPutts===pts && h.variance===v;
               const safeV = v.replace(/[<>+]/g,'_');
-              const bdr = vi===4 ? 'border-left:2px solid #c5d8ef;' : '';
-              if (disabled) return `<td class="gcell disabled" style="${bdr}"></td>`;
+              if (disabled) return `<td class="gcell disabled"></td>`;
               return `<td class="gcell${sel?' on':''}" id="gc2-${i}-${safePts}-${safeV}"
-                          style="${bdr}" onclick="onGrid2(${i},'${pts}','${v}')"></td>`;
+                          onclick="onGrid2(${i},'${pts}','${v}')"></td>`;
             }).join('')}
             </tr>`;
           }).join('')}
@@ -811,8 +809,8 @@ function buildHoleFormHTML(h, i) {
             <td class="row-head">${g.l}</td>
             ${MISS_COLS.map(m => {
               const isMade = m.v === 'made';
-              // 'Made' only valid for 1-putts
-              const madeDisabled = isMade && !isPuttHoled;
+              // 'Made' only valid for 1-putts; don't disable until a putt count is actually chosen
+              const madeDisabled = isMade && h.numPutts !== null && !isPuttHoled;
               // Short/Long disabled when pin-high (variance=0); all miss dirs disabled when holed
               const missDisabled = !isMade && (isPuttHoled || (isPacePerfect && (m.v==='short'||m.v==='long')));
               const isDisabled = madeDisabled || missDisabled;
