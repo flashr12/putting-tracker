@@ -248,7 +248,7 @@
       overflow:hidden;
     }
     .pgrid td.row-head {
-      padding:3px 5px; text-align:left; font-size:10px; font-weight:600; color:#374151;
+      padding:3px 5px; text-align:center; font-size:10px; font-weight:600; color:#374151;
       background:#f9fafb; border:1px solid #d1d5db; white-space:nowrap;
     }
     .pgrid td.gcell {
@@ -494,7 +494,9 @@
 // ═══════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════
-const LEN_BUCKETS = ['1-3','4-6','7-10','11-15','16-20','21-30','30-50','50+'];
+const LEN_BUCKETS = ['≤3','4-8','9-20','21+'];
+// Legacy bucket values kept for backward-compatibility with existing saved data
+const LEGACY_MAP  = { '1-3':'≤3','4-6':'4-8','7-10':'4-8','11-15':'9-20','16-20':'9-20','21-30':'21+','30-50':'21+','50+':'21+' };
 const VAR_OPTS    = ['<-6','-5','-3','-1','+1','+3','+5','>+6'];
 const SHORT_VAR   = ['<-6','>-7','-5','-3','-1'];  // stopped short of hole
 const LONG_VAR    = ['+1','+3','+5','>+6','>+7'];   // ran past hole
@@ -727,7 +729,7 @@ function buildHoleFormHTML(h, i) {
         <tbody>
           ${LEN_BUCKETS.map(len => `
           <tr>
-            <td class="row-head" style="border-right:2px solid #6b7280">${len}</td>
+            <td class="row-head" style="border-right:2px solid #6b7280">${len}'</td>
             ${COLS1.map((c,ci) => {
               const sel = h.length===len && h.slope===c.slope && h.direction===c.dir;
               const bdr = ci===3 ? 'border-left:2px solid #6b7280;' : ci===6 ? 'border-left:2px solid #003A72;' : '';
@@ -741,7 +743,8 @@ function buildHoleFormHTML(h, i) {
   </div>`;
 
   // ── Table 2: # Putts × 1st-putt variance ────────────────────────────────
-  // '0' (middle col) only valid for row '1'.  Rows 2+: all other columns valid.
+  // '0' (middle col): valid for row '1' (holed) AND rows 2+ (pin-high miss, L/R only).
+  // Non-zero cols disabled for row '1' (can't miss distance if you holed it).
   const PUTTS_ROWS = ['1','2','3','4+'];
   const VAR_COLS   = ['>-7','-5','-3','-1','0','+1','+3','+5','>+7'];
   const grid2 = `
@@ -768,7 +771,8 @@ function buildHoleFormHTML(h, i) {
             <td class="row-head">${pts}</td>
             ${VAR_COLS.map((v,vi) => {
               const isZero = v === '0';
-              const disabled = (pts==='1' && !isZero) || (pts!=='1' && isZero);
+              // 1-putt row: only '0' valid (holed). Multi-putt rows: all cols valid including '0' (pin-high miss).
+              const disabled = pts==='1' && !isZero;
               const sel = h.numPutts===pts && h.variance===v;
               const safeV = v.replace(/[<>+]/g,'_');
               const bdr = vi===4 ? 'border-left:2px solid #c5d8ef;' : '';
@@ -1090,6 +1094,8 @@ function computeStats(holes) {
   const total   = holes.reduce((s,h)=>s+parseInt(h.numPutts),0);
   const misses  = holes.filter(h=>parseInt(h.numPutts)>=2);
 
+  // Normalise legacy bucket values to new 4-bucket system
+  holes.forEach(h => { if (LEGACY_MAP[h.length]) h.length = LEGACY_MAP[h.length]; });
   const byDist = LEN_BUCKETS.map(b => {
     const bh = holes.filter(h=>h.length===b);
     return { b, n:bh.length, m:bh.filter(h=>h.numPutts==='1').length,
@@ -1356,13 +1362,11 @@ function generateInsights(rounds) {
   const varHoles    = allHoles.filter(h => h.variance && parseInt(h.numPutts) >= 2);
   const varOldHoles = varHoles.filter(h => SHORT_VAR.includes(h.variance) || LONG_VAR.includes(h.variance));
 
-  const SHORT_DIST = new Set(['1-3','4-6']);
-  const MID_DIST   = new Set(['7-10','11-15']);
-  const LONG_DIST  = new Set(['16-20','21-30','30-50','50+']);
   const distGroups = [
-    { label:'short putts (≤6ft)',       set:SHORT_DIST, key:'short' },
-    { label:'mid-range putts (7–15ft)', set:MID_DIST,   key:'mid'   },
-    { label:'long putts (16ft+)',        set:LONG_DIST,  key:'long'  },
+    { label:'short putts (≤3ft)',     set:new Set(['≤3','1-3']),                          key:'short'   },
+    { label:'scoring putts (4–8ft)',  set:new Set(['4-8','4-6','7-10']),                  key:'scoring' },
+    { label:'mid-range putts (9–20ft)',set:new Set(['9-20','11-15','16-20']),              key:'mid'     },
+    { label:'long putts (21ft+)',     set:new Set(['21+','21-30','30-50','50+']),          key:'long'    },
   ];
 
   // Variance magnitude groups — 5 buckets preserving how far off pace the 1st putt was
@@ -1433,7 +1437,7 @@ function generateInsights(rounds) {
       tryAdd(pool.filter(h => h.slope === s.v), lbl);
     });
     distGroups.forEach(dg => {
-      const lbl = dg.key==='short' ? 'Short ≤6ft' : dg.key==='mid' ? 'Mid 7-15ft' : 'Long 16ft+';
+      const lbl = dg.key==='short'?'≤3ft':dg.key==='scoring'?'4–8ft':dg.key==='mid'?'9–20ft':'21ft+';
       tryAdd(pool.filter(h => dg.set.has(h.length)), lbl);
     });
     DIR_OPTS.forEach(dir => {
@@ -1490,7 +1494,7 @@ function generateInsights(rounds) {
             ...calc(pool.filter(h=>h.slope===s.v))
           })).filter(c=>c.N>=2) },
         { lbl:'Dist', cells: distGroups.map(dg => ({
-            k: dg.key==='short'?'≤6ft':dg.key==='mid'?'7–15ft':'16ft+',
+            k: dg.key==='short'?'≤3ft':dg.key==='scoring'?'4–8ft':dg.key==='mid'?'9–20ft':'21ft+',
             ...calc(pool.filter(h=>dg.set.has(h.length)))
           })).filter(c=>c.N>=2) },
         { lbl:'Break', cells: DIR_OPTS.map(dir => ({
@@ -1563,7 +1567,7 @@ function generateInsights(rounds) {
         );
         const sLabel   = slope.v==='flat'?'Flat':slope.v==='up'?'⬆ Uphill':'⬇ Downhill';
         const dirLabel = dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'Straight';
-        const distLabel= dg.key==='short'?'≤6ft':dg.key==='mid'?'7–15ft':'16ft+';
+        const distLabel= dg.key==='short'?'≤3ft':dg.key==='scoring'?'4–8ft':dg.key==='mid'?'9–20ft':'21ft+';
         MISS_VAR_GROUPS.forEach(vg => {
           const sub = vg.key === 'any' ? base3d
             : base3d.filter(h => vg.fn(h));
@@ -1657,14 +1661,16 @@ function generateInsights(rounds) {
     const nUnder = paceHoles.filter(h => SHORT_VAR.includes(h.variance)).length;
     const nTotal = nOver + nUnder;
     if (nTotal < MIN_N) return;
-    const distLbl = dg.key==='short' ? 'short putts (≤6ft)' : dg.key==='mid' ? 'mid-range putts (7–15ft)' : 'long putts (16ft+)';
+    const distLbl = dg.key==='short'?'short putts (≤3ft)':dg.key==='scoring'?'scoring putts (4–8ft)':dg.key==='mid'?'mid-range putts (9–20ft)':'long putts (21ft+)';
     add(zt(nOver, nTotal, 0.5), '📈',
       `Hitting ${distLbl} too hard`,
       `${pct(nOver, nTotal)}% of pace errors on ${distLbl} are over-hit (${nOver}/${nTotal}) — variance data`,
       dg.key==='short'
         ? 'On short putts, charging through the hole means a tricky come-backer if you miss. Ease off and focus on a smooth, controlled stroke that just reaches the back of the cup.'
+        : dg.key==='scoring'
+        ? 'Scoring putts hit too hard lip out and leave difficult come-backers. Commit to smooth tempo — aim to finish 6–12 inches past, not charge the back of the cup.'
         : dg.key==='mid'
-        ? 'Mid-range putts hit too hard lip out and leave tough second putts. Commit to a smooth tempo — aim to finish 6–12 inches past, not charge the back of the cup.'
+        ? 'Mid-range putts hit too hard leave tough second putts. Commit to a smooth tempo — aim to finish 6–12 inches past, not charge the back of the cup.'
         : 'Your long-range pace is too aggressive. Focus on "dying the ball at the hole" — a soft lag that leaves a tap-in beats a charge that runs 6ft past. Practice: lag to a towel 30ft away, not the hole.',
       [], paceHoles, h=>LONG_VAR.includes(h.variance));
     add(zt(nUnder, nTotal, 0.5), '📉',
@@ -1672,6 +1678,8 @@ function generateInsights(rounds) {
       `${pct(nUnder, nTotal)}% of pace errors on ${distLbl} are under-hit (${nUnder}/${nTotal}) — variance data`,
       dg.key==='short'
         ? 'Timid strokes on short putts are a confidence problem. Commit fully — a bold, smooth stroke on the right line will go in; a dying one won\'t.'
+        : dg.key==='scoring'
+        ? 'Scoring putts that die short are a pace problem. Add a touch more weight — aim for 6 inches past the hole minimum to give the ball a chance.'
         : dg.key==='mid'
         ? 'Mid-range putts that die short are a pace problem. Add a touch more weight — aim for 6 inches past the hole minimum to give the ball a chance.'
         : 'Your lag pace is too timid. Commit to rolling the ball 12–18 inches past the hole. A bold putt that misses can still go in; a short one never can.',
@@ -1708,7 +1716,8 @@ function generateInsights(rounds) {
           `High 3-putt rate on ${dg.label}`,
           `${pct(n3,sub.length)}% 3-putt rate on ${dg.label} (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
           dg.key==='long' ? 'Long-range 3-putts are mostly a pace problem. Practice "speed golf" — from 30ft, putt 10 balls with eyes closed to feel the distance. Speed before direction.'
-          : dg.key==='mid' ? 'Mid-range 3-putts are costly and avoidable. These should be conversion putts — focus on smooth tempo, centred face contact and a committed line.'
+          : dg.key==='mid' ? 'Mid-range 3-putts are costly. Focus on smooth tempo, centred face contact and a committed line — get it within 3 feet every time.'
+          : dg.key==='scoring' ? 'Three-putting from scoring range (4–8ft) is very costly. These should be 1-putt opportunities — focus on your read and commit to a confident stroke.'
           : 'Three-putting from close range points to a mental or technical issue. Slow down your routine on short putts and make sure you\'re aligned correctly.',
           bd(sub, is3putt, n3/sub.length), sub, is3putt);
       });
