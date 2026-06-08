@@ -413,9 +413,16 @@
       </div>
       <div>
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Holes</div>
-        <div class="cg2" style="max-width:220px">
-          <div class="ch on" data-grp="setup-holes" data-val="18" onclick="selChip(this)">18 Holes</div>
-          <div class="ch"    data-grp="setup-holes" data-val="9"  onclick="selChip(this)">9 Holes</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;height:38px">
+            <button onclick="adjustSetupHoles(-1)" style="width:38px;height:38px;border:none;background:#f9fafb;font-size:18px;font-weight:700;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+            <span id="setup-hole-count" style="min-width:36px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
+            <button onclick="adjustSetupHoles(1)"  style="width:38px;height:38px;border:none;background:#f9fafb;font-size:18px;font-weight:700;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+          </div>
+          <div style="display:flex;gap:6px">
+            <div class="ch" onclick="setSetupHoles(9)"  style="padding:6px 14px">9</div>
+            <div class="ch" onclick="setSetupHoles(18)" style="padding:6px 14px">18</div>
+          </div>
         </div>
       </div>
       <button onclick="startRound()"
@@ -430,14 +437,28 @@
 
     <!-- Round info + view toggle -->
     <div id="round-info-bar">
-      <div style="font-size:12px;color:#6b7280;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
+      <div style="font-size:12px;color:#6b7280;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0">
         <span id="ri-course" style="font-weight:700;color:#1f2937"></span>
         <span id="ri-date"   style="color:#9ca3af;margin-left:4px"></span>
       </div>
-      <div class="vtoggle">
+      <span id="ri-holecount" onclick="showHoleAdj()"
+        style="flex-shrink:0;font-size:11px;font-weight:700;color:#003A72;background:#dbe8f5;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 8px">
+        18H ✎
+      </span>
+      <div class="vtoggle" style="flex-shrink:0">
         <button class="vbtn on" id="vbtn-form"  onclick="setRoundView('form')">Form</button>
         <button class="vbtn"    id="vbtn-table" onclick="setRoundView('table')">Table</button>
       </div>
+    </div>
+
+    <!-- Inline hole-count adjuster (hidden by default) -->
+    <div id="hole-adj-bar" style="display:none;flex-shrink:0;background:#f0f5fb;border-bottom:1px solid #e5e7eb;padding:8px 14px;align-items:center;justify-content:center;gap:10px">
+      <span style="font-size:12px;font-weight:600;color:#374151">Holes:</span>
+      <button onclick="stepHoleAdj(-1)" style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">−</button>
+      <span id="hole-adj-val" style="min-width:28px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
+      <button onclick="stepHoleAdj(1)"  style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">+</button>
+      <button onclick="applyHoleAdj()"  style="height:32px;padding:0 14px;border:none;border-radius:8px;background:#003A72;color:#fff;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">Done</button>
+      <button onclick="hideHoleAdj()"   style="height:32px;padding:0 10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;color:#6b7280;font-size:12px;font-weight:600;cursor:pointer">Cancel</button>
     </div>
 
     <!-- Hole pill strip -->
@@ -583,6 +604,7 @@ function showMain(name) {
         document.getElementById('step-holes').style.display = 'flex';
         document.getElementById('ri-course').textContent = AR.course || 'New Round';
         document.getElementById('ri-date').textContent = new Date(AR.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        document.getElementById('ri-holecount').textContent = (AR.holeCount||18) + 'H ✎';
         setRoundView('form'); renderPills(); renderAccordion();
       } else { clearDraft(); initSetup(); }
     } else { initSetup(); }
@@ -610,7 +632,7 @@ function initSetup() {
 function startRound() {
   const date   = document.getElementById('inp-date').value;
   const course = document.getElementById('inp-course').value.trim();
-  const hc     = parseInt(document.querySelector('[data-grp="setup-holes"].on')?.dataset.val || '18');
+  const hc     = parseInt(document.getElementById('setup-hole-count').textContent) || 18;
   if (!date) { alert('Please select a date.'); return; }
   clearDraft(); // discard any previous incomplete round
   AR = { id: Date.now().toString(), date, course, holeCount:hc,
@@ -621,9 +643,58 @@ function startRound() {
   // info bar
   document.getElementById('ri-course').textContent = course || 'New Round';
   document.getElementById('ri-date').textContent   = new Date(date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  document.getElementById('ri-holecount').textContent = hc + 'H ✎';
   setRoundView('form');
   renderPills();
   renderAccordion();
+}
+
+// ═══════════════════════════════════════
+//  SETUP HOLE COUNT STEPPER
+// ═══════════════════════════════════════
+function adjustSetupHoles(delta) {
+  const el = document.getElementById('setup-hole-count');
+  const cur = parseInt(el.textContent) || 18;
+  el.textContent = Math.min(18, Math.max(1, cur + delta));
+}
+function setSetupHoles(n) {
+  document.getElementById('setup-hole-count').textContent = n;
+}
+
+// ═══════════════════════════════════════
+//  MID-ROUND HOLE COUNT ADJUSTER
+// ═══════════════════════════════════════
+function showHoleAdj() {
+  document.getElementById('hole-adj-val').textContent = AR.holeCount;
+  document.getElementById('hole-adj-bar').style.display = 'flex';
+}
+function hideHoleAdj() {
+  document.getElementById('hole-adj-bar').style.display = 'none';
+}
+function stepHoleAdj(delta) {
+  const el = document.getElementById('hole-adj-val');
+  el.textContent = Math.min(18, Math.max(1, parseInt(el.textContent) + delta));
+}
+function applyHoleAdj() {
+  const newCount = parseInt(document.getElementById('hole-adj-val').textContent);
+  if (newCount === AR.holeCount) { hideHoleAdj(); return; }
+  if (newCount < AR.holeCount) {
+    // Check if any holes beyond newCount have data
+    const dataLost = AR.holes.slice(newCount).some(isHoleDone);
+    if (dataLost && !confirm(`Holes ${newCount+1}–${AR.holeCount} have data that will be removed. Continue?`)) return;
+    AR.holes = AR.holes.slice(0, newCount);
+    if (AH >= newCount) AH = newCount - 1;
+  } else {
+    // Extend: append blank holes
+    for (let i = AR.holeCount; i < newCount; i++) AR.holes.push(blankHole(i+1));
+  }
+  AR.holeCount = newCount;
+  document.getElementById('ri-holecount').textContent = newCount + 'H ✎';
+  hideHoleAdj();
+  saveDraft();
+  renderPills();
+  renderAccordion();
+  updateBottomNav();
 }
 
 // ═══════════════════════════════════════
@@ -959,6 +1030,16 @@ function onGrid2(hi, numPutts, variance) {
 // Table 3: Result × GIR — sets missDirection + gir
 function onGrid3(hi, missDir, gir) {
   const h = AR.holes[hi];
+  // Auto-fill 1-putt + variance=0 if 'made' tapped before Grid 2 is set
+  if (missDir === 'made' && !h.numPutts) {
+    h.numPutts = '1'; h.variance = '0';
+    const tbl2 = document.getElementById(`grid2-${hi}`);
+    if (tbl2) {
+      tbl2.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+      const c2 = document.getElementById(`gc2-${hi}-1-0`);
+      if (c2) c2.classList.add('on');
+    }
+  }
   const isPuttHoled   = h.numPutts === '1';
   const isPacePerfect = h.variance === '0' && !isPuttHoled; // pin-high miss: L/R only
   // Guard: 'made' only when 1-putt; miss dirs only when not 1-putt; short/long not valid when pin-high
@@ -966,16 +1047,6 @@ function onGrid3(hi, missDir, gir) {
   if (missDir !== 'made' && isPuttHoled) return;
   if ((missDir === 'short' || missDir === 'long') && isPacePerfect) return;
   h.missDirection = missDir; h.gir = gir;
-  // If 'made' selected and numPutts not yet set, auto-fill 1-putt
-  if (missDir === 'made' && !h.numPutts) {
-    h.numPutts = '1'; h.variance = '0';
-    const tbl2 = document.getElementById(`grid2-${hi}`);
-    if (tbl2) {
-      tbl2.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
-      const c2 = document.getElementById(`gc2-${hi}-1-0`); // '0' has no special chars
-      if (c2) c2.classList.add('on');
-    }
-  }
   const tbl = document.getElementById(`grid3-${hi}`);
   if (tbl) {
     tbl.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
