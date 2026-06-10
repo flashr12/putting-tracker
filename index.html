@@ -222,6 +222,8 @@
     .kpi-v { font-size:26px; font-weight:800; line-height:1; }
     .kpi-l { font-size:10px; color:#9ca3af; margin-top:3px; text-transform:uppercase; letter-spacing:.05em; }
     .stab { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; color:#6b7280; background:#f3f4f6; white-space:nowrap; border:none; outline:none; }
+    .ins-ftab { padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
+    .ins-ftab.on { background:#003A72; color:#fff; }
     .stab.on { background:#003A72; color:#fff; }
     .brk { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f9fafb; }
     .brk-l { min-width:72px; font-size:12px; color:#6b7280; }
@@ -362,9 +364,6 @@
     </div>
   </div>
 
-  <!-- INSIGHTS -->
-  <div id="view-insights" style="display:none"></div>
-
   <!-- HISTORY -->
   <div id="view-history" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -494,6 +493,18 @@
   </div><!-- /step-holes -->
 </div><!-- /round-shell -->
 
+<!-- ════════════════════════════════════
+     INSIGHTS (filter strip + scroll)
+════════════════════════════════════ -->
+<div id="view-insights" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+  <div id="insights-filter-bar" style="flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;padding:8px 14px;display:flex;gap:6px;overflow-x:auto">
+    <button class="ins-ftab on" onclick="setInsightFilter('all')">All</button>
+    <button class="ins-ftab"   onclick="setInsightFilter(20)">Last 20</button>
+    <button class="ins-ftab"   onclick="setInsightFilter(10)">Last 10</button>
+    <button class="ins-ftab"   onclick="setInsightFilter(5)">Last 5</button>
+  </div>
+  <div id="insights-content" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
+</div>
 
 <!-- ── MODAL ── -->
 <div id="modal-wrap" style="display:none" onclick="closeModal(event)">
@@ -582,12 +593,12 @@ function missIcon(v) {
 //  MAIN VIEW ROUTING
 // ═══════════════════════════════════════
 function showMain(name) {
-  const scrollViews = ['dashboard','history','insights'];
+  const scrollViews = ['dashboard','history'];
   document.getElementById('scroll-main').style.display  = scrollViews.includes(name) ? 'block' : 'none';
   document.getElementById('round-shell').style.display  = (name==='round') ? 'flex' : 'none';
   document.getElementById('view-dashboard').style.display = (name==='dashboard') ? 'block' : 'none';
   document.getElementById('view-history').style.display   = (name==='history') ? 'block' : 'none';
-  document.getElementById('view-insights').style.display  = (name==='insights') ? 'block' : 'none';
+  document.getElementById('view-insights').style.display  = (name==='insights') ? 'flex' : 'none';
   ['dashboard','round','history','insights'].forEach(v => {
     document.getElementById('tab-'+v).classList.toggle('on', v===name);
   });
@@ -1865,9 +1876,24 @@ function generateInsights(rounds) {
   };
 }
 
+let INSIGHT_FILTER = 'all';
+
+function setInsightFilter(val) {
+  INSIGHT_FILTER = val;
+  document.querySelectorAll('.ins-ftab').forEach(b => b.classList.remove('on'));
+  const labels = {'all':'All', 20:'Last 20', 10:'Last 10', 5:'Last 5'};
+  document.querySelectorAll('.ins-ftab').forEach(b => {
+    if (b.textContent.trim() === labels[val]) b.classList.add('on');
+  });
+  renderInsights();
+}
+
 function renderInsights() {
-  const container = document.getElementById('view-insights');
-  const rounds = loadRounds();
+  const container = document.getElementById('insights-content');
+  const allRounds = loadRounds();
+  // Sort newest-first, then apply filter
+  const sorted = [...allRounds].sort((a,b) => b.date.localeCompare(a.date));
+  const rounds  = INSIGHT_FILTER === 'all' ? sorted : sorted.slice(0, INSIGHT_FILTER);
 
   if (!rounds.length) {
     container.innerHTML = `
@@ -1918,7 +1944,7 @@ function renderInsights() {
   <div style="padding:14px;padding-bottom:calc(20px + env(safe-area-inset-bottom))">
 
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:14px">
-      Based on ${totalHoles} putts · ${totalRounds} round${totalRounds!==1?'s':''} · sorted by statistical weight
+      Based on ${totalHoles} putts · ${totalRounds} round${totalRounds!==1?'s':''}${INSIGHT_FILTER !== 'all' ? ` · last ${INSIGHT_FILTER} rounds` : ''} · sorted by statistical weight
     </div>
 
     ${insights.map((ins, i) => {
