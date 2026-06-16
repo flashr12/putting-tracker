@@ -1238,7 +1238,7 @@ function computeStats(holes) {
   return {
     n, makes, makesPct:pct(makes,n), three, threePct:pct(three,n),
     girCount:girH.length, puttsPerGir: girH.length?(girPuts/girH.length).toFixed(2):null,
-    avgPutts:(total/n).toFixed(2),
+    avgPutts:(total/n).toFixed(2), totalPutts: total,
     byDist, bySlope, byDir, misses:misses.length, mL, mS, mLo, mR, byMissByDir, byVar,
     varByDist, varBySlope, varByDir,
     rounds: null // filled in by caller
@@ -1484,9 +1484,9 @@ function generateInsights(rounds) {
   }
 
   const insights = [];
-  function add(z, emoji, title, stat, rec, breakdown = [], pool = null, testFn = null) {
+  function add(z, emoji, title, stat, rec, breakdown = [], pool = null, testFn = null, skipRows = []) {
     if (z < MIN_Z) return;
-    const fb = (pool && testFn) ? fullBd(pool, testFn) : null;
+    const fb = (pool && testFn) ? fullBd(pool, testFn, skipRows) : null;
     insights.push({ z, emoji, title, stat, rec, breakdown, fullBreakdown: fb });
   }
 
@@ -1536,13 +1536,13 @@ function generateInsights(rounds) {
   // ── Contextual recommendation for combinatorial miss insights ──────────
   function comboRec(slope, dg, dir, miss) {
     if (miss === 'left') {
-      if (dir.v === 'r-to-l') return 'You\'re over-reading the break. A firmer stroke holds the ball on line and reduces the R→L pull — aim closer to the hole than feels natural.';
+      if (dir.v === 'r-to-l') return 'You\'re under-reading the R→L break — it\'s pulling further left than you\'re allowing for. A firmer stroke holds the ball on line and reduces the pull; also try aiming further from the hole (more right) than feels natural.';
       if (slope.v === 'down') return 'On downhill putts a slightly closed face pulls left and the slope amplifies the error. Double-check face angle at address before every downhill putt.';
       if (slope.v === 'up') return 'Check your alignment on uphill putts — the tendency is to set up slightly left without realising. Use an intermediate target to confirm your aim.';
       return 'A left miss points to a closed putter face or pull-stroke path. Focus on squaring the face at impact and keeping the path straight through the ball.';
     }
     if (miss === 'right') {
-      if (dir.v === 'l-to-r') return 'You\'re over-reading the L→R break. A firmer stroke reduces the effective break and keeps the ball on line — aim less right than feels natural.';
+      if (dir.v === 'l-to-r') return 'You\'re under-reading the L→R break — it\'s curving further than you\'re planning for and slipping past on the right. A firmer stroke reduces the effective break and keeps the ball more on line; also try aiming further left than feels natural.';
       if (slope.v === 'up') return 'Uphill putts hit too hard can push the face right through over-acceleration. Commit to smooth tempo and a square face rather than forcing pace.';
       if (slope.v === 'down') return 'Decelerating on downhill putts often causes a push-right. Commit to a smooth controlled stroke — don\'t steer it.';
       return 'A right miss suggests an open face or push path. Check face angle at address and keep the putter tracking straight through the ball.';
@@ -1563,7 +1563,9 @@ function generateInsights(rounds) {
   }
 
   // ── Full breakdown: all categories, raw counts, no significance filter ──
-  function fullBd(pool, testFn) {
+  // skipRows: row labels to omit — used when testFn itself is defined by variance
+  // direction, which would make the '1st Putt' row tautological (0%/100% cells).
+  function fullBd(pool, testFn, skipRows = []) {
     const base = pool.length ? pool.filter(testFn).length / pool.length : 0;
     const calc = sub => ({ n: sub.filter(testFn).length, N: sub.length });
     return {
@@ -1584,7 +1586,7 @@ function generateInsights(rounds) {
         { lbl:'1st Putt', cells: VAR_MAG_GROUPS.map(vg => ({
             k: vg.label, ...calc(pool.filter(vg.fn))
           })).filter(c=>c.N>=2) },
-      ].filter(row=>row.cells.length>=2),
+      ].filter(row => row.cells.length>=2 && !skipRows.includes(row.lbl)),
     };
   }
 
@@ -1698,13 +1700,13 @@ function generateInsights(rounds) {
         s.v==='up' ? 'Uphill putts die quickly — add noticeably more pace; aim for 18 inches past.'
         : s.v==='down' ? 'Leaving downhill putts short means you\'re decelerating. Trust the slope through the ball.'
         : 'Add a little more pace and aim for the ball to finish 12 inches past.',
-        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length), sub, h=>SHORT_VAR.includes(h.variance));
+        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length), sub, h=>SHORT_VAR.includes(h.variance), ['1st Putt']);
       add(zt2(nL,sub.length,cLo.count,cLo.n),'📈',
         `Running past the hole on ${s.l} putts`,
         `${pct(nL,sub.length)}% of ${s.v} putts run long (${nL}/${sub.length}) vs ${Math.round(cLo.rate*100)}% on all other putts`,
         s.v==='down' ? 'Shorter backswing, let gravity do the work. Think "dead weight" — just reach the hole.'
         : 'Ease off the pace — aim to finish 12 inches past maximum.',
-        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length), sub, h=>LONG_VAR.includes(h.variance));
+        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length), sub, h=>LONG_VAR.includes(h.variance), ['1st Putt']);
     });
     distGroups.forEach(dg => {
       const sub = varOldHoles.filter(h=>dg.set.has(h.length));
@@ -1718,13 +1720,13 @@ function generateInsights(rounds) {
         `${pct(nS,sub.length)}% of ${dg.label} end up short (${nS}/${sub.length}) vs ${Math.round(cSh.rate*100)}% on all other putts`,
         dg.key==='long' ? 'Focus purely on speed from long range — not direction.'
         : 'Be more committed — aim for 12 inches past the hole minimum.',
-        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length), sub, h=>SHORT_VAR.includes(h.variance));
+        bd(sub, h=>SHORT_VAR.includes(h.variance), nS/sub.length), sub, h=>SHORT_VAR.includes(h.variance), ['1st Putt']);
       add(zt2(nL,sub.length,cLo.count,cLo.n),'📈',
         `Running ${dg.label} well past the hole`,
         `${pct(nL,sub.length)}% of ${dg.label} run long (${nL}/${sub.length}) vs ${Math.round(cLo.rate*100)}% on all other putts`,
         dg.key==='long' ? 'Running long lag putts past leaves difficult come-backers. Practice "die at the hole" pace.'
         : 'You may be over-accelerating. Focus on smooth, controlled tempo.',
-        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length), sub, h=>LONG_VAR.includes(h.variance));
+        bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length), sub, h=>LONG_VAR.includes(h.variance), ['1st Putt']);
     });
   }
 
@@ -1752,7 +1754,7 @@ function generateInsights(rounds) {
         : dg.key==='mid'
         ? 'Mid-range putts hit too hard leave tough second putts. Commit to a smooth tempo — aim to finish 6–12 inches past, not charge the back of the cup.'
         : 'Your long-range pace is too aggressive. Focus on "dying the ball at the hole" — a soft lag that leaves a tap-in beats a charge that runs 6ft past. Practice: lag to a towel 30ft away, not the hole.',
-      [], paceHoles, h=>LONG_VAR.includes(h.variance));
+      [], paceHoles, h=>LONG_VAR.includes(h.variance), ['1st Putt']);
     add(zt(nUnder, nTotal, 0.5), '📉',
       `Leaving ${distLbl} short (pace)`,
       `${pct(nUnder, nTotal)}% of pace errors on ${distLbl} are under-hit (${nUnder}/${nTotal}) — variance data`,
@@ -1763,7 +1765,7 @@ function generateInsights(rounds) {
         : dg.key==='mid'
         ? 'Mid-range putts that die short are a pace problem. Add a touch more weight — aim for 6 inches past the hole minimum to give the ball a chance.'
         : 'Your lag pace is too timid. Commit to rolling the ball 12–18 inches past the hole. A bold putt that misses can still go in; a short one never can.',
-      [], paceHoles, h=>SHORT_VAR.includes(h.variance));
+      [], paceHoles, h=>SHORT_VAR.includes(h.variance), ['1st Putt']);
   });
 
   // ── 3-PUTT RATE ANALYSES ───────────────────────────────
@@ -2128,22 +2130,100 @@ function openModal(id) {
   const s = computeStats(r.holes);
   const dt = new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   document.getElementById('modal-title').textContent = r.course||dt;
+  const mt = s.mL+s.mS+s.mLo+s.mR;
   document.getElementById('modal-body').innerHTML = `
     <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">${dt} · ${s.n} holes</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:800;color:#003A72">${s.makesPct}%</div>
-        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase">Make</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:14px">
+      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:#1f2937">${s.totalPutts}</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Putts</div>
       </div>
-      <div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:800;color:#f59e0b">${s.threePct}%</div>
-        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase">3-Putt</div>
+      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:#003A72">${s.makesPct}%</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Make</div>
       </div>
-      <div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:800;color:#3b82f6">${s.puttsPerGir??'—'}</div>
-        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase">P/GIR</div>
+      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:#f59e0b">${s.threePct}%</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">3-Putt</div>
+      </div>
+      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:#3b82f6">${s.puttsPerGir??'—'}</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">P/GIR</div>
+      </div>
+      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:#1f2937">${s.avgPutts}</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Avg/Hole</div>
       </div>
     </div>
+
+    <!-- Breakdown tabs -->
+    <div style="background:#f9fafb;border-radius:12px;overflow:hidden;margin-bottom:16px">
+      <div style="display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid #f3f4f6;overflow-x:auto">
+        <button class="stab on" onclick="setModalStab(this,'dist')">Distance</button>
+        <button class="stab"    onclick="setModalStab(this,'slope')">Slope</button>
+        <button class="stab"    onclick="setModalStab(this,'dir')">Direction</button>
+        <button class="stab"    onclick="setModalStab(this,'miss')">Miss</button>
+        <button class="stab"    onclick="setModalStab(this,'var')">Variance</button>
+      </div>
+      <div style="padding:12px">
+        <div id="mstab-dist">
+          <table style="width:100%;font-size:11px;border-collapse:collapse">
+            <thead><tr style="color:#9ca3af">
+              <th style="text-align:left;padding:4px 2px">Range</th>
+              <th style="text-align:center;padding:4px 2px">Tries</th>
+              <th style="text-align:center;padding:4px 2px">Makes</th>
+              <th style="text-align:center;padding:4px 2px">Make%</th>
+              <th style="text-align:right;padding:4px 2px">3-Putt%</th>
+            </tr></thead>
+            <tbody>
+              ${s.byDist.filter(d=>d.n>0).map(d=>`
+                <tr style="border-top:1px solid #f3f4f6">
+                  <td style="padding:5px 2px;font-weight:600;color:#374151">${d.b}</td>
+                  <td style="text-align:center;color:#9ca3af">${d.n}</td>
+                  <td style="text-align:center;color:#9ca3af">${d.m}</td>
+                  <td style="text-align:center;font-weight:700;color:${colorForPct(d.mp)}">${d.mp!==null?d.mp+'%':'—'}</td>
+                  <td style="text-align:right;font-weight:700;color:${colorForPct(d.tp!==null?100-d.tp:null)}">${pct(d.tp,d.n)!==null?pct(d.tp,d.n)+'%':'—'}</td>
+                </tr>`).join('') || '<tr><td colspan="5" style="padding:8px;color:#9ca3af;text-align:center">No data</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <div id="mstab-slope" style="display:none">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Make % by Slope</div>
+          ${s.bySlope.map(sl=>brkHTML(sl.l,sl.mp,sl.n)).join('')}
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">3-Putt % by Slope</div>
+          ${s.bySlope.map(sl=>brkHTML(sl.l,sl.tp,sl.n)).join('')}
+        </div>
+        <div id="mstab-dir" style="display:none">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Make % by Break</div>
+          ${s.byDir.map(d=>brkHTML(d.l,d.mp,d.n)).join('')}
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">3-Putt % by Break</div>
+          ${s.byDir.map(d=>brkHTML(d.l,d.tp,d.n)).join('')}
+        </div>
+        <div id="mstab-miss" style="display:none">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Miss Side</div>
+          ${mt?brkHTML('◀ Left',pct(s.mL,mt),s.mL)+brkHTML('▶ Right',pct(s.mR,mt),s.mR)+brkHTML('▼ Short',pct(s.mS,mt),s.mS)+brkHTML('▲ Long',pct(s.mLo,mt),s.mLo)
+             :'<p style="font-size:12px;color:#9ca3af">No miss data yet</p>'}
+        </div>
+        <div id="mstab-var" style="display:none">
+          <table style="width:100%;font-size:11px;border-collapse:collapse">
+            <thead><tr style="color:#9ca3af">
+              <th style="text-align:left;padding:3px 2px">Variance</th>
+              <th style="text-align:center;padding:3px 2px">Count</th>
+              <th style="text-align:right;padding:3px 2px">Make%</th>
+            </tr></thead>
+            <tbody>
+              ${s.byVar.filter(v=>v.n>0).map(v=>`
+                <tr style="border-top:1px solid #f3f4f6">
+                  <td style="padding:4px 2px;font-weight:600;color:#374151">${v.v}</td>
+                  <td style="text-align:center;color:#9ca3af">${v.n}</td>
+                  <td style="text-align:right;font-weight:700;color:${colorForPct(v.mp)}">${v.mp!==null?v.mp+'%':'—'}</td>
+                </tr>`).join('') || '<tr><td colspan="3" style="padding:8px;color:#9ca3af;text-align:center">No data</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Hole Detail</div>
     <div>
       <table style="width:100%;border-collapse:collapse;font-size:11px">
@@ -2173,6 +2253,15 @@ function openModal(id) {
       </table>
     </div>`;
   document.getElementById('modal-wrap').style.display = 'flex';
+}
+
+function setModalStab(el, name) {
+  el.parentElement.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  ['dist','slope','dir','miss','var'].forEach(t => {
+    const e = document.getElementById('mstab-'+t);
+    if (e) e.style.display = t===name ? 'block' : 'none';
+  });
 }
 
 function closeModal(e) { if(e.target===document.getElementById('modal-wrap')) closeModalBtn(); }
