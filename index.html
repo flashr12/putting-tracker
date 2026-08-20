@@ -497,11 +497,12 @@
      INSIGHTS (filter strip + scroll)
 ════════════════════════════════════ -->
 <div id="view-insights" style="display:none;flex-direction:column;flex:1;overflow:hidden">
-  <div id="insights-filter-bar" style="flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;padding:8px 14px;display:flex;gap:6px;overflow-x:auto">
+  <div id="insights-filter-bar" style="flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;padding:8px 14px;display:flex;gap:6px;overflow-x:auto;align-items:center">
     <button class="ins-ftab on" onclick="setInsightFilter('all')">All</button>
     <button class="ins-ftab"   onclick="setInsightFilter(20)">Last 20</button>
     <button class="ins-ftab"   onclick="setInsightFilter(10)">Last 10</button>
     <button class="ins-ftab"   onclick="setInsightFilter(5)">Last 5</button>
+    <button onclick="printInsights()" style="margin-left:auto;flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#003A72;background:#dbe8f5;border:none;outline:none;white-space:nowrap">⬇ PDF</button>
   </div>
   <div id="insights-content" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
 </div>
@@ -2023,6 +2024,34 @@ function renderInsights() {
       σ = standard deviations from your baseline (higher = more significant).
     </div>
   </div>`;
+}
+
+function printInsights() {
+  const content = document.getElementById('insights-content').innerHTML;
+  if (!content.trim()) { alert('No insights to print yet.'); return; }
+  const filterLabel = INSIGHT_FILTER === 'all' ? 'All Rounds' : `Last ${INSIGHT_FILTER} Rounds`;
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Putting Insights — ${filterLabel}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1f2937; padding: 24px 20px; max-width: 680px; margin: 0 auto; }
+    h1 { font-size: 22px; font-weight: 800; color: #002855; margin-bottom: 4px; }
+    .sub { font-size: 12px; color: #9ca3af; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; }
+    @media print { .no-print { display: none; } div { page-break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <h1>&#9971; Putting Insights</h1>
+  <div class="sub">${filterLabel} &middot; Generated ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}</div>
+  ${content}
+  <script>setTimeout(function(){ window.print(); }, 400);<\/script>
+</body>
+</html>`);
+  w.document.close();
 }
 
 // ═══════════════════════════════════════
