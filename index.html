@@ -225,6 +225,10 @@
     .ins-ftab { padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
     .ins-ftab.on { background:#003A72; color:#fff; }
     .stab.on { background:#003A72; color:#fff; }
+    .tr-tab  { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
+    .tr-tab.on  { background:#003A72; color:#fff; }
+    .tr3-tab { padding:3px 9px; border-radius:16px; font-size:10px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
+    .tr3-tab.on { background:#1a4f8a; color:#fff; }
     .brk { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f9fafb; }
     .brk-l { min-width:72px; font-size:12px; color:#6b7280; }
     .brk-bg { flex:1; height:7px; background:#f3f4f6; border-radius:99px; overflow:hidden; }
@@ -1880,6 +1884,8 @@ function generateInsights(rounds) {
 }
 
 let INSIGHT_FILTER = 'all';
+let TREND_TAB    = 'make';
+let TREND_3P_TAB = 'dist';
 
 function setInsightFilter(val) {
   INSIGHT_FILTER = val;
@@ -1891,16 +1897,225 @@ function setInsightFilter(val) {
   renderInsights();
 }
 
+function setTrendTab(name) {
+  TREND_TAB = name;
+  document.querySelectorAll('.tr-tab').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll(`.tr-tab[data-tab="${name}"]`).forEach(b => b.classList.add('on'));
+  ['make','pace','miss','3putt'].forEach(t => {
+    const el = document.getElementById('tt-' + t);
+    if (el) el.style.display = t === name ? 'block' : 'none';
+  });
+}
+
+function set3pTrendTab(name) {
+  TREND_3P_TAB = name;
+  document.querySelectorAll('.tr3-tab').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll(`.tr3-tab[data-tab="${name}"]`).forEach(b => b.classList.add('on'));
+  ['dist','var','slope'].forEach(t => {
+    const el = document.getElementById('tt3-' + t);
+    if (el) el.style.display = t === name ? 'block' : 'none';
+  });
+}
+
+// ── Impact-based insights engine ────────────────────────────────────────────
+function computeImpactInsights(rounds) {
+  const DG = [
+    { label:'≤3ft',  key:'short',   set:new Set(['≤3','1-3']) },
+    { label:'4–8ft', key:'scoring', set:new Set(['4-8','4-6','7-10']) },
+    { label:'9–20ft',key:'mid',     set:new Set(['9-20','11-15','16-20']) },
+    { label:'21ft+', key:'long',    set:new Set(['21+','21-30','30-50','50+']) },
+  ];
+  const VG = [
+    { label:'≥3ft short', fn: h => SHORT_VAR.filter(v=>v!=='-1').includes(h.variance) },
+    { label:'1ft short',  fn: h => h.variance === '-1'  },
+    { label:'On pace',    fn: h => h.variance === '0'   },
+    { label:'1ft long',   fn: h => h.variance === '+1'  },
+    { label:'≥3ft long',  fn: h => LONG_VAR.filter(v=>v!=='+1').includes(h.variance) },
+  ];
+
+  const sorted = [...rounds].sort((a,b) => b.date.localeCompare(a.date));
+  const allH   = sorted.flatMap(r => (r.holes||[]).filter(h => h.numPutts));
+  const N = allH.length, R = sorted.length;
+  if (N < 15) return { N, R, insufficient: true };
+
+  const rate  = (pool, fn) => pool.length >= 1 ? pool.filter(fn).length / pool.length : null;
+  const is3   = h => parseInt(h.numPutts) >= 3;
+  const is1   = h => h.numPutts === '1';
+  const isMissed = h => parseInt(h.numPutts) >= 2 && h.missDirection && h.missDirection !== 'made';
+  const isShortV = h => SHORT_VAR.includes(h.variance);
+  const isLongV  = h => LONG_VAR.includes(h.variance);
+  const isOnPace = h => h.variance === '0';
+
+  const overall3pR = rate(allH, is3) || 0;
+  const overallMkR = rate(allH, is1) || 0;
+  const allMisses  = allH.filter(isMissed);
+  const varHoles   = allH.filter(h => h.variance && parseInt(h.numPutts) >= 2);
+
+  // ── Focus areas ──────────────────────────────────────────────────────────
+  const MIN_N = 15, MIN_IMP = 0.08;
+  const candidates = [];
+
+  const tryAdd = cfg => {
+    const { pool, testFn, baseRate } = cfg;
+    if (!pool || pool.length < MIN_N) return;
+    const sr = rate(pool, testFn);
+    if (sr === null || sr <= baseRate) return;
+    const imp = (sr - baseRate) * pool.length / R;
+    if (imp < MIN_IMP) return;
+    candidates.push({ ...cfg, subRate: sr, imp });
+  };
+
+  // 3-putt by distance
+  const tpDistRec = {
+    long:    'Long-range 3-putts are a pace problem. From 20ft+, commit to landing every first putt inside a 3-foot circle — speed is the priority, direction is secondary. Practice distance feel with eyes-closed putting from 25–35ft.',
+    mid:     'Mid-range 3-putts often come from deceleration on the first putt. Commit to a positive, accelerating stroke — aim to finish 12 inches past every time.',
+    scoring: '3-putting from 4–8ft is very costly. Take extra care over your read, commit fully to your line, and stroke it with confidence. Own this distance.',
+    short:   '3-putting from close range is a mental challenge. Slow your routine, take a breath, and commit to a single confident stroke.',
+  };
+  DG.forEach(dg => {
+    const sub = allH.filter(h => dg.set.has(h.length));
+    tryAdd({ type:'3putt_dist', emoji:'🎯', title:`3-putt rate: ${dg.label}`, pool:sub, testFn:is3, baseRate:overall3pR, rec:tpDistRec[dg.key] });
+  });
+
+  // 3-putt by slope
+  const tpSlopeRec = {
+    flat: 'Flat-surface 3-putts are a lag pace issue. Set a 3-foot circle drill and practice landing every first putt inside it from various distances.',
+    up:   'Uphill lags die fast — add noticeably more pace, aiming 18 inches past the hole to make sure it gets there.',
+    down: 'Downhill 3-putts: "speed first." Your job is to leave the ball inside 3 feet, then make the short one. Never charge a downhill lag.',
+  };
+  SLOPE_OPTS.forEach(s => {
+    const label = s.v==='flat'?'flat':s.v==='up'?'uphill':'downhill';
+    tryAdd({ type:'3putt_slope', emoji:'🎯', title:`3-putt rate: ${label}`, pool:allH.filter(h=>h.slope===s.v), testFn:is3, baseRate:overall3pR, rec:tpSlopeRec[s.v] });
+  });
+
+  // Pace: over/under-hit by distance
+  const paceRec = {
+    scoring_over:  'Scoring putts hit too hard lip out and leave tricky come-backers. Commit to smooth tempo — aim 6 inches past the hole, not at the back of the cup.',
+    scoring_under: 'Scoring putts dying short means deceleration. Add a touch more pace and aim to finish at least 6 inches past on every putt.',
+    long_over:     'Over-hitting lag putts leaves 6ft+ come-backers. Aim to die the ball at the hole, not past it. Lag drill: putt into a hula hoop 25–35ft away, not a hole.',
+    long_under:    'Leaving lags short gives you no chance. Commit to rolling the ball 12–18 inches past. A bold putt can still go in; a short one never can.',
+    mid_over:      'Mid-range over-hits leave difficult second putts. Smooth tempo — aim 6–12 inches past.',
+    mid_under:     'Mid-range putts dying short shows deceleration. Accelerate through the ball, aim 12 inches past.',
+    short_over:    'Short putts hit too hard charge past. Slow the stroke — smooth acceleration just to the back of the cup.',
+    short_under:   'Short putts dying short is a confidence issue. Commit fully — smooth acceleration through the ball.',
+  };
+  if (varHoles.length >= MIN_N) {
+    const baseOver  = rate(varHoles, isLongV)  || 0;
+    const baseUnder = rate(varHoles, isShortV) || 0;
+    DG.forEach(dg => {
+      const sub = varHoles.filter(h => dg.set.has(h.length));
+      if (sub.length < MIN_N) return;
+      tryAdd({ type:'pace_over_'+dg.key,  emoji:'📈', title:`Over-hitting ${dg.label}`,  pool:sub, testFn:isLongV,  baseRate:baseOver,  rec:paceRec[dg.key+'_over']  || '' });
+      tryAdd({ type:'pace_under_'+dg.key, emoji:'📉', title:`Leaving ${dg.label} short`, pool:sub, testFn:isShortV, baseRate:baseUnder, rec:paceRec[dg.key+'_under'] || '' });
+    });
+  }
+
+  // Miss direction
+  if (allMisses.length >= MIN_N) {
+    const missRec = {
+      right: 'A consistent right miss points to an open putter face or push-stroke path. Focus on squaring the face at impact and keeping your follow-through on the intended line. Drill: set an alignment stick along your target line and keep the putter on it.',
+      left:  'A consistent left miss indicates a closed face or pull path. Check grip pressure and confirm the face is square at address. Drill: practice with a coin just outside your right toe to prevent the pull.',
+      short: '"Never up, never in." Your read is good — commit to pace. Aim to finish every putt at least 12 inches past on the practice green.',
+      long:  'Your read is good but pace is too aggressive. Aim to finish 6 inches past the hole — not the back of the cup.',
+    };
+    const baseDir = 0.25; // expected random rate per direction
+    ['right','left','short','long'].forEach(dir => {
+      const emojis = {right:'▶',left:'◀',short:'▼',long:'▲'};
+      tryAdd({ type:'miss_'+dir, emoji:emojis[dir], title:`Miss tendency: ${dir}`, pool:allMisses, testFn:h=>h.missDirection===dir, baseRate:baseDir, rec:missRec[dir] });
+    });
+  }
+
+  // Rank by impact, keep best per type-family (max 5 total)
+  candidates.sort((a, b) => b.imp - a.imp);
+  const seenFamilies = new Set();
+  const focusAreas = [];
+  for (const c of candidates) {
+    if (focusAreas.length >= 5) break;
+    const family = c.type.replace(/_[^_]+$/, ''); // '3putt_dist' → '3putt', 'pace_over' → 'pace', 'miss' → 'miss'
+    // Allow up to 2 from same family so both 3putt and pace can each contribute
+    const famCount = focusAreas.filter(f => f.type.replace(/_[^_]+$/, '') === family).length;
+    if (famCount >= 2) continue;
+    focusAreas.push(c);
+  }
+
+  // ── Overall summary ──────────────────────────────────────────────────────
+  const last5H = sorted.slice(0, 5).flatMap(r => (r.holes||[]).filter(h => h.numPutts));
+  const totalPuttCount = allH.reduce((s, h) => s + parseInt(h.numPutts), 0);
+  const summary = {
+    avgPutts:  (totalPuttCount / N).toFixed(2),
+    makeR:     Math.round(overallMkR * 100),
+    threePR:   Math.round(overall3pR * 100),
+    avgPutts5: last5H.length >= 5 ? (last5H.reduce((s,h)=>s+parseInt(h.numPutts),0)/last5H.length).toFixed(2) : null,
+    makeR5:    last5H.length >= 5 ? Math.round((rate(last5H, is1)||0) * 100) : null,
+    threePR5:  last5H.length >= 5 ? Math.round((rate(last5H, is3)||0) * 100) : null,
+  };
+
+  // ── Trend tables ─────────────────────────────────────────────────────────
+  const periodDefs = [
+    { label:'All time', h: allH },
+    { label:'Last 20',  h: sorted.slice(0,20).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts)) },
+    { label:'Last 10',  h: sorted.slice(0,10).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts)) },
+    { label:'Last 5',   h: sorted.slice(0,5).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts))  },
+  ].filter(p => p.h.length >= 5);
+
+  const cell = (pool, fn, minN=5) => pool.length>=minN ? Math.round(pool.filter(fn).length/pool.length*100) : null;
+
+  const trends = {
+    make: periodDefs.map(p => ({
+      period: p.label, n: p.h.length,
+      cols: [
+        { label:'Overall', v:cell(p.h, is1) },
+        ...DG.map(dg => ({ label:dg.label, v:cell(p.h.filter(h=>dg.set.has(h.length)), is1) })),
+      ],
+    })),
+    pace: periodDefs.map(p => {
+      const vh = p.h.filter(h => h.variance && parseInt(h.numPutts)>=2);
+      return { period:p.label, n:vh.length, cols:[
+        { label:'% Short',   v:cell(vh, isShortV) },
+        { label:'% On pace', v:cell(vh, isOnPace) },
+        { label:'% Long',    v:cell(vh, isLongV)  },
+      ]};
+    }),
+    miss: periodDefs.map(p => {
+      const m = p.h.filter(isMissed);
+      return { period:p.label, n:m.length, cols:[
+        { label:'← Left',  v:cell(m, h=>h.missDirection==='left')  },
+        { label:'→ Right', v:cell(m, h=>h.missDirection==='right') },
+        { label:'▼ Short', v:cell(m, h=>h.missDirection==='short') },
+        { label:'▲ Long',  v:cell(m, h=>h.missDirection==='long')  },
+      ]};
+    }),
+    tp_dist: periodDefs.map(p => ({
+      period:p.label, n:p.h.length,
+      cols:[
+        { label:'Overall', v:cell(p.h, is3) },
+        ...DG.map(dg => ({ label:dg.label, v:cell(p.h.filter(h=>dg.set.has(h.length)), is3) })),
+      ],
+    })),
+    tp_var: periodDefs.map(p => ({
+      period:p.label, n:p.h.length,
+      cols: VG.map(vg => ({ label:vg.label, v:cell(p.h.filter(vg.fn), is3) })),
+    })),
+    tp_slope: periodDefs.map(p => ({
+      period:p.label, n:p.h.length,
+      cols: SLOPE_OPTS.map(s => ({
+        label: s.v==='flat'?'Flat':s.v==='up'?'Uphill':'Downhill',
+        v: cell(p.h.filter(h=>h.slope===s.v), is3),
+      })),
+    })),
+  };
+
+  return { N, R, summary, focusAreas, trends };
+}
+
 function renderInsights() {
   const container = document.getElementById('insights-content');
   const allRounds = loadRounds();
-  // Sort newest-first, then apply filter
-  const sorted = [...allRounds].sort((a,b) => b.date.localeCompare(a.date));
-  const rounds  = INSIGHT_FILTER === 'all' ? sorted : sorted.slice(0, INSIGHT_FILTER);
+  const sortedAll = [...allRounds].sort((a,b) => b.date.localeCompare(a.date));
+  const rounds    = INSIGHT_FILTER === 'all' ? sortedAll : sortedAll.slice(0, INSIGHT_FILTER);
 
   if (!rounds.length) {
-    container.innerHTML = `
-    <div style="text-align:center;padding:60px 16px;color:#9ca3af">
+    container.innerHTML = `<div style="text-align:center;padding:60px 16px;color:#9ca3af">
       <div style="font-size:52px">💡</div>
       <p style="font-weight:600;color:#374151;margin:8px 0 4px">No data yet</p>
       <p style="font-size:13px">Complete a round to start getting insights</p>
@@ -1909,119 +2124,194 @@ function renderInsights() {
     return;
   }
 
-  const result = generateInsights(rounds);
+  const data = computeImpactInsights(rounds);
 
-  if (result.totalHoles < 15) {
-    container.innerHTML = `
-    <div style="padding:16px">
+  if (data.insufficient) {
+    container.innerHTML = `<div style="padding:16px">
       <div style="background:#fff;border-radius:16px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
         <div style="font-size:40px;margin-bottom:10px">📊</div>
         <p style="font-weight:700;color:#374151;margin-bottom:6px">Building your profile…</p>
-        <p style="font-size:13px;color:#9ca3af;line-height:1.5">${result.totalHoles} putts tracked across ${result.totalRounds} round${result.totalRounds!==1?'s':''}.<br>Need around 30+ putts for meaningful patterns.</p>
-      </div>
-    </div>`;
+        <p style="font-size:13px;color:#9ca3af;line-height:1.5">${data.N} putts tracked across ${data.R} round${data.R!==1?'s':''}.<br>Need 15+ putts for meaningful patterns.</p>
+      </div></div>`;
     return;
   }
 
-  const { insights, totalHoles, totalRounds, totalMisses } = result;
+  const { summary, focusAreas, trends } = data;
 
-  if (!insights.length) {
-    container.innerHTML = `
-    <div style="padding:16px">
-      <div style="background:#fff;border-radius:16px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
-        <div style="font-size:40px;margin-bottom:10px">✅</div>
-        <p style="font-weight:700;color:#374151;margin-bottom:6px">No significant patterns found</p>
-        <p style="font-size:13px;color:#9ca3af;line-height:1.5">Your putting is consistent across all conditions — great sign! Keep adding rounds for more granular analysis.</p>
-      </div>
-    </div>`;
-    return;
+  // ── Badge style ───────────────────────────────────────────────────────────
+  function badge(fa) {
+    const rel = fa.baseRate > 0 ? fa.subRate / fa.baseRate : fa.subRate / 0.05;
+    if (rel >= 2.5) return { label:'HIGH IMPACT', bg:'#fef2f2', border:'#fca5a5', badgeBg:'#dc2626' };
+    if (rel >= 1.5) return { label:'MEDIUM',      bg:'#fffbeb', border:'#fcd34d', badgeBg:'#d97706' };
+    return              { label:'NOTE',          bg:'#eff6ff', border:'#bfdbfe', badgeBg:'#3b82f6' };
   }
 
-  function impactStyle(z) {
-    if (z >= 2.5) return { label:'HIGH IMPACT', bg:'#fef2f2', border:'#fca5a5', badgeBg:'#dc2626', badgeText:'#fff' };
-    if (z >= 1.5) return { label:'MEDIUM',      bg:'#fffbeb', border:'#fcd34d', badgeBg:'#d97706', badgeText:'#fff' };
-    return              { label:'NOTE',          bg:'#eff6ff', border:'#bfdbfe', badgeBg:'#3b82f6', badgeText:'#fff' };
+  // ── Breakdown grid (hidden by default) ───────────────────────────────────
+  function bdGrid(pool, testFn, skipVarRow) {
+    const allRate = pool.length ? pool.filter(testFn).length / pool.length : 0;
+    const c = (sub) => {
+      if (sub.length < 3) return null;
+      const n = sub.filter(testFn).length;
+      const r = n / sub.length;
+      const col = r > allRate + 0.06 ? '#dc2626' : r < allRate - 0.06 ? '#16a34a' : '#374151';
+      return `<div style="flex:1;background:rgba(255,255,255,.55);border-radius:5px;padding:3px;text-align:center;min-width:0">
+        <div style="font-size:8px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sub._label||''}</div>
+        <div style="font-size:11px;font-weight:800;color:${col}">${Math.round(r*100)}%</div>
+        <div style="font-size:8px;color:#9ca3af">${n}/${sub.length}</div></div>`;
+    };
+    const DGx = [{label:'≤3ft',set:new Set(['≤3','1-3'])},{label:'4–8ft',set:new Set(['4-8','4-6','7-10'])},{label:'9–20ft',set:new Set(['9-20','11-15','16-20'])},{label:'21ft+',set:new Set(['21+','21-30','30-50','50+'])}];
+    const VGx = [
+      {label:'≥3ft short',fn:h=>SHORT_VAR.filter(v=>v!=='-1').includes(h.variance)},
+      {label:'1ft short', fn:h=>h.variance==='-1'},{label:'On pace',fn:h=>h.variance==='0'},
+      {label:'1ft long',  fn:h=>h.variance==='+1'},{label:'≥3ft long',fn:h=>LONG_VAR.filter(v=>v!=='+1').includes(h.variance)},
+    ];
+    const rows = [
+      { lbl:'Slope', subs: SLOPE_OPTS.map(s => Object.assign(pool.filter(h=>h.slope===s.v), {_label:s.v==='flat'?'Flat':s.v==='up'?'Uphill':'Downhill'})) },
+      { lbl:'Dist',  subs: DGx.map(dg  => Object.assign(pool.filter(h=>dg.set.has(h.length)), {_label:dg.label})) },
+      { lbl:'Break', subs: DIR_OPTS.map(d  => Object.assign(pool.filter(h=>h.direction===d.v), {_label:d.v==='straight'?'Str':d.v==='l-to-r'?'L→R':'R→L'})) },
+      ...(skipVarRow ? [] : [{ lbl:'Pace', subs: VGx.map(vg => Object.assign(pool.filter(vg.fn), {_label:vg.label})) }]),
+    ].filter(row => row.subs.filter(s=>s.length>=3).length >= 2);
+    if (!rows.length) return '';
+    return rows.map(row => `<div style="display:flex;align-items:center;gap:3px;margin-bottom:4px">
+      <span style="font-size:9px;color:#9ca3af;min-width:36px;font-weight:700;flex-shrink:0">${row.lbl}</span>
+      ${row.subs.filter(s=>s.length>=3).map(s=>c(s)).join('')}
+    </div>`).join('');
   }
 
-  container.innerHTML = `
-  <div style="padding:14px;padding-bottom:calc(20px + env(safe-area-inset-bottom))">
+  // ── Trend table ───────────────────────────────────────────────────────────
+  // higherIsBetter: true = green when newer period > all-time (make%)
+  //                false = green when newer period < all-time (3-putt, miss%)
+  function trendTable(rows, higherIsBetter) {
+    if (!rows.length) return '<p style="font-size:12px;color:#9ca3af;padding:4px 0">Not enough data yet</p>';
+    const atv = rows[0].cols; // all-time reference
+    const thStyle = 'text-align:center;padding:5px 3px;color:#9ca3af;font-weight:700;font-size:10px;white-space:nowrap';
+    const th = `<th style="text-align:left;padding:5px 4px;color:#9ca3af;font-weight:700;font-size:10px">Period</th>`
+             + atv.map(c=>`<th style="${thStyle}">${c.label}</th>`).join('');
+    const body = rows.map((row, ri) => {
+      const cells = row.cols.map((c, ci) => {
+        const v = c.v, ref = atv[ci].v;
+        let bg = 'transparent', color = '#374151', fw = '600';
+        if (ri === 0) { fw = '700'; color = '#1f2937'; }
+        else if (v !== null && ref !== null) {
+          const better = higherIsBetter ? v > ref : v < ref;
+          const worse  = higherIsBetter ? v < ref : v > ref;
+          if (better) { bg='#f0fdf4'; color='#16a34a'; }
+          else if (worse) { bg='#fef2f2'; color='#dc2626'; }
+        }
+        return `<td style="text-align:center;padding:5px 3px;font-weight:${fw};color:${color};background:${bg};border-radius:4px">${v!==null?v+'%':'<span style="color:#d1d5db">—</span>'}</td>`;
+      }).join('');
+      return `<tr${ri>0?' style="border-top:1px solid #f3f4f6"':''}><td style="padding:5px 4px;font-weight:${ri===0?'700':'600'};color:#374151;white-space:nowrap">${row.period}</td>${cells}</tr>`;
+    }).join('');
+    return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
 
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:14px">
-      Based on ${totalHoles} putts · ${totalRounds} round${totalRounds!==1?'s':''}${INSIGHT_FILTER !== 'all' ? ` · last ${INSIGHT_FILTER} rounds` : ''} · sorted by statistical weight
+  // ── Summary card ──────────────────────────────────────────────────────────
+  const kpis = [
+    { label:'Make %',   v:summary.makeR+'%',   v5:summary.makeR5!==null?summary.makeR5+'%':null,   better:'higher' },
+    { label:'3-Putt %', v:summary.threePR+'%', v5:summary.threePR5!==null?summary.threePR5+'%':null, better:'lower'  },
+    { label:'Avg Putts',v:summary.avgPutts,    v5:summary.avgPutts5, better:'lower', raw:true },
+  ];
+  const summaryHTML = `
+  <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:12px">
+      Performance · ${data.N} putts · ${data.R} round${data.R!==1?'s':''}${INSIGHT_FILTER!=='all'?` · last ${INSIGHT_FILTER} rounds`:''}
     </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      ${kpis.map(k => {
+        let arrowEl = '';
+        if (k.v5 !== null) {
+          const vn = parseFloat(k.v), v5n = parseFloat(k.v5);
+          const better = k.better==='higher' ? v5n > vn : v5n < vn;
+          const worse  = k.better==='higher' ? v5n < vn : v5n > vn;
+          arrowEl = better ? ' <span style="color:#16a34a">▲</span>' : worse ? ' <span style="color:#dc2626">▼</span>' : '';
+        }
+        return `<div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:18px;font-weight:800;color:#1f2937">${k.v}</div>
+          <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">${k.label}</div>
+          ${k.v5!==null?`<div style="font-size:9px;color:#6b7280;margin-top:2px">Last 5: ${k.v5}${arrowEl}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:10px;color:#9ca3af;line-height:1.5;border-top:1px solid #f3f4f6;padding-top:10px">
+      📌 <strong>Priority method:</strong> (your rate in condition − your overall rate) × frequency ÷ rounds played. Conditions with fewer than 15 putts excluded.
+    </div>
+  </div>`;
 
-    ${insights.map((ins, i) => {
-      const st = impactStyle(ins.z);
-      const pctBar = Math.min(100, Math.round((ins.z / 4) * 100));
-      return `
-      <div style="background:${st.bg};border-radius:16px;padding:16px;margin-bottom:12px;
-                  border:1.5px solid ${st.border};box-shadow:0 1px 4px rgba(0,0,0,.06)">
+  // ── Focus area cards ──────────────────────────────────────────────────────
+  const focusHTML = focusAreas.length ? `
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:10px">Focus areas — ranked by impact</div>
+  ${focusAreas.map((fa, i) => {
+    const st = badge(fa);
+    const n  = fa.pool.filter(fa.testFn).length;
+    const sr = Math.round(fa.subRate * 100), br = Math.round(fa.baseRate * 100);
+    const impTxt = fa.type.startsWith('3putt') ? `~${fa.imp.toFixed(1)} extra 3-putts/round` : `${sr}% vs ${br}% baseline`;
+    const bdId   = `fabd-${i}`;
+    const skipV  = fa.type.startsWith('pace_');
+    const bd     = bdGrid(fa.pool, fa.testFn, skipV);
+    return `
+    <div style="background:${st.bg};border-radius:16px;padding:16px;margin-bottom:12px;border:1.5px solid ${st.border};box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="background:${st.badgeBg};color:#fff;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:800;letter-spacing:.05em">${st.label}</div>
+        <div style="font-size:10px;color:#9ca3af">#${i+1} of ${focusAreas.length}</div>
+        <div style="margin-left:auto;font-size:10px;font-weight:700;color:${st.badgeBg}">${impTxt}</div>
+      </div>
+      <div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:8px;line-height:1.3">${fa.emoji} ${fa.title}</div>
+      <div style="background:rgba(255,255,255,.7);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+        <div style="font-size:12px;color:#374151;line-height:1.5">${sr}% in this condition (${n}/${fa.pool.length}) vs your overall ${br}%</div>
+      </div>
+      <div style="font-size:12px;color:#1f2937;line-height:1.6;margin-bottom:10px">
+        <span style="font-weight:800;color:#002855">💡 Fix: </span>${fa.rec}
+      </div>
+      ${bd ? `<button onclick="(function(b,el){el.style.display=el.style.display==='none'?'block':'none';b.textContent=b.textContent.includes('▼')?'Hide details ▲':'Details by condition ▼';})(this,document.getElementById('${bdId}'))"
+        style="border:none;background:rgba(0,0,0,.06);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;color:#374151;cursor:pointer;width:100%;text-align:center;margin-bottom:2px">
+        Details by condition ▼
+      </button>
+      <div id="${bdId}" style="display:none;margin-top:8px">${bd}</div>` : ''}
+    </div>`;
+  }).join('')}` : `
+  <div style="background:#fff;border-radius:16px;padding:20px;text-align:center;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+    <div style="font-size:40px;margin-bottom:10px">✅</div>
+    <p style="font-weight:700;color:#374151;margin-bottom:6px">No significant patterns found</p>
+    <p style="font-size:13px;color:#9ca3af;line-height:1.5">Your putting is consistent across all conditions. Keep adding rounds for more granular analysis.</p>
+  </div>`;
 
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="background:${st.badgeBg};color:${st.badgeText};border-radius:6px;
-                        padding:3px 9px;font-size:10px;font-weight:800;letter-spacing:.05em">${st.label}</div>
-            <div style="font-size:10px;color:#9ca3af">#${i+1} of ${insights.length}</div>
-          </div>
-          <div style="font-size:10px;color:#9ca3af">sig: ${ins.z.toFixed(1)}σ</div>
-        </div>
+  // ── Trends section ────────────────────────────────────────────────────────
+  const tTabDefs = [{k:'make',l:'Make %'},{k:'pace',l:'Pace'},{k:'miss',l:'Miss Dir'},{k:'3putt',l:'3-Putt'}];
+  const tp3Defs  = [{k:'dist',l:'By Distance'},{k:'var',l:'By Variance'},{k:'slope',l:'By Slope'}];
 
-        <div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:8px;line-height:1.3">
-          ${ins.emoji} ${ins.title}
-        </div>
+  const trendsHTML = `
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:10px">Trends over time</div>
+  <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+    <div style="display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">
+      ${tTabDefs.map(t=>`<button class="tr-tab${t.k===TREND_TAB?' on':''}" data-tab="${t.k}" onclick="setTrendTab('${t.k}')">${t.l}</button>`).join('')}
+    </div>
+    <div id="tt-make" style="${TREND_TAB==='make'?'':'display:none'}">
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of holes holed with 1 putt. ↑ green = improving vs all-time.</div>
+      ${trendTable(trends.make, true)}
+    </div>
+    <div id="tt-pace" style="${TREND_TAB==='pace'?'':'display:none'}">
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of 2+ putt holes where pace was short / on pace / long. On pace = ±1ft. ↓ Short/Long = improving.</div>
+      ${trendTable(trends.pace, false)}
+    </div>
+    <div id="tt-miss" style="${TREND_TAB==='miss'?'':'display:none'}">
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of missed putts by direction. ↓ green = fewer misses in that direction vs all-time.</div>
+      ${trendTable(trends.miss, false)}
+    </div>
+    <div id="tt-3putt" style="${TREND_TAB==='3putt'?'':'display:none'}">
+      <div style="display:flex;gap:5px;margin-bottom:10px">
+        ${tp3Defs.map(t=>`<button class="tr3-tab${t.k===TREND_3P_TAB?' on':''}" data-tab="${t.k}" onclick="set3pTrendTab('${t.k}')">${t.l}</button>`).join('')}
+      </div>
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">3-putt rate (%). ↓ green = improving vs all-time.</div>
+      <div id="tt3-dist"  style="${TREND_3P_TAB==='dist'?'':'display:none'}">${trendTable(trends.tp_dist,  false)}</div>
+      <div id="tt3-var"   style="${TREND_3P_TAB==='var'?'':'display:none'}">${trendTable(trends.tp_var,   false)}</div>
+      <div id="tt3-slope" style="${TREND_3P_TAB==='slope'?'':'display:none'}">${trendTable(trends.tp_slope, false)}</div>
+    </div>
+  </div>`;
 
-        <div style="background:rgba(255,255,255,0.7);border-radius:10px;padding:10px 12px;margin-bottom:10px">
-          <div style="font-size:12px;color:#374151;line-height:1.5;margin-bottom:6px">${ins.stat}</div>
-          <div style="height:4px;background:#e5e7eb;border-radius:2px">
-            <div style="height:100%;border-radius:2px;background:${st.badgeBg};width:${pctBar}%;transition:width .4s"></div>
-          </div>
-        </div>
-
-        ${ins.breakdown && ins.breakdown.length ? `
-        <div style="margin-bottom:10px">
-          <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase">Where it's worst / best</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px">
-            ${ins.breakdown.map(b => `
-            <div style="background:${b.delta > 0 ? '#fff1f2' : '#f0f5fb'};
-                        border:1.5px solid ${b.delta > 0 ? '#fecaca' : '#c5d8ef'};
-                        border-radius:8px;padding:5px 10px;
-                        display:flex;flex-direction:column;align-items:center;min-width:0">
-              <span style="font-size:9px;color:#6b7280;text-align:center;line-height:1.3;white-space:nowrap">${b.label}</span>
-              <span style="font-size:13px;font-weight:800;color:${b.delta > 0 ? '#dc2626' : '#16a34a'};line-height:1.4">
-                ${Math.round(b.rate*100)}%${b.delta > 0 ? '▲' : '▼'}
-              </span>
-              <span style="font-size:9px;color:#9ca3af">${b.n} putts</span>
-            </div>`).join('')}
-          </div>
-        </div>` : ''}
-
-        ${ins.fullBreakdown && ins.fullBreakdown.rows.length ? `
-        <div style="margin-bottom:10px">
-          <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.06em;margin-bottom:5px;text-transform:uppercase">By condition <span style="font-weight:400;text-transform:none;letter-spacing:0">(% ${ {'◀':'miss left','▶':'miss right','▼':'miss short','▲':'miss long / over-hit','🎯':'3-putted','⚠️':'3-putted'}[ins.emoji] || 'rate' })</span></div>
-          ${ins.fullBreakdown.rows.map(row => `
-          <div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">
-            <span style="font-size:9px;color:#9ca3af;min-width:36px;font-weight:700;flex-shrink:0">${row.lbl}</span>
-            ${row.cells.map(c => {
-              const rate = c.N ? c.n/c.N : 0;
-              const col = rate > ins.fullBreakdown.base + 0.05 ? '#dc2626' : rate < ins.fullBreakdown.base - 0.05 ? '#16a34a' : '#374151';
-              return '<div style="flex:1;background:rgba(255,255,255,0.55);border-radius:6px;padding:3px 4px;text-align:center;min-width:0">'
-                + '<div style="font-size:8px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + c.k + '</div>'
-                + '<div style="font-size:11px;font-weight:800;color:' + col + '">' + Math.round(rate*100) + '%</div>'
-                + '<div style="font-size:8px;color:#6b7280">' + c.n + '/' + c.N + '</div>'
-                + '</div>';
-            }).join('')}
-          </div>`).join('')}
-        </div>` : ''}
-
-        <div style="font-size:12px;color:#1f2937;line-height:1.6">
-          <span style="font-weight:800;color:#002855">💡 Fix: </span>${ins.rec}
-        </div>
-      </div>`;
-    }).join('')}
-
-    <div style="font-size:11px;color:#9ca3af;text-align:center;line-height:1.6;margin-top:4px">
-      Patterns with fewer than 5 observations are excluded.<br>
-      σ = standard deviations from your baseline (higher = more significant).
+  container.innerHTML = `<div style="padding:14px;padding-bottom:calc(20px + env(safe-area-inset-bottom))">
+    ${summaryHTML}${focusHTML}${trendsHTML}
+    <div style="font-size:11px;color:#9ca3af;text-align:center;line-height:1.6;margin-top:14px">
+      Conditions with fewer than 15 putts excluded from focus areas.<br>Trend cells require 5+ putts.
     </div>
   </div>`;
 }
