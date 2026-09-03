@@ -390,6 +390,36 @@
     .hd-fade-l { left:0;  background:linear-gradient(to right,#fff 12%,rgba(255,255,255,0)); }
     .hd-fade-r { right:0; background:linear-gradient(to left, #fff 12%,rgba(255,255,255,0)); }
 
+    /* ── Toast: reaction to a hole, or a backup nudge ──────────────────────
+       Sits above the bottom nav so it never covers Prev/Next, and never
+       blocks input — you can keep entering while it is on screen. */
+    #toast-wrap {
+      position: fixed; left: 10px; right: 10px; z-index: 60;
+      bottom: calc(64px + env(safe-area-inset-bottom));
+      display: flex; flex-direction: column; gap: 6px;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto; cursor: pointer;
+      border-radius: 13px; padding: 11px 14px;
+      font-size: 13.5px; font-weight: 600; line-height: 1.35;
+      box-shadow: 0 6px 20px rgba(0,0,0,.18);
+      display: flex; align-items: center; gap: 10px;
+      animation: toast-in .26s cubic-bezier(.2,.9,.3,1.2);
+      transition: opacity .25s, transform .25s;
+    }
+    .toast.out { opacity: 0; transform: translateY(8px); }
+    .toast-good { background: #14532d; color: #eafbf0; }
+    .toast-bad  { background: #7f1d1d; color: #fee2e2; }
+    .toast-info { background: #1f2937; color: #f3f4f6; }
+    .toast-emoji { font-size: 21px; line-height: 1; flex-shrink: 0; }
+    .toast-act {
+      margin-left: auto; flex-shrink: 0; border: none; cursor: pointer;
+      background: rgba(255,255,255,.18); color: inherit;
+      border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 800;
+    }
+    @keyframes toast-in { from { opacity:0; transform: translateY(14px) scale(.97); } }
+
     /* Setup screen. initSetup() sets display:flex on #step-setup, which
        defaults to row direction — that pinned the card to the left and
        stretched it to full height. Column + centre fixes both. */
@@ -461,6 +491,7 @@
       <p style="font-size:13px;color:#9ca3af;margin-bottom:16px">Start a round to see your stats</p>
       <button onclick="showMain('round')" style="background:#166534;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
     </div>
+    <div id="backup-banner" style="display:none"></div>
     <div id="db-content" style="display:none">
       <!-- KPIs -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
@@ -550,7 +581,7 @@
       </button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button onclick="backupData()"
+      <button onclick="backupData()" id="hist-backup-btn"
         style="flex:1;background:#f0fdf4;color:#15803d;border:1.5px solid #16a34a;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
         💾 Backup Data
       </button>
@@ -614,12 +645,15 @@
 
     <!-- Round info + view toggle -->
     <div id="round-info-bar">
-      <div style="font-size:12px;color:#6b7280;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0">
-        <span id="ri-course" style="font-weight:700;color:#1f2937"></span>
-        <span id="ri-date"   style="color:#9ca3af;margin-left:4px"></span>
+      <!-- course may truncate; the date must not -->
+      <div style="font-size:12px;color:#6b7280;display:flex;align-items:baseline;gap:5px;flex:1;min-width:0">
+        <span id="ri-course" style="font-weight:700;color:#1f2937;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0"></span>
+        <span id="ri-date"   style="color:#9ca3af;white-space:nowrap;flex-shrink:0"></span>
       </div>
       <button id="snd-btn" onclick="toggleSound()" title="Drum click sound"
-        style="flex-shrink:0;border:none;background:none;font-size:15px;cursor:pointer;padding:2px 4px;line-height:1">🔊</button>
+        style="flex-shrink:0;border:none;background:none;font-size:15px;cursor:pointer;padding:2px 3px;line-height:1">🔊</button>
+      <button id="react-btn" onclick="toggleReactions()" title="Reactions to your holes"
+        style="flex-shrink:0;border:none;background:none;font-size:15px;cursor:pointer;padding:2px 3px;line-height:1">💬</button>
       <span id="ri-holecount" onclick="showHoleAdj()"
         style="flex-shrink:0;font-size:11px;font-weight:700;color:#166534;background:#dcfce7;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 8px">
         18H ✎
@@ -689,6 +723,9 @@
   </div>
   <div id="insights-content" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
 </div>
+
+<!-- ── TOASTS ── -->
+<div id="toast-wrap"></div>
 
 <!-- ── MODAL ── -->
 <div id="modal-wrap" style="display:none" onclick="closeModal(event)">
@@ -948,6 +985,7 @@ function startRound() {
   renderPills();
   renderAccordion();
   syncSoundBtn();
+  syncReactBtn();
 }
 
 // Reflect the persisted sound preference on the toggle
@@ -1545,6 +1583,120 @@ function onGrid3(hi, missDir, gir) {
   saveDraft();
 }
 
+// ═══════════════════════════════════════
+//  TOASTS + HOLE REACTIONS
+// ═══════════════════════════════════════
+let REACTIONS_ON = localStorage.getItem('putt_reactions') !== 'off';
+
+function showToast(emoji, text, kind, opts = {}) {
+  const wrap = document.getElementById('toast-wrap');
+  if (!wrap) return;
+  // never stack more than two
+  while (wrap.children.length >= 2) wrap.firstElementChild.remove();
+
+  const el = document.createElement('div');
+  el.className = `toast toast-${kind || 'info'}`;
+  el.innerHTML = `<span class="toast-emoji">${emoji}</span><span>${text}</span>` +
+    (opts.action ? `<button class="toast-act">${opts.action}</button>` : '');
+
+  const close = () => {
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 250);
+  };
+  if (opts.action && opts.onAction) {
+    el.querySelector('.toast-act').onclick = e => { e.stopPropagation(); close(); opts.onAction(); };
+  }
+  el.onclick = close;
+  wrap.appendChild(el);
+  setTimeout(close, opts.ms || 3600);
+}
+
+function toggleReactions() {
+  REACTIONS_ON = !REACTIONS_ON;
+  localStorage.setItem('putt_reactions', REACTIONS_ON ? 'on' : 'off');
+  syncReactBtn();
+  if (REACTIONS_ON) showToast('💬', 'Reactions on. Go hole something.', 'info', { ms: 2200 });
+}
+function syncReactBtn() {
+  const b = document.getElementById('react-btn');
+  if (!b) return;
+  b.textContent = REACTIONS_ON ? '💬' : '🤐';
+  b.style.opacity = REACTIONS_ON ? '1' : '.45';
+}
+
+// Message pools. Picked at random, avoiding an immediate repeat, so the same
+// line does not land twice in a round.
+const REACTIONS = {
+  monster: ['{d} FEET. Absolute filth.', 'From {d} feet?! Frame it.',
+            '{d}-footer drops. Casually devastating.', 'You holed a {d} footer. Tell everyone.'],
+  long:    ['🔥 {d} feet — get in!', '{d}-footer! Somebody is warm.',
+            'Drained it from {d}. Lovely.', '{d} feet, no bother.'],
+  solid:   ['{d} feet, straight in the middle.', 'Nice — {d}-footer converted.',
+            'That is why you practise. {d} feet.'],
+  lag:     ['Two from {d} feet. Lag clinic.', '{d} feet to a tap-in — textbook speed.',
+            'Cosied {d} feet to gimme range. Well judged.'],
+  streak:  ['{n} one-putts on the bounce. Do not look down.',
+            'That is {n} in a row. The putter is hot.',
+            '{n} straight one-putts — someone stop him.'],
+  shortTp: ['Ouch. Three from {d} feet. That one stings.',
+            'Three-putt from {d}. We saw nothing.',
+            '{d} feet and three putts — shake it off, it is one hole.',
+            'Three from {d} feet. Deep breath. Next tee.'],
+  midTp:   ['Three-putt from {d}. Speed first next time.',
+            'Three from {d} feet — the lag was the problem, not the line.'],
+  four:    ['Four putts. We shall never speak of this again.',
+            'A four-putt. Golf is a stupid game. Onwards.'],
+};
+let lastReactionMsg = '';
+function pickMsg(pool, vars) {
+  let opts = REACTIONS[pool];
+  if (opts.length > 1) opts = opts.filter(o => o !== lastReactionMsg);
+  let m = opts[Math.floor(Math.random() * opts.length)];
+  lastReactionMsg = m;
+  return m.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+}
+
+// How many completed holes ending at `hi` were one-putts
+function oneputtStreak(hi) {
+  let n = 0;
+  for (let i = hi; i >= 0; i--) {
+    const h = AR.holes[i];
+    if (!isHoleDone(h)) break;
+    if (h.numPutts !== '1') break;
+    n++;
+  }
+  return n;
+}
+
+// Fires once per completed hole, only on genuinely notable outcomes.
+function reactToHole(hi) {
+  if (!REACTIONS_ON) return;
+  const h = AR.holes[hi];
+  if (!h || !isHoleDone(h)) return;
+  const d = h.distance, putts = h.numPutts;
+
+  if (putts === '1') {
+    const streak = oneputtStreak(hi);
+    // a streak outranks the individual putt, but only from 3 up
+    if (streak >= 3) return showToast('🔥', pickMsg('streak', { n: streak }), 'good');
+    if (d >= 40) return showToast('😱', pickMsg('monster', { d }), 'good', { ms: 4200 });
+    if (d >= 25) return showToast('🔥', pickMsg('long',    { d }), 'good', { ms: 4000 });
+    if (d >= 15) return showToast('🎯', pickMsg('solid',   { d }), 'good');
+    return;
+  }
+
+  if (putts === '4+') return showToast('💀', pickMsg('four', { d }), 'bad', { ms: 4200 });
+
+  if (putts === '3') {
+    if (d <= 10) return showToast('😬', pickMsg('shortTp', { d }), 'bad', { ms: 4200 });
+    if (d <= 25) return showToast('😕', pickMsg('midTp',   { d }), 'bad');
+    return;   // a 3-putt from 40ft is unlucky, not worth a poke
+  }
+
+  // 2 putts: only notable as a good lag from a long way
+  if (putts === '2' && d >= 40) return showToast('🎳', pickMsg('lag', { d }), 'good');
+}
+
 // Build the one-line summary shown on a collapsed hole row
 function holeSummaryText(h) {
   return [
@@ -1566,6 +1718,7 @@ function refreshHoleSummary(i) {
 
 function onHoleDone(i) {
   refreshHoleSummary(i);
+  reactToHole(i);
   // Update pill
   const pill = document.getElementById(`pill-${i}`);
   if (pill) pill.className = i===AH ? 'hp cur' : 'hp done';
@@ -1621,6 +1774,14 @@ function saveRound() {
   clearDraft(); // round properly saved, discard draft
   AR = null; AH = 0; RVIEW = 'form';
   showMain('dashboard');
+
+  // Nudge once the backup is behind, with the action right there in the toast
+  const behind = roundsSinceBackup();
+  if (behind >= 3) {
+    setTimeout(() => showToast('💾',
+      `${behind} rounds since your last backup.`, 'info',
+      { ms: 7000, action: 'Back up', onAction: backupData }), 700);
+  }
 }
 
 // ═══════════════════════════════════════
@@ -1769,7 +1930,34 @@ function setStab(el, name) {
   activeStab = name;
 }
 
+// Persistent warning on the dashboard once the backup is meaningfully behind
+function renderBackupBanner() {
+  const el = document.getElementById('backup-banner');
+  if (!el) return;
+  const behind = roundsSinceBackup();
+  const total  = loadRounds().length;
+  if (!total || behind < 3) { el.style.display = 'none'; return; }
+
+  const info = getBackupInfo();
+  const when = info ? new Date(info.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : null;
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:#fff7ed;border:1.5px solid #fdba74;border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:11px">
+      <span style="font-size:20px;line-height:1">⚠️</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:#9a3412">
+          ${behind} round${behind!==1?'s':''} not backed up
+        </div>
+        <div style="font-size:11px;color:#9a3412;opacity:.85;line-height:1.4;margin-top:2px">
+          ${when ? `Last backup ${when}. ` : 'Never backed up. '}Phone storage can be cleared without warning.
+        </div>
+      </div>
+      <button onclick="backupData()" style="flex-shrink:0;border:none;background:#ea580c;color:#fff;border-radius:9px;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer">Back up</button>
+    </div>`;
+}
+
 function renderDashboard() {
+  renderBackupBanner();
   const rounds = loadRounds();
   const allHoles = rounds.flatMap(r=>r.holes);
   const s = computeStats(allHoles);
@@ -2928,9 +3116,28 @@ function exportCSV() {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
+// ── Backup tracking ───────────────────────────────────────────────────────
+// localStorage is not durable storage: iOS can evict it under pressure, and a
+// season of rounds lives there. A manual button alone gets forgotten, so the
+// app tracks how far behind the last backup is and says so.
+const BACKUP_KEY = 'putt_lastbackup';
+function getBackupInfo() {
+  try { return JSON.parse(localStorage.getItem(BACKUP_KEY)) || null; } catch { return null; }
+}
+function markBackedUp(count) {
+  localStorage.setItem(BACKUP_KEY, JSON.stringify({ date: new Date().toISOString(), count }));
+}
+function roundsSinceBackup() {
+  const total = loadRounds().length;
+  const info  = getBackupInfo();
+  return info ? Math.max(0, total - (info.count || 0)) : total;
+}
+
 function backupData() {
   const rounds = loadRounds();
   if (!rounds.length) { alert('No rounds to backup yet.'); return; }
+  markBackedUp(rounds.length);
+  renderBackupBanner();
   const payload = { version: 'putttrack_v4', exportDate: new Date().toISOString(), rounds };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2987,6 +3194,16 @@ function restoreData(e) {
 
 function renderHistory() {
   const rounds = loadRounds();
+  // say plainly how far behind the backup is, on the button itself
+  const btn = document.getElementById('hist-backup-btn');
+  if (btn) {
+    const behind = roundsSinceBackup();
+    btn.textContent = behind > 0 && rounds.length
+      ? `💾 Back up (${behind} new)` : '💾 Backup Data';
+    btn.style.background   = behind >= 3 ? '#fff7ed' : '#f0fdf4';
+    btn.style.color        = behind >= 3 ? '#c2410c' : '#15803d';
+    btn.style.borderColor  = behind >= 3 ? '#ea580c' : '#16a34a';
+  }
   document.getElementById('hist-empty').style.display = rounds.length ? 'none' : 'block';
   document.getElementById('hist-list').innerHTML = rounds.map(r=>{
     const s = computeStats(r.holes);
