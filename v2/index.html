@@ -482,6 +482,7 @@
         <div class="kpi" style="text-align:center">
           <div class="kpi-v" id="kpi-sgp" style="font-size:22px">—</div>
           <div class="kpi-l">SG Putting / Rd</div>
+          <div style="font-size:9px;color:#9ca3af;margin-top:1px" id="kpi-sgp-base">—</div>
         </div>
         <div class="kpi" style="text-align:center">
           <div class="kpi-v" id="kpi-feet" style="color:#0d9488;font-size:22px">—</div>
@@ -681,7 +682,10 @@
     <button class="ins-ftab"   onclick="setInsightFilter(20)">Last 20</button>
     <button class="ins-ftab"   onclick="setInsightFilter(10)">Last 10</button>
     <button class="ins-ftab"   onclick="setInsightFilter(5)">Last 5</button>
-    <button onclick="printInsights()" style="margin-left:auto;flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#166534;background:#dcfce7;border:none;outline:none;white-space:nowrap">⬇ PDF</button>
+    <select id="sg-base-sel" onchange="setSGBase(this.value)" title="Strokes gained benchmark"
+      style="margin-left:auto;flex-shrink:0;padding:5px 8px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;color:#166534;background:#dcfce7;border:none;outline:none">
+    </select>
+    <button onclick="printInsights()" style="flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#166534;background:#dcfce7;border:none;outline:none;white-space:nowrap">⬇ PDF</button>
   </div>
   <div id="insights-content" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
 </div>
@@ -718,18 +722,50 @@ const DIST_BANDS = [
   { label:"21'+",  key:'long',    fn: h => h.distance >= 21 },
 ];
 
-// ── Strokes Gained Putting benchmark ──────────────────────────────────────
-// Expected putts to hole out from X feet (PGA Tour ShotLink baseline).
-// SG = expected(start distance) − putts actually taken.  Positive = gained.
-const SGP_TABLE = [
-  [1,1.001],[2,1.009],[3,1.053],[4,1.147],[5,1.256],
-  [6,1.357],[7,1.443],[8,1.515],[9,1.575],[10,1.626],
-  [12,1.706],[15,1.788],[20,1.883],[25,1.940],[30,1.977],
-  [35,2.009],[40,2.037],[50,2.087],[60,2.132],[75,2.192],[100,2.290],
-];
-function sgpExpected(feet) {
-  if (!feet || feet <= 0) return 2.0;
-  const t = SGP_TABLE;
+// ── Strokes Gained Putting benchmarks ─────────────────────────────────────
+// Expected putts to hole out from X feet.  SG = expected(start distance) −
+// putts actually taken.  Positive = gained.
+//
+// PROVENANCE — the two families differ and it matters when reading a figure:
+//
+//  • 'tour' is the PGA Tour ShotLink curve (Broadie). Widely published.
+//
+//  • The handicap curves are DERIVED, not measured end-to-end. Make % by
+//    distance band comes from Shot Scope's tracked amateur database (real
+//    data, millions of putts). Expected putts also needs a 3-putt term, which
+//    that source does not break down by distance, so P(3+ putts) is modelled:
+//    a distance shape anchored on a 15-handicap, scaled per handicap to match
+//    each one's published overall 3-putt rate. Raw make % was also isotonic-
+//    smoothed across handicap — the tracked long-range bands are noisy enough
+//    that a 20-handicap "out-putted" a 15, which would make the higher
+//    benchmark the harder one to beat.
+//    So: treat handicap curves as a good yardstick, not gospel.
+const SG_BASELINES = {
+  tour: { label:'PGA Tour', table:[
+    [1,1.001],[2,1.009],[3,1.053],[4,1.147],[5,1.256],
+    [6,1.357],[7,1.443],[8,1.515],[9,1.575],[10,1.626],
+    [12,1.706],[15,1.788],[20,1.883],[25,1.940],[30,1.977],
+    [35,2.009],[40,2.037],[50,2.087],[60,2.132],[75,2.192],[100,2.290] ] },
+  h0:  { label:'0 handicap',  table:[[1,1.010],[3,1.074],[9,1.582],[15,1.773],[21,1.899],[27,1.971],[40,2.064],[60,2.150],[100,2.250]] },
+  h5:  { label:'5 handicap',  table:[[1,1.015],[3,1.101],[9,1.598],[15,1.790],[21,1.922],[27,1.984],[40,2.085],[60,2.175],[100,2.280]] },
+  h10: { label:'10 handicap', table:[[1,1.020],[3,1.111],[9,1.627],[15,1.837],[21,1.959],[27,2.034],[40,2.141],[60,2.240],[100,2.350]] },
+  h15: { label:'15 handicap', table:[[1,1.025],[3,1.161],[9,1.631],[15,1.848],[21,1.979],[27,2.063],[40,2.190],[60,2.300],[100,2.420]] },
+  h20: { label:'20 handicap', table:[[1,1.030],[3,1.166],[9,1.645],[15,1.869],[21,1.991],[27,2.081],[40,2.229],[60,2.350],[100,2.480]] },
+};
+const SG_BASE_KEYS = ['tour','h0','h5','h10','h15','h20'];
+let SG_BASE = SG_BASELINES[localStorage.getItem('putt_sgbase')] ? localStorage.getItem('putt_sgbase') : 'tour';
+
+function sgBaseLabel() { return SG_BASELINES[SG_BASE].label; }
+
+function setSGBase(key) {
+  if (!SG_BASELINES[key]) return;
+  SG_BASE = key;
+  localStorage.setItem('putt_sgbase', key);
+  renderInsights();
+  if (document.getElementById('view-dashboard').style.display !== 'none') renderDashboard();
+}
+
+function lookupExpected(t, feet) {
   if (feet <= t[0][0]) return t[0][1];
   if (feet >= t[t.length-1][0]) return t[t.length-1][1];
   for (let i = 0; i < t.length-1; i++) {
@@ -740,11 +776,25 @@ function sgpExpected(feet) {
   }
   return 2.0;
 }
+
+function sgpExpected(feet, baseKey) {
+  if (!feet || feet <= 0) return 2.0;
+  const key = baseKey || SG_BASE;
+  const val = lookupExpected(SG_BASELINES[key].table, feet);
+  if (key === 'tour') return val;
+  // Floor every amateur curve at the Tour curve. The source gives make % per
+  // BAND, which we anchor at the band's midpoint — but short putts are far
+  // more common than long ones inside a band, so the band average flatters the
+  // midpoint. Interpolating between sparse anchors then let the scratch curve
+  // dip under Tour around 8-15ft, i.e. a scratch amateur out-putting a pro.
+  // A Tour pro is at least as good at every distance, so clamp to that.
+  return Math.max(val, lookupExpected(SG_BASELINES.tour.table, feet));
+}
 // Strokes gained for a single hole (null when data is incomplete)
-function holeSGP(h) {
+function holeSGP(h, baseKey) {
   if (!h || !h.distance || !h.numPutts) return null;
   const putts = h.numPutts === '4+' ? 4 : parseInt(h.numPutts);
-  return sgpExpected(h.distance) - putts;
+  return sgpExpected(h.distance, baseKey) - putts;
 }
 function fmtSG(v, dp = 2) {
   if (v === null || v === undefined || isNaN(v)) return '—';
@@ -1747,6 +1797,8 @@ function renderDashboard() {
     sgEl.textContent = fmtSG(sgRound, 1);
     sgEl.style.color = sgRound >= 0 ? '#16a34a' : '#dc2626';
   } else { sgEl.textContent = '—'; sgEl.style.color = '#d1d5db'; }
+  const sgBaseEl = document.getElementById('kpi-sgp-base');
+  if (sgBaseEl) sgBaseEl.textContent = 'vs ' + sgBaseLabel();
 
   document.getElementById('kpi-feet').textContent =
     rounds.length ? Math.round(s.feetMade / rounds.length) + "'" : '—';
@@ -2582,6 +2634,17 @@ function renderInsights() {
     return;
   }
 
+  // keep the benchmark selector in sync with the stored choice
+  const sel = document.getElementById('sg-base-sel');
+  if (sel && !sel.options.length) {
+    // short labels: the filter bar is tight on a phone
+    const shortLbl = { tour:'vs Tour', h0:'vs 0 hcp', h5:'vs 5 hcp',
+                       h10:'vs 10 hcp', h15:'vs 15 hcp', h20:'vs 20 hcp' };
+    sel.innerHTML = SG_BASE_KEYS.map(k =>
+      `<option value="${k}">${shortLbl[k]}</option>`).join('');
+  }
+  if (sel) sel.value = SG_BASE;
+
   const data = computeImpactInsights(rounds);
 
   if (data.insufficient) {
@@ -2679,6 +2742,7 @@ function renderInsights() {
     <div style="background:${summary.sg===null?'#f9fafb':summary.sg>=0?'#f0fdf4':'#fef2f2'};border-radius:10px;padding:10px;text-align:center">
       <div style="font-size:20px;font-weight:800;color:${summary.sg===null?'#d1d5db':summary.sg>=0?'#16a34a':'#dc2626'}">${summary.sg===null?'—':fmtSG(summary.sg,1)}</div>
       <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">SG Putting / 18 holes</div>
+      <div style="font-size:9px;color:#6b7280;margin-top:1px">vs ${sgBaseLabel()}</div>
       ${summary.sg5!==null&&summary.sg!==null?`<div style="font-size:9px;color:#6b7280;margin-top:2px">Last 5: ${fmtSG(summary.sg5,1)}${summary.sg5>summary.sg?' <span style="color:#16a34a">▲</span>':summary.sg5<summary.sg?' <span style="color:#dc2626">▼</span>':''}</div>`:''}
     </div>
     <div style="background:#f0fdfa;border-radius:10px;padding:10px;text-align:center">
@@ -2763,7 +2827,7 @@ function renderInsights() {
     </div>
     <div id="tt-sg" style="${TREND_TAB==='sg'?'':'display:none'}">
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">
-        Strokes gained per round vs the Tour benchmark, split by first-putt distance.
+        Strokes gained per round vs the ${sgBaseLabel()} benchmark, split by first-putt distance.
         The four bands add up to Overall, so this shows <em>where</em> strokes are won or lost.
         ↑ green = improving vs all-time.
       </div>
