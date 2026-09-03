@@ -2620,6 +2620,21 @@ function computeImpactInsights(rounds) {
 
 function renderInsights() {
   const container = document.getElementById('insights-content');
+
+  // Populate the benchmark selector BEFORE any early return, so it is never
+  // left empty on a fresh install with no rounds yet.
+  const sel = document.getElementById('sg-base-sel');
+  if (sel) {
+    if (!sel.options.length) {
+      // short labels: the filter bar is tight on a phone
+      const shortLbl = { tour:'vs Tour', h0:'vs 0 hcp', h5:'vs 5 hcp',
+                         h10:'vs 10 hcp', h15:'vs 15 hcp', h20:'vs 20 hcp' };
+      sel.innerHTML = SG_BASE_KEYS.map(k =>
+        `<option value="${k}">${shortLbl[k]}</option>`).join('');
+    }
+    sel.value = SG_BASE;
+  }
+
   const allRounds = loadRounds();
   const sortedAll = [...allRounds].sort((a,b) => b.date.localeCompare(a.date));
   const rounds    = INSIGHT_FILTER === 'all' ? sortedAll : sortedAll.slice(0, INSIGHT_FILTER);
@@ -2633,17 +2648,6 @@ function renderInsights() {
     </div>`;
     return;
   }
-
-  // keep the benchmark selector in sync with the stored choice
-  const sel = document.getElementById('sg-base-sel');
-  if (sel && !sel.options.length) {
-    // short labels: the filter bar is tight on a phone
-    const shortLbl = { tour:'vs Tour', h0:'vs 0 hcp', h5:'vs 5 hcp',
-                       h10:'vs 10 hcp', h15:'vs 15 hcp', h20:'vs 20 hcp' };
-    sel.innerHTML = SG_BASE_KEYS.map(k =>
-      `<option value="${k}">${shortLbl[k]}</option>`).join('');
-  }
-  if (sel) sel.value = SG_BASE;
 
   const data = computeImpactInsights(rounds);
 
