@@ -250,7 +250,9 @@
     .hole-form-wrap.complete-pulse { animation: pulse-green .5s ease; }
 
     /* ── Dashboard / History ── */
-    .kpi { background:#fff; border-radius:14px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+    /* centred by default so every KPI box matches — the third row was relying
+       on an inline style the others had and it did not */
+    .kpi { background:#fff; border-radius:14px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.07); text-align:center; }
     .kpi-v { font-size:26px; font-weight:800; line-height:1; }
     .kpi-l { font-size:10px; color:#9ca3af; margin-top:3px; text-transform:uppercase; letter-spacing:.05em; }
     .stab { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; color:#6b7280; background:#f3f4f6; white-space:nowrap; border:none; outline:none; }
@@ -282,54 +284,58 @@
        Softens the spreadsheet look: a rounded, clipping wrapper gives the block
        a card edge while the table keeps its own cell borders (including the
        heavier separators between the Downhill / Flat / Uphill groups). */
-    /* No border of its own — the table's own cell borders form the outer edge.
-       Having both produced a visible double line around every grid. */
+    /* The WRAPPER owns the outer border so it follows the rounded corner.
+       (With the border on the cells instead, the radius clipped it and the
+       curve showed as a blank gap.) Cells therefore carry only their inner
+       right/bottom rules, which also prevents a doubled outer line. */
     .gwrap {
       overflow:hidden; -webkit-overflow-scrolling:touch;
-      border-radius:10px;
+      border-radius:10px; border:1px solid #cfd6dd; background:#fff;
     }
-    .pgrid { border-collapse:collapse; font-size:10px; width:100%; table-layout:fixed; }
+    .pgrid { border-collapse:separate; border-spacing:0; font-size:10px; width:100%; table-layout:fixed; }
+    .pgrid th, .pgrid td {
+      border:0; border-right:1px solid #dfe3e8; border-bottom:1px solid #dfe3e8;
+    }
+    .pgrid tr > *:last-child        { border-right:0; }   /* wrapper supplies the edge */
+    .pgrid tbody tr:last-child > *  { border-bottom:0; }
+
     .pgrid th {
       padding:3px 1px; text-align:center; font-weight:700; color:#6b7280;
-      background:#f2f9f4; border:1px solid #d1d5db; font-size:9px; white-space:nowrap;
-      overflow:hidden;
+      background:#f2f9f4; font-size:9px; white-space:nowrap; overflow:hidden;
     }
     .pgrid td.row-head {
       padding:3px 5px; text-align:center; font-size:10px; font-weight:600; color:#374151;
-      background:#f9fafb; border:1px solid #d1d5db; white-space:nowrap;
+      background:#f9fafb; white-space:nowrap;
     }
     .pgrid td.gcell {
-      height:28px; text-align:center;
-      border:1px solid #d1d5db; cursor:pointer; background:#fff;
+      height:28px; text-align:center; cursor:pointer; background:#fff;
       transition:background .08s; -webkit-tap-highlight-color:transparent;
     }
     .pgrid td.gcell:active { background:#dcfce7; }
-    .pgrid td.gcell.on { background:#166534; box-shadow:inset 0 0 0 1.5px #0b3f1f; }
+    .pgrid td.gcell.on { background:#166534; }
     .pgrid td.gcell.on::after { content:'✓'; font-size:11px; color:#fff; font-weight:800; line-height:1; }
     .pgrid td.gcell.disabled { background:#f3f4f6; cursor:default; pointer-events:none; }
-    /* consecutive dead cells read as one block, not a row of empty options */
-    .pgrid td.gcell.disabled.merge-l { border-left-color:#f3f4f6; }
+    /* a run of dead cells reads as one block: drop the rule to the next dead cell */
+    .pgrid td.gcell.disabled.merge-r { border-right-color:transparent; }
 
-    /* Slope group headers — taller than the cells beneath them */
+    /* Slope group headers — taller than the cells, and butted straight
+       together since their colours already separate the groups */
     .pgrid th.slope-h {
       color:#fff; padding:11px 1px; font-size:12px; font-weight:800;
-      letter-spacing:.3px; border-color:transparent;
+      letter-spacing:.3px; border:0;
     }
 
     /* ── v2: slope × break selector — the arrow row is the tap target ── */
     .pgrid td.dcell {
       height:42px; padding:4px 1px; text-align:center;
-      font-size:19px; font-weight:700; color:#4b5563;
-      background:#f9fafb; border:1px solid #d1d5db;
+      font-size:20px; font-weight:700; color:#4b5563;
+      background:#f9fafb;
       cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent;
       -webkit-user-select:none; user-select:none;
       transition:background .1s, color .1s;
     }
     .pgrid td.dcell:active { background:#dcfce7; }
-    .pgrid td.dcell.on {
-      background:#166534; color:#fff;
-      box-shadow:inset 0 0 0 1.5px #0b3f1f;
-    }
+    .pgrid td.dcell.on { background:#166534; color:#fff; }
 
     /* ── v2: horizontal distance drum ──────────────────────────────────────
        One drum per hole (not per cell): tap a slope×break cell above, then
@@ -339,7 +345,7 @@
       padding:6px 0 5px; margin-top:7px;
       transition:border-color .12s, box-shadow .12s;
     }
-    .hd-outer.set { border-color:#166534; box-shadow:0 0 0 2px rgba(0,58,114,.12); }
+    .hd-outer.set { border-color:#166534; }
     .hd-cap {
       display:flex; align-items:center; justify-content:center; gap:6px;
       font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
@@ -946,11 +952,10 @@ function renderAccordion() {
 
 function buildCurrentHoleHTML(i) {
   const h = AR.holes[i];
+  // No hole heading here — the pill strip directly above already shows which
+  // hole is active, and the list below repeats it.
   return `
   <div id="cur-hole">
-    <div id="cur-hole-head">
-      <div class="cur-hole-title">Hole ${h.n}</div>
-    </div>
     <div class="hole-form-inner" id="hfi-${i}">
       ${buildHoleFormHTML(h, i)}
     </div>
@@ -981,7 +986,7 @@ function buildHoleListRow(h, i) {
 }
 
 function slopeIcon(v) { return v==='up'?'⬆':v==='down'?'⬇':'—'; }
-function dirIcon(v)   { return v==='l-to-r'?'↗':v==='r-to-l'?'↖':'→'; }
+function dirIcon(v)   { return v==='l-to-r'?'→':v==='r-to-l'?'←':'↑'; }
 
 // Section heading with a small "i" that toggles a one-line explanation
 function flLabel(text, infoId) {
@@ -1012,7 +1017,7 @@ function buildHoleFormHTML(h, i) {
   const grid1 = `
   <div class="fl">
     ${flLabel('🎯 Putt Distance + Slope + Break', `i1-${i}`)}
-    ${flInfo(`i1-${i}`, 'Tap the arrow under the slope that matches your putt — ↗ breaks left-to-right, ↑ straight, ↖ right-to-left. Then scroll the drum to the distance from ball to hole, in feet.')}
+    ${flInfo(`i1-${i}`, 'Tap the arrow under the slope that matches your putt — → breaks left-to-right, ↑ straight, ← right-to-left. Then scroll the drum to the distance from ball to hole, in feet.')}
     <div class="gwrap">
       <table class="pgrid" id="grid1-${i}">
         <thead>
@@ -1027,7 +1032,9 @@ function buildHoleFormHTML(h, i) {
           <tr>
             ${COLS1.map(c => {
               const sel = h.slope===c.slope && h.direction===c.dir;
-              const lbl = c.dir==='l-to-r' ? '↗' : c.dir==='straight' ? '↑' : '↖';
+              // Horizontal arrows read as direction far more clearly than
+              // diagonals do: → breaks right, ← breaks left, ↑ is straight.
+              const lbl = c.dir==='l-to-r' ? '→' : c.dir==='straight' ? '↑' : '←';
               return `<td class="dcell${sel?' on':''}" id="gc1-${i}-${c.slope}-${c.dir}"
                           onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</td>`;
             }).join('')}
@@ -1085,8 +1092,10 @@ function buildHoleFormHTML(h, i) {
               if (disabled) {
                 // Merge the run of dead cells either side of '0' into one flat
                 // block — internal grid lines there suggest something tappable.
-                const prevDead = vi > 0 && VAR_COLS[vi-1] !== '0';
-                return `<td class="gcell disabled${prevDead?' merge-l':''}"></td>`;
+                // Each cell owns its RIGHT rule, so drop it when the next cell
+                // is dead too (the last of a run keeps its rule).
+                const nextDead = vi < VAR_COLS.length-1 && VAR_COLS[vi+1] !== '0';
+                return `<td class="gcell disabled${nextDead?' merge-r':''}"></td>`;
               }
               return `<td class="gcell${sel?' on':''}" id="gc2-${i}-${safePts}-${safeV}"
                           onclick="onGrid2(${i},'${pts}','${v}')"></td>`;
@@ -1802,7 +1811,7 @@ function renderDashboard() {
   charts.trend = new Chart(document.getElementById('chart-trend').getContext('2d'),{
     type:'line',
     data:{labels:td.map(t=>t.l),
-      datasets:[{data:td.map(t=>t.v),borderColor:'#166534',backgroundColor:'rgba(0,58,114,.1)',
+      datasets:[{data:td.map(t=>t.v),borderColor:'#166534',backgroundColor:'rgba(22,101,52,.12)',
         tension:.3,fill:true,pointBackgroundColor:'#166534',pointRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false}},
