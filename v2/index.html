@@ -134,14 +134,29 @@
     /* ── Chip system ── */
     .fl { margin-bottom: 10px; }
     .fl:last-child { margin-bottom: 0; }
-    /* Rounded on ALL corners — the old `0 4px 4px 0` left the left edge square */
+    /* Rounded on ALL corners — the old `0 4px 4px 0` left the left edge square.
+       Taller than the cells below it so it reads as a heading, not another row. */
     .fl-label {
-      display: block; text-align: center;
-      font-size: 10px; font-weight: 800; text-transform: uppercase;
-      letter-spacing: .06em; color: #e8f0f8;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      font-size: 12.5px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .04em; color: #fff;
       background: #15803d;
-      padding: 8px; border-radius: 8px;
-      margin-bottom: 6px; line-height: 1.4;
+      min-height: 40px; padding: 8px 12px; border-radius: 9px;
+      margin-bottom: 6px; line-height: 1.3;
+    }
+    /* small round "i" that reveals a one-line explanation */
+    .fl-i {
+      flex-shrink: 0; width: 19px; height: 19px; border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,.6); background: transparent;
+      color: #fff; font-size: 11px; font-weight: 800; font-style: italic;
+      line-height: 1; cursor: pointer; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fl-i:active { background: rgba(255,255,255,.22); }
+    .fl-info {
+      font-size: 11px; color: #4b5563; line-height: 1.45;
+      background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-radius: 8px; padding: 8px 10px; margin: -2px 0 6px;
     }
     /* Grid chips (4 per row) */
     .cg4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; }
@@ -267,9 +282,11 @@
        Softens the spreadsheet look: a rounded, clipping wrapper gives the block
        a card edge while the table keeps its own cell borders (including the
        heavier separators between the Downhill / Flat / Uphill groups). */
+    /* No border of its own — the table's own cell borders form the outer edge.
+       Having both produced a visible double line around every grid. */
     .gwrap {
       overflow:hidden; -webkit-overflow-scrolling:touch;
-      border-radius:10px; border:1.5px solid #d1d5db;
+      border-radius:10px;
     }
     .pgrid { border-collapse:collapse; font-size:10px; width:100%; table-layout:fixed; }
     .pgrid th {
@@ -290,11 +307,19 @@
     .pgrid td.gcell.on { background:#166534; box-shadow:inset 0 0 0 1.5px #0b3f1f; }
     .pgrid td.gcell.on::after { content:'✓'; font-size:11px; color:#fff; font-weight:800; line-height:1; }
     .pgrid td.gcell.disabled { background:#f3f4f6; cursor:default; pointer-events:none; }
+    /* consecutive dead cells read as one block, not a row of empty options */
+    .pgrid td.gcell.disabled.merge-l { border-left-color:#f3f4f6; }
 
-    /* ── v2: slope × break selector — the label row is the tap target ── */
+    /* Slope group headers — taller than the cells beneath them */
+    .pgrid th.slope-h {
+      color:#fff; padding:11px 1px; font-size:12px; font-weight:800;
+      letter-spacing:.3px; border-color:transparent;
+    }
+
+    /* ── v2: slope × break selector — the arrow row is the tap target ── */
     .pgrid td.dcell {
-      height:40px; padding:4px 1px; text-align:center;
-      font-size:12px; font-weight:700; color:#374151;
+      height:42px; padding:4px 1px; text-align:center;
+      font-size:19px; font-weight:700; color:#4b5563;
       background:#f9fafb; border:1px solid #d1d5db;
       cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent;
       -webkit-user-select:none; user-select:none;
@@ -921,12 +946,10 @@ function renderAccordion() {
 
 function buildCurrentHoleHTML(i) {
   const h = AR.holes[i];
-  const txt = holeSummaryText(h);
   return `
   <div id="cur-hole">
     <div id="cur-hole-head">
       <div class="cur-hole-title">Hole ${h.n}</div>
-      <div class="cur-hole-sum" id="cur-sum-${i}">${txt || ''}</div>
     </div>
     <div class="hole-form-inner" id="hfi-${i}">
       ${buildHoleFormHTML(h, i)}
@@ -960,6 +983,19 @@ function buildHoleListRow(h, i) {
 function slopeIcon(v) { return v==='up'?'⬆':v==='down'?'⬇':'—'; }
 function dirIcon(v)   { return v==='l-to-r'?'↗':v==='r-to-l'?'↖':'→'; }
 
+// Section heading with a small "i" that toggles a one-line explanation
+function flLabel(text, infoId) {
+  return `<div class="fl-label"><span>${text}</span>` +
+         `<button class="fl-i" onclick="toggleInfo('${infoId}')" aria-label="What goes here?">i</button></div>`;
+}
+function flInfo(infoId, text) {
+  return `<div class="fl-info" id="${infoId}" style="display:none">${text}</div>`;
+}
+function toggleInfo(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 function buildHoleFormHTML(h, i) {
   // ── Table 1: Putt Characteristics (distance × slope+direction) ──────────
   // 9 columns: [Down L→R, Down Str, Down R→L, Flat L→R, Flat Str, Flat R→L, Up L→R, Up Str, Up R→L]
@@ -970,27 +1006,30 @@ function buildHoleFormHTML(h, i) {
   ];
   // One drum per slope × break cell. Scrolling a drum sets all three inputs at
   // once: the column gives slope, the row-header gives break, the value gives feet.
+  // Slope groups are separated by their header colour, so no divider rules.
+  // Break is shown as the arrow alone — the "L-R"/"Str"/"R-L" text crowded the
+  // row, and the arrows carry the same meaning (the info button spells it out).
   const grid1 = `
   <div class="fl">
-    <div class="fl-label">🎯 Putt Distance + Slope + Break</div>
+    ${flLabel('🎯 Putt Distance + Slope + Break', `i1-${i}`)}
+    ${flInfo(`i1-${i}`, 'Tap the arrow under the slope that matches your putt — ↗ breaks left-to-right, ↑ straight, ↖ right-to-left. Then scroll the drum to the distance from ball to hole, in feet.')}
     <div class="gwrap">
       <table class="pgrid" id="grid1-${i}">
         <thead>
           <tr>
-            <th colspan="3" style="border-left:2px solid #166534;color:#fff;background:#0f766e;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬇ Downhill</th>
-            <th colspan="3" style="border-left:2px solid #6b7280;color:#fff;background:#374151;padding:10px 1px;font-size:11px;letter-spacing:.3px">— Flat</th>
-            <th colspan="3" style="border-left:2px solid #166534;color:#fff;background:#7c3010;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬆ Uphill</th>
+            <th colspan="3" class="slope-h" style="background:#0f766e">⬇ Downhill</th>
+            <th colspan="3" class="slope-h" style="background:#374151">— Flat</th>
+            <th colspan="3" class="slope-h" style="background:#7c3010">⬆ Uphill</th>
           </tr>
         </thead>
         <tbody>
-          <!-- the break labels ARE the tap targets — no separate blank row -->
+          <!-- the break arrows ARE the tap targets — no separate blank row -->
           <tr>
-            ${COLS1.map((c,ci) => {
+            ${COLS1.map(c => {
               const sel = h.slope===c.slope && h.direction===c.dir;
-              const bdr = ci===3 ? 'border-left:2px solid #6b7280;' : ci===6 ? 'border-left:2px solid #166534;' : '';
-              const lbl = c.dir==='l-to-r' ? 'L-R ↗' : c.dir==='straight' ? 'Str ↑' : 'R-L ↖';
+              const lbl = c.dir==='l-to-r' ? '↗' : c.dir==='straight' ? '↑' : '↖';
               return `<td class="dcell${sel?' on':''}" id="gc1-${i}-${c.slope}-${c.dir}"
-                          style="${bdr}" onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</td>`;
+                          onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</td>`;
             }).join('')}
           </tr>
         </tbody>
@@ -999,9 +1038,8 @@ function buildHoleFormHTML(h, i) {
 
     <!-- Distance drum: one per hole, populated when the hole opens -->
     <div class="hd-outer${h.distance>0?' set':''}" id="hdo-${i}">
-      <div class="hd-cap" id="hdc-${i}">
-        ${h.distance>0 ? `Putt distance <b>${h.distance}'</b>` : 'Scroll to putt distance'}
-      </div>
+      <!-- no value echoed here — the drum below already shows it large -->
+      <div class="hd-cap" id="hdc-${i}">Putt distance</div>
       <div class="hd-wrap">
         <div class="hd-band"></div>
         <div class="hd-fade-l"></div>
@@ -1018,7 +1056,8 @@ function buildHoleFormHTML(h, i) {
   const VAR_COLS   = ['>-7','-5','-3','-1','0','+1','+3','+5','>+7'];
   const grid2 = `
   <div class="fl">
-    <div class="fl-label">🏌️ # Putts × 1st-putt variance</div>
+    ${flLabel('🏌️ # Putts × 1st-Putt Variance', `i2-${i}`)}
+    ${flInfo(`i2-${i}`, 'Pick the row for how many putts you took, and the column for where the FIRST putt finished — negative feet if it stopped short, positive if it ran past, 0 if it finished level with the hole.')}
     <div class="gwrap">
       <table class="pgrid" id="grid2-${i}">
         <thead>
@@ -1043,7 +1082,12 @@ function buildHoleFormHTML(h, i) {
               const disabled = pts==='1' && !isZero;
               const sel = h.numPutts===pts && h.variance===v;
               const safeV = v.replace(/[<>+]/g,'_');
-              if (disabled) return `<td class="gcell disabled"></td>`;
+              if (disabled) {
+                // Merge the run of dead cells either side of '0' into one flat
+                // block — internal grid lines there suggest something tappable.
+                const prevDead = vi > 0 && VAR_COLS[vi-1] !== '0';
+                return `<td class="gcell disabled${prevDead?' merge-l':''}"></td>`;
+              }
               return `<td class="gcell${sel?' on':''}" id="gc2-${i}-${safePts}-${safeV}"
                           onclick="onGrid2(${i},'${pts}','${v}')"></td>`;
             }).join('')}
@@ -1063,7 +1107,8 @@ function buildHoleFormHTML(h, i) {
   const isPacePerfect = h.variance === '0' && !isPuttHoled; // pin-high miss: only L/R valid
   const grid3 = `
   <div class="fl" style="margin-bottom:4px">
-    <div class="fl-label">📍 GIR? / Miss Side</div>
+    ${flLabel('📍 GIR? / Miss Side', `i3-${i}`)}
+    ${flInfo(`i3-${i}`, 'Row: did you hit the green in regulation? Column: which side the ball finished on. Use Made when you holed it.')}
     <div class="gwrap">
       <table class="pgrid" id="grid3-${i}">
         <thead>
@@ -1195,22 +1240,29 @@ let AC = null, NOISE = null;
 function unlockAudio() {
   try {
     if (!AC) {
-      AC = new (window.AudioContext || window.webkitAudioContext)();
-      // 30ms of white noise, generated once and reused for every click
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return Promise.resolve(false);
+      AC = new Ctor();
+      // 30ms of decaying white noise, built once and reused for every click
       const n = Math.floor(AC.sampleRate * 0.03);
       NOISE = AC.createBuffer(1, n, AC.sampleRate);
       const d = NOISE.getChannelData(0);
       for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
     }
-    if (AC.state === 'suspended') AC.resume();
-  } catch (e) { AC = null; }
+    // resume() is async; callers that need to make a sound right away must wait
+    if (AC.state === 'suspended') return AC.resume().then(() => true).catch(() => false);
+    return Promise.resolve(AC.state === 'running');
+  } catch (e) { AC = null; return Promise.resolve(false); }
 }
-['touchstart','mousedown','keydown'].forEach(ev =>
+// Any first interaction unlocks. Listening on several events (and on the drum
+// itself via pointerdown) because iOS only permits this inside a real gesture.
+['pointerdown','touchstart','mousedown','keydown'].forEach(ev =>
   document.addEventListener(ev, unlockAudio, { passive: true }));
 
 let lastTick = 0;
 function drumTick() {
-  if (!SOUND_ON || !AC || !NOISE || AC.state !== 'running') return;
+  if (!SOUND_ON || !AC || !NOISE) return;
+  if (AC.state !== 'running') { AC.resume && AC.resume().catch(() => {}); return; }
   const now = performance.now();
   if (now - lastTick < 22) return;   // cap the rate on a fast flick
   lastTick = now;
@@ -1219,7 +1271,7 @@ function drumTick() {
   const bp  = AC.createBiquadFilter(); bp.type = 'bandpass';
   bp.frequency.value = 2200; bp.Q.value = 1.1;
   const g   = AC.createGain();
-  g.gain.setValueAtTime(0.16, t);
+  g.gain.setValueAtTime(0.22, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
   src.connect(bp).connect(g).connect(AC.destination);
   src.start(t); src.stop(t + 0.035);
@@ -1228,9 +1280,17 @@ function drumTick() {
 function toggleSound() {
   SOUND_ON = !SOUND_ON;
   localStorage.setItem('putt_sound', SOUND_ON ? 'on' : 'off');
-  const b = document.getElementById('snd-btn');
-  if (b) { b.textContent = SOUND_ON ? '🔊' : '🔇'; b.style.opacity = SOUND_ON ? '1' : '.45'; }
-  if (SOUND_ON) { unlockAudio(); drumTick(); }
+  syncSoundBtn();
+  if (!SOUND_ON) return;
+  // Wait for resume() to settle, otherwise the confirmation click is swallowed
+  unlockAudio().then(ok => {
+    if (ok) { lastTick = 0; drumTick(); }
+    else {
+      alert('Sound could not start.\n\nOn iPhone the ring/silent switch on the ' +
+            'left edge also silences web audio — flick it to ring, and make sure ' +
+            'the volume is up.');
+    }
+  });
 }
 
 const DRUM_T = {}, DRUM_LAST = {};
@@ -1269,9 +1329,7 @@ function commitDist(hi, feet) {
   h.distance = feet > 0 ? feet : null;
 
   const outer = document.getElementById(`hdo-${hi}`);
-  const cap   = document.getElementById(`hdc-${hi}`);
   if (outer) outer.classList.toggle('set', feet > 0);
-  if (cap)   cap.innerHTML = feet > 0 ? `Putt distance <b>${feet}'</b>` : 'Scroll to putt distance';
 
   if (isHoleDone(h)) onHoleDone(hi);
   else refreshHoleSummary(hi);
@@ -1392,11 +1450,8 @@ function holeSummaryText(h) {
 
 // Live-update the header above the form plus this hole's row in the list below
 function refreshHoleSummary(i) {
-  const h = AR.holes[i];
-  if (!h) return;
-  const head = document.getElementById(`cur-sum-${i}`);
-  if (head) head.textContent = holeSummaryText(h);
-  refreshHoleRow(i);
+  if (!AR.holes[i]) return;
+  refreshHoleRow(i);   // the list row below is the only place the summary shows
 }
 
 function onHoleDone(i) {
