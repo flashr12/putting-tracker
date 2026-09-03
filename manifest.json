@@ -2,7 +2,7 @@
   "name": "Putting Tracker",
   "short_name": "Putts",
   "description": "Hole-by-hole putting analysis",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f0fdfa",
@@ -14,5 +14,6 @@
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "scope": "./"
 }

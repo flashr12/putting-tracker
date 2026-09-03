@@ -1,0 +1,19 @@
+{
+  "name": "Putting Tracker 2.0",
+  "short_name": "Putts 2",
+  "description": "Exact-distance putting analysis with strokes gained",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f5fb",
+  "theme_color": "#002855",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="Putts"/>
+  <meta name="apple-mobile-web-app-title" content="Putts 2"/>
   <meta name="theme-color" content="#002855"/>
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon.svg"/>
-  <title>Putting Tracker</title>
+  <title>Putting Tracker v2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -267,6 +267,72 @@
     .pgrid td.gcell.on::after { content:'✓'; font-size:11px; color:#fff; font-weight:800; line-height:1; }
     .pgrid td.gcell.disabled { background:#f3f4f6; cursor:default; pointer-events:none; }
 
+    /* ── v2: slope × break selector — the label row is the tap target ── */
+    .pgrid td.dcell {
+      height:40px; padding:4px 1px; text-align:center;
+      font-size:12px; font-weight:700; color:#374151;
+      background:#f9fafb; border:1px solid #d1d5db;
+      cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent;
+      -webkit-user-select:none; user-select:none;
+      transition:background .1s, color .1s;
+    }
+    .pgrid td.dcell:active { background:#dbe8f5; }
+    .pgrid td.dcell.on {
+      background:#003A72; color:#fff;
+      box-shadow:inset 0 0 0 1.5px #001d3d;
+    }
+
+    /* ── v2: horizontal distance drum ──────────────────────────────────────
+       One drum per hole (not per cell): tap a slope×break cell above, then
+       scroll this to the putt distance in feet. */
+    .hd-outer {
+      background:#fff; border:1.5px solid #d1d5db; border-radius:10px;
+      padding:6px 0 5px; margin-top:7px;
+      transition:border-color .12s, box-shadow .12s;
+    }
+    .hd-outer.set { border-color:#003A72; box-shadow:0 0 0 2px rgba(0,58,114,.12); }
+    .hd-cap {
+      display:flex; align-items:center; justify-content:center; gap:6px;
+      font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+      color:#9ca3af; margin-bottom:4px;
+    }
+    .hd-cap b { font-size:15px; font-weight:800; color:#003A72; letter-spacing:0; }
+
+    .hd-wrap { position:relative; height:46px; overflow:hidden; }
+    .hd-scroller {
+      position:relative; z-index:3;
+      display:flex; height:100%; align-items:center;
+      overflow-x:scroll; overflow-y:hidden;
+      scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+      scrollbar-width:none; overscroll-behavior-x:contain;
+      /* half the track minus half an item, so item 0 can sit dead centre.
+         With this, scrollLeft === index * HD_ITEM_W exactly. */
+      padding:0 calc(50% - 24px);
+    }
+    .hd-scroller::-webkit-scrollbar { display:none; }
+    .hd-item {
+      flex:0 0 48px; height:38px;
+      display:flex; align-items:center; justify-content:center;
+      scroll-snap-align:center; scroll-snap-stop:always;
+      font-size:12px; font-weight:600; color:#b6bcc6; line-height:1;
+      transition:color .1s, font-size .1s;
+    }
+    /* the value sitting in the centre band */
+    .hd-item.hd-sel { font-size:18px; font-weight:800; color:#002855; }
+
+    /* centre band: bordered highlight marking the selected value */
+    .hd-band {
+      position:absolute; z-index:1; top:4px; bottom:4px; left:50%; width:48px;
+      transform:translateX(-50%);
+      background:#eef4fb; border:1.5px solid #c7d7e8; border-radius:8px;
+      pointer-events:none;
+    }
+    .hd-outer.set .hd-band { background:#dbe8f5; border-color:#003A72; }
+    /* fade the values either side so the centre reads as selected */
+    .hd-fade-l, .hd-fade-r { position:absolute; z-index:4; top:0; bottom:0; width:56px; pointer-events:none; }
+    .hd-fade-l { left:0;  background:linear-gradient(to right,#fff 12%,rgba(255,255,255,0)); }
+    .hd-fade-r { right:0; background:linear-gradient(to left, #fff 12%,rgba(255,255,255,0)); }
+
     /* Setup card */
     .setup-card { background:#fff; border-radius:16px; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
     .inp {
@@ -283,8 +349,8 @@
 <div id="app-header">
   <span style="font-size:22px">⛳</span>
   <div>
-    <div style="font-size:16px;font-weight:700;line-height:1.2">Putting Tracker</div>
-    <div style="font-size:11px;color:#5eead4">Hole-by-hole analysis</div>
+    <div style="font-size:16px;font-weight:700;line-height:1.2">Putting Tracker <span style="font-size:10px;background:#5eead4;color:#002855;border-radius:4px;padding:1px 5px;vertical-align:middle;font-weight:800">2.0</span></div>
+    <div style="font-size:11px;color:#5eead4">Exact distances · Strokes gained</div>
   </div>
 </div>
 
@@ -325,10 +391,29 @@
           <div class="kpi-l">Putts/GIR</div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <!-- v2: strokes gained + feet holed -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-v" id="kpi-sgp" style="font-size:22px">—</div>
+          <div class="kpi-l">SG Putting / Rd</div>
+        </div>
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-v" id="kpi-feet" style="color:#0d9488;font-size:22px">—</div>
+          <div class="kpi-l">Feet Made / Rd</div>
+        </div>
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-v" id="kpi-longest" style="color:#7c3010;font-size:22px">—</div>
+          <div class="kpi-l">Longest Made</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="kpi">
           <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-avg">—</div>
           <div class="kpi-l">Avg Putts / Hole</div>
+        </div>
+        <div class="kpi">
+          <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-avgdist">—</div>
+          <div class="kpi-l">Avg 1st Putt</div>
         </div>
         <div class="kpi">
           <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-rounds">—</div>
@@ -486,7 +571,7 @@
         <thead>
           <tr>
             <th style="text-align:left">H</th>
-            <th>Len</th><th>Slp</th><th>Dir</th>
+            <th>Dist</th><th>Slp</th><th>Dir</th>
             <th>Pts</th><th>Var</th><th>Miss</th><th>GIR</th>
           </tr>
         </thead>
@@ -531,9 +616,51 @@
 // ═══════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════
-const LEN_BUCKETS = ['≤3','4-8','9-20','21+'];
-// Legacy bucket values kept for backward-compatibility with existing saved data
-const LEGACY_MAP  = { '1-3':'≤3','4-6':'4-8','7-10':'4-8','11-15':'9-20','16-20':'9-20','21-30':'21+','30-50':'21+','50+':'21+' };
+// v2: exact distance in feet. Bands below are for reporting only — raw feet is stored.
+const MAX_DIST  = 100;   // drum picker upper bound (feet)
+const HD_ITEM_W = 48;    // px width of one drum value (must match .hd-item CSS)
+
+// Reporting bands, applied to h.distance (integer feet)
+const DIST_BANDS = [
+  { label:"≤3'",   key:'short',   fn: h => h.distance >= 1  && h.distance <= 3  },
+  { label:"4–8'",  key:'scoring', fn: h => h.distance >= 4  && h.distance <= 8  },
+  { label:"9–20'", key:'mid',     fn: h => h.distance >= 9  && h.distance <= 20 },
+  { label:"21'+",  key:'long',    fn: h => h.distance >= 21 },
+];
+
+// ── Strokes Gained Putting benchmark ──────────────────────────────────────
+// Expected putts to hole out from X feet (PGA Tour ShotLink baseline).
+// SG = expected(start distance) − putts actually taken.  Positive = gained.
+const SGP_TABLE = [
+  [1,1.001],[2,1.009],[3,1.053],[4,1.147],[5,1.256],
+  [6,1.357],[7,1.443],[8,1.515],[9,1.575],[10,1.626],
+  [12,1.706],[15,1.788],[20,1.883],[25,1.940],[30,1.977],
+  [35,2.009],[40,2.037],[50,2.087],[60,2.132],[75,2.192],[100,2.290],
+];
+function sgpExpected(feet) {
+  if (!feet || feet <= 0) return 2.0;
+  const t = SGP_TABLE;
+  if (feet <= t[0][0]) return t[0][1];
+  if (feet >= t[t.length-1][0]) return t[t.length-1][1];
+  for (let i = 0; i < t.length-1; i++) {
+    if (feet >= t[i][0] && feet <= t[i+1][0]) {
+      const f = (feet - t[i][0]) / (t[i+1][0] - t[i][0]);
+      return t[i][1] + f * (t[i+1][1] - t[i][1]);
+    }
+  }
+  return 2.0;
+}
+// Strokes gained for a single hole (null when data is incomplete)
+function holeSGP(h) {
+  if (!h || !h.distance || !h.numPutts) return null;
+  const putts = h.numPutts === '4+' ? 4 : parseInt(h.numPutts);
+  return sgpExpected(h.distance) - putts;
+}
+function fmtSG(v, dp = 2) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return (v >= 0 ? '+' : '') + v.toFixed(dp);
+}
+
 const VAR_OPTS    = ['<-6','-5','-3','-1','+1','+3','+5','>+6'];
 const SHORT_VAR   = ['<-6','>-7','-5','-3','-1'];  // stopped short of hole
 const LONG_VAR    = ['+1','+3','+5','>+6','>+7'];   // ran past hole
@@ -542,7 +669,7 @@ const DIR_OPTS    = [{v:'straight',l:'↑ Str'},{v:'l-to-r',l:'↗ L→R'},{v:'r
 const NUM_OPTS    = ['1','2','3','4+'];
 const MISS_OPTS   = [{v:'left',l:'◀ Left'},{v:'right',l:'▶ Right'},{v:'short',l:'▼ Short'},{v:'long',l:'▲ Long'},{v:'made',l:'✓ Made'}];
 const GIR_OPTS    = [{v:'yes',l:'✓ Yes'},{v:'no',l:'✗ No'}];
-const STORAGE_KEY = 'putttrack_v3';
+const STORAGE_KEY = 'putttrack_v4';   // v2 keeps its own store — v1 data is untouched
 
 // ═══════════════════════════════════════
 //  STORAGE
@@ -561,7 +688,7 @@ function loadRounds()   {
 function saveRounds(r)  { localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
 
 // Draft round (auto-saved after every chip tap so Safari crashes don't lose data)
-const DRAFT_KEY = 'putttrack_draft';
+const DRAFT_KEY = 'putttrack_v4_draft';
 function saveDraft()  { if (AR) localStorage.setItem(DRAFT_KEY, JSON.stringify({AR, AH})); }
 function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
 function loadDraft()  { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch { return null; } }
@@ -574,12 +701,14 @@ let AH   = 0;     // active hole index (0-based)
 let RVIEW = 'form'; // 'form' | 'table'
 
 function blankHole(n) {
-  return { n, length:null, slope:null, direction:null, numPutts:null,
+  // distance = exact feet from ball to hole (integer, null until set)
+  return { n, distance:null, slope:null, direction:null, numPutts:null,
            variance:null, missDirection:null, gir:null };
 }
 
 function isHoleDone(h) {
-  if (!h.length || !h.slope || !h.direction || !h.numPutts || !h.gir) return false;
+  if (!h.distance || h.distance < 1) return false;
+  if (!h.slope || !h.direction || !h.numPutts || !h.gir) return false;
   if (h.numPutts === '1') return true;   // 1-putt: variance/miss optional (old compat)
   return !!(h.variance && h.missDirection); // 2+ putts need variance + miss direction
 }
@@ -762,18 +891,13 @@ function buildHoleAccordionHTML(h, i) {
   const missed = h.numPutts && parseInt(h.numPutts) >= 2;
   const puttNum = h.numPutts ? parseInt(h.numPutts) : null;
   const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
-  const summaryChips = done ? [
-    h.length, slopeIcon(h.slope), dirIcon(h.direction),
-    `${h.numPutts}pt`, varDisplay(h.variance, h.missDirection),
-    h.missDirection && h.missDirection !== 'made' ? missIcon(h.missDirection) : null,
-    h.gir==='yes'?'GIR':''
-  ].filter(Boolean).join(' · ') : '—';
+  const summaryChips = holeSummaryText(h);
 
   return `
   <div class="hole-row" id="hr-${i}">
     <div class="hole-summary" onclick="jumpHole(${i})">
       <div class="hole-num-badge ${done?'tc-g':'tc-d'}" style="font-size:11px;font-weight:700">${h.n}</div>
-      <div class="hole-quick">${done ? summaryChips : '<span style="color:#d1d5db">tap to enter</span>'}</div>
+      <div class="hole-quick">${summaryChips || '<span style="color:#d1d5db">tap to enter</span>'}</div>
       ${done ? `<span class="tc ${badgeCls}" style="min-width:28px;text-align:center">${h.numPutts}</span>` : ''}
     </div>
     <div class="hole-form-wrap" id="hfw-${i}">
@@ -795,37 +919,46 @@ function buildHoleFormHTML(h, i) {
     {slope:'flat',dir:'l-to-r'},{slope:'flat',dir:'straight'},{slope:'flat',dir:'r-to-l'},
     {slope:'up',  dir:'l-to-r'},{slope:'up',  dir:'straight'},{slope:'up',  dir:'r-to-l'},
   ];
+  // One drum per slope × break cell. Scrolling a drum sets all three inputs at
+  // once: the column gives slope, the row-header gives break, the value gives feet.
   const grid1 = `
   <div class="fl">
-    <div class="fl-label">🎯 Tap a cell → sets Distance + Slope + Break in one tap</div>
+    <div class="fl-label">🎯 Putt Distance + Slope + Break</div>
     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
       <table class="pgrid" id="grid1-${i}">
         <thead>
           <tr>
-            <th rowspan="2" style="min-width:28px;border-right:2px solid #6b7280">Feet</th>
-            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#1e4d2b;padding:6px 1px;font-size:10px;letter-spacing:.3px">⬇ Downhill</th>
-            <th colspan="3" style="border-left:2px solid #6b7280;color:#fff;background:#374151;padding:6px 1px;font-size:10px;letter-spacing:.3px">— Flat</th>
-            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#7c3010;padding:6px 1px;font-size:10px;letter-spacing:.3px">⬆ Uphill</th>
-          </tr>
-          <tr>
-            <th style="border-left:2px solid #003A72">L-R ↗</th><th>Str ↑</th><th>R-L ↖</th>
-            <th style="border-left:2px solid #6b7280">L-R ↗</th><th>Str ↑</th><th>R-L ↖</th>
-            <th style="border-left:2px solid #003A72">L-R ↗</th><th>Str ↑</th><th>R-L ↖</th>
+            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#1e4d2b;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬇ Downhill</th>
+            <th colspan="3" style="border-left:2px solid #6b7280;color:#fff;background:#374151;padding:10px 1px;font-size:11px;letter-spacing:.3px">— Flat</th>
+            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#7c3010;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬆ Uphill</th>
           </tr>
         </thead>
         <tbody>
-          ${LEN_BUCKETS.map(len => `
+          <!-- the break labels ARE the tap targets — no separate blank row -->
           <tr>
-            <td class="row-head" style="border-right:2px solid #6b7280">${len}'</td>
             ${COLS1.map((c,ci) => {
-              const sel = h.length===len && h.slope===c.slope && h.direction===c.dir;
+              const sel = h.slope===c.slope && h.direction===c.dir;
               const bdr = ci===3 ? 'border-left:2px solid #6b7280;' : ci===6 ? 'border-left:2px solid #003A72;' : '';
-              return `<td class="gcell${sel?' on':''}" id="gc1-${i}-${len}-${c.slope}-${c.dir}"
-                          style="${bdr}" onclick="onGrid1(${i},'${len}','${c.slope}','${c.dir}')"></td>`;
+              const lbl = c.dir==='l-to-r' ? 'L-R ↗' : c.dir==='straight' ? 'Str ↑' : 'R-L ↖';
+              return `<td class="dcell${sel?' on':''}" id="gc1-${i}-${c.slope}-${c.dir}"
+                          style="${bdr}" onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</td>`;
             }).join('')}
-          </tr>`).join('')}
+          </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Distance drum: one per hole, populated when the hole opens -->
+    <div class="hd-outer${h.distance>0?' set':''}" id="hdo-${i}">
+      <div class="hd-cap" id="hdc-${i}">
+        ${h.distance>0 ? `Putt distance <b>${h.distance}'</b>` : 'Scroll to putt distance'}
+      </div>
+      <div class="hd-wrap">
+        <div class="hd-band"></div>
+        <div class="hd-fade-l"></div>
+        <div class="hd-fade-r"></div>
+        <div class="hd-scroller" id="hds-${i}" onscroll="onDistScroll(${i},this)"></div>
+      </div>
     </div>
   </div>`;
 
@@ -938,6 +1071,10 @@ function openHoleForm(i, animate=true) {
   document.querySelectorAll('.hole-form-wrap.open').forEach(el => el.classList.remove('open'));
   const fw = document.getElementById(`hfw-${i}`);
   if (fw) fw.classList.add('open');
+  // Drums can only be scrolled once the wrapper has height — wait for the transition
+  trimDrums(i);
+  requestAnimationFrame(() => initDrums(i));
+  setTimeout(() => initDrums(i), 260);
   // Scroll into view
   if (animate) {
     setTimeout(() => {
@@ -980,18 +1117,92 @@ function selChip(el) {
 //  GRID CELL HANDLERS
 // ═══════════════════════════════════════
 
-// Table 1: Putt Characteristics — sets length + slope + direction
-function onGrid1(hi, length, slope, dir) {
+// ── Table 1 (v2): slope×break cell tap, then one distance drum ────────────
+// Drum index 0 is the empty "—" value; index N is N feet. The scroller's
+// side padding centres item 0 at scrollLeft 0, so scrollLeft = feet * HD_ITEM_W.
+
+// Tapping a cell sets slope + break. Distance comes from the drum below.
+function onGrid1(hi, slope, dir) {
   const h = AR.holes[hi];
-  h.length = length; h.slope = slope; h.direction = dir;
+  h.slope = slope; h.direction = dir;
   const tbl = document.getElementById(`grid1-${hi}`);
   if (tbl) {
-    tbl.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
-    const cell = document.getElementById(`gc1-${hi}-${length}-${slope}-${dir}`);
+    tbl.querySelectorAll('.dcell.on').forEach(c => c.classList.remove('on'));
+    const cell = document.getElementById(`gc1-${hi}-${slope}-${dir}`);
     if (cell) cell.classList.add('on');
   }
   if (isHoleDone(h)) onHoleDone(hi);
+  else refreshHoleSummary(hi);
   saveDraft();
+}
+
+function drumItemsHTML(sel) {
+  let s = `<div class="hd-item${sel===0?' hd-sel':''}">—</div>`;
+  for (let n = 1; n <= MAX_DIST; n++) {
+    s += `<div class="hd-item${sel===n?' hd-sel':''}">${n}'</div>`;
+  }
+  return s;
+}
+
+// Bold the value currently sitting in the centre band
+function paintDrum(scroller, idx) {
+  const prev = scroller.querySelector('.hd-item.hd-sel');
+  if (prev) prev.classList.remove('hd-sel');
+  const items = scroller.children;
+  if (items[idx]) items[idx].classList.add('hd-sel');
+}
+
+function drumIdx(scroller) {
+  return Math.max(0, Math.min(MAX_DIST, Math.round(scroller.scrollLeft / HD_ITEM_W)));
+}
+
+const DRUM_T = {};
+function onDistScroll(hi, scroller) {
+  // Populated lazily — an empty scroller is mid-teardown, not user input.
+  if (!scroller.firstElementChild) return;
+  // Repaint live while the finger is moving…
+  paintDrum(scroller, drumIdx(scroller));
+  // …but only commit once scrolling settles.
+  clearTimeout(DRUM_T[hi]);
+  DRUM_T[hi] = setTimeout(() => {
+    const idx = drumIdx(scroller);
+    paintDrum(scroller, idx);
+    commitDist(hi, idx);
+  }, 140);
+}
+
+function commitDist(hi, feet) {
+  const h = AR.holes[hi];
+  h.distance = feet > 0 ? feet : null;
+
+  const outer = document.getElementById(`hdo-${hi}`);
+  const cap   = document.getElementById(`hdc-${hi}`);
+  if (outer) outer.classList.toggle('set', feet > 0);
+  if (cap)   cap.innerHTML = feet > 0 ? `Putt distance <b>${feet}'</b>` : 'Scroll to putt distance';
+
+  if (isHoleDone(h)) onHoleDone(hi);
+  else refreshHoleSummary(hi);
+  saveDraft();
+}
+
+// Populate + position the drum for one hole (only the open hole carries rows)
+function initDrums(hi) {
+  const h = AR.holes[hi];
+  if (!h) return;
+  const sc = document.getElementById(`hds-${hi}`);
+  if (!sc) return;
+  const val = h.distance > 0 ? h.distance : 0;
+  if (!sc.firstElementChild) sc.innerHTML = drumItemsHTML(val);
+  if (drumIdx(sc) !== val) sc.scrollLeft = val * HD_ITEM_W;
+  paintDrum(sc, val);
+}
+
+// Drop the rows of every hole except `keep` — keeps the DOM small on phones
+function trimDrums(keep) {
+  document.querySelectorAll('.hd-scroller').forEach(sc => {
+    const hi = parseInt(sc.id.split('-')[1]);
+    if (hi !== keep && sc.firstElementChild) sc.innerHTML = '';
+  });
 }
 
 // Table 2: Putts × Distance — sets numPutts + variance
@@ -1073,20 +1284,35 @@ function onGrid3(hi, missDir, gir) {
   saveDraft();
 }
 
+// Build the one-line summary shown on a collapsed hole row
+function holeSummaryText(h) {
+  return [
+    h.distance ? h.distance + "'" : null,
+    h.slope ? slopeIcon(h.slope) : null,
+    h.direction ? dirIcon(h.direction) : null,
+    h.numPutts ? `${h.numPutts}pt` : null,
+    varDisplay(h.variance, h.missDirection),
+    h.missDirection && h.missDirection !== 'made' ? missIcon(h.missDirection) : null,
+    h.gir==='yes' ? 'GIR' : ''
+  ].filter(Boolean).join(' · ');
+}
+
+// Live-update a partially-filled hole's summary line (drum scroll, etc.)
+function refreshHoleSummary(i) {
+  const h  = AR.holes[i];
+  const el = document.querySelector(`#hr-${i} .hole-quick`);
+  if (!el || !h) return;
+  const txt = holeSummaryText(h);
+  el.innerHTML = txt ? txt : '<span style="color:#d1d5db">tap to enter</span>';
+}
+
 function onHoleDone(i) {
   // Refresh the summary row text (without disrupting open state)
   const h = AR.holes[i];
   const summaryEl = document.querySelector(`#hr-${i} .hole-quick`);
   const puttNum = parseInt(h.numPutts);
   const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
-  if (summaryEl) {
-    summaryEl.textContent = [
-      h.length, slopeIcon(h.slope), dirIcon(h.direction), `${h.numPutts}pt`,
-      varDisplay(h.variance, h.missDirection),
-      h.missDirection && h.missDirection !== 'made' ? missIcon(h.missDirection) : null,
-      h.gir==='yes'?'GIR':''
-    ].filter(Boolean).join(' · ');
-  }
+  if (summaryEl) summaryEl.textContent = holeSummaryText(h);
   // Update badge in summary row
   const summaryRow = document.querySelector(`#hr-${i} .hole-summary`);
   if (summaryRow) {
@@ -1134,7 +1360,7 @@ function renderTable() {
     return `
     <tr class="${i===AH?'cur-row':''}" onclick="jumpHole(${i});setRoundView('form')">
       <td>H${h.n}</td>
-      <td>${cell(h.length)}</td>
+      <td>${cell(h.distance ? h.distance+"'" : null, 'tc-b')}</td>
       <td>${cell(h.slope ? slopeIcon(h.slope) : null)}</td>
       <td>${cell(h.direction ? dirIcon(h.direction) : null)}</td>
       <td>${cell(h.numPutts, pc)}</td>
@@ -1179,14 +1405,22 @@ function computeStats(holes) {
   const total   = holes.reduce((s,h)=>s+parseInt(h.numPutts),0);
   const misses  = holes.filter(h=>parseInt(h.numPutts)>=2);
 
-  // Normalise legacy bucket values to new 4-bucket system
-  holes.forEach(h => { if (LEGACY_MAP[h.length]) h.length = LEGACY_MAP[h.length]; });
-  const byDist = LEN_BUCKETS.map(b => {
-    const bh = holes.filter(h=>h.length===b);
-    return { b, n:bh.length, m:bh.filter(h=>h.numPutts==='1').length,
+  const byDist = DIST_BANDS.map(band => {
+    const bh = holes.filter(h => h.distance && band.fn(h));
+    return { b:band.label, n:bh.length, m:bh.filter(h=>h.numPutts==='1').length,
              tp:bh.filter(h=>parseInt(h.numPutts)>=3).length,
              mp:pct(bh.filter(h=>h.numPutts==='1').length, bh.length) };
   });
+
+  // ── v2 metrics: strokes gained + feet of putts holed ──────────────────────
+  const sgH      = holes.filter(h => h.distance && h.numPutts);
+  const sgTotal  = sgH.reduce((s,h) => s + holeSGP(h), 0);
+  const sgPerHole= sgH.length ? sgTotal / sgH.length : null;
+  const feetMade = holes.filter(h => h.numPutts === '1' && h.distance)
+                        .reduce((s,h) => s + h.distance, 0);
+  const longestMade = holes.filter(h => h.numPutts === '1' && h.distance)
+                           .reduce((m,h) => Math.max(m, h.distance), 0);
+  const avgDist  = sgH.length ? (sgH.reduce((s,h)=>s+h.distance,0) / sgH.length) : null;
 
   const bySlope = SLOPE_OPTS.map(s => {
     const sh = holes.filter(h=>h.slope===s.v);
@@ -1218,11 +1452,11 @@ function computeStats(holes) {
 
   // Variance cross-analysis: short vs long by distance, slope, direction
   const varHoles = holes.filter(h=>h.variance);
-  const varByDist = LEN_BUCKETS.map(b => {
-    const bh = varHoles.filter(h=>h.length===b);
+  const varByDist = DIST_BANDS.map(band => {
+    const bh = varHoles.filter(h=>h.distance && band.fn(h));
     const sc = bh.filter(h=>SHORT_VAR.includes(h.variance)).length;
     const lo = bh.filter(h=>LONG_VAR.includes(h.variance)).length;
-    return { b, n:bh.length, short:sc, long:lo,
+    return { b:band.label, n:bh.length, short:sc, long:lo,
              shortPct:pct(sc,bh.length), longPct:pct(lo,bh.length) };
   });
   const varBySlope = SLOPE_OPTS.map(s => {
@@ -1246,6 +1480,8 @@ function computeStats(holes) {
     avgPutts:(total/n).toFixed(2), totalPutts: total,
     byDist, bySlope, byDir, misses:misses.length, mL, mS, mLo, mR, byMissByDir, byVar,
     varByDist, varBySlope, varByDir,
+    // v2
+    sgTotal, sgPerHole, sgN:sgH.length, feetMade, longestMade, avgDist,
     rounds: null // filled in by caller
   };
 }
@@ -1315,6 +1551,20 @@ function renderDashboard() {
   document.getElementById('kpi-gir').textContent    = s.puttsPerGir ?? '—';
   document.getElementById('kpi-avg').textContent    = s.avgPutts;
   document.getElementById('kpi-rounds').textContent = `${rounds.length} / ${s.n}`;
+
+  // ── v2 KPIs: strokes gained per round, feet holed per round ──────────────
+  // SG is scaled to an 18-hole round so it's comparable to Tour figures.
+  const sgEl = document.getElementById('kpi-sgp');
+  if (s.sgN >= 5) {
+    const sgRound = s.sgPerHole * 18;
+    sgEl.textContent = fmtSG(sgRound, 1);
+    sgEl.style.color = sgRound >= 0 ? '#16a34a' : '#dc2626';
+  } else { sgEl.textContent = '—'; sgEl.style.color = '#d1d5db'; }
+
+  document.getElementById('kpi-feet').textContent =
+    rounds.length ? Math.round(s.feetMade / rounds.length) + "'" : '—';
+  document.getElementById('kpi-longest').textContent = s.longestMade ? s.longestMade + "'" : '—';
+  document.getElementById('kpi-avgdist').textContent = s.avgDist ? s.avgDist.toFixed(1) + "'" : '—';
 
   // Distance chart + table
   const ad = s.byDist.filter(d=>d.n>0);
@@ -1447,12 +1697,13 @@ function generateInsights(rounds) {
   const varHoles    = allHoles.filter(h => h.variance && parseInt(h.numPutts) >= 2);
   const varOldHoles = varHoles.filter(h => SHORT_VAR.includes(h.variance) || LONG_VAR.includes(h.variance));
 
-  const distGroups = [
-    { label:'short putts (≤3ft)',     set:new Set(['≤3','1-3']),                          key:'short'   },
-    { label:'scoring putts (4–8ft)',  set:new Set(['4-8','4-6','7-10']),                  key:'scoring' },
-    { label:'mid-range putts (9–20ft)',set:new Set(['9-20','11-15','16-20']),              key:'mid'     },
-    { label:'long putts (21ft+)',     set:new Set(['21+','21-30','30-50','50+']),          key:'long'    },
-  ];
+  const distGroups = DIST_BANDS.map(b => ({
+    key: b.key, fn: b.fn,
+    label: b.key==='short'   ? 'short putts (≤3ft)'
+         : b.key==='scoring' ? 'scoring putts (4–8ft)'
+         : b.key==='mid'     ? 'mid-range putts (9–20ft)'
+         :                     'long putts (21ft+)',
+  }));
 
   // Variance magnitude groups — 5 buckets preserving how far off pace the 1st putt was
   const VAR_MAG_GROUPS = [
@@ -1523,7 +1774,7 @@ function generateInsights(rounds) {
     });
     distGroups.forEach(dg => {
       const lbl = dg.key==='short'?'≤3ft':dg.key==='scoring'?'4–8ft':dg.key==='mid'?'9–20ft':'21ft+';
-      tryAdd(pool.filter(h => dg.set.has(h.length)), lbl);
+      tryAdd(pool.filter(h => dg.fn(h)), lbl);
     });
     DIR_OPTS.forEach(dir => {
       const lbl = dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'Straight';
@@ -1582,7 +1833,7 @@ function generateInsights(rounds) {
           })).filter(c=>c.N>=2) },
         { lbl:'Dist', cells: distGroups.map(dg => ({
             k: dg.key==='short'?'≤3ft':dg.key==='scoring'?'4–8ft':dg.key==='mid'?'9–20ft':'21ft+',
-            ...calc(pool.filter(h=>dg.set.has(h.length)))
+            ...calc(pool.filter(h=>dg.fn(h)))
           })).filter(c=>c.N>=2) },
         { lbl:'Break', cells: DIR_OPTS.map(dir => ({
             k: dir.v==='straight'?'Str':dir.v==='l-to-r'?'L→R':'R→L',
@@ -1650,7 +1901,7 @@ function generateInsights(rounds) {
       const comboCands = [];
       SLOPE_OPTS.forEach(slope => distGroups.forEach(dg => DIR_OPTS.forEach(dir => {
         const base3d = misses.filter(h =>
-          h.slope === slope.v && dg.set.has(h.length) && h.direction === dir.v
+          h.slope === slope.v && dg.fn(h) && h.direction === dir.v
         );
         const sLabel   = slope.v==='flat'?'Flat':slope.v==='up'?'⬆ Uphill':'⬇ Downhill';
         const dirLabel = dir.v==='l-to-r'?'L→R':dir.v==='r-to-l'?'R→L':'Straight';
@@ -1666,7 +1917,7 @@ function generateInsights(rounds) {
             const n = sub.filter(h => h.missDirection === miss.v).length;
             if (n === 0) return;
             const c = comp(misses,
-              h => h.slope===slope.v && dg.set.has(h.length) && h.direction===dir.v && vg.fn(h),
+              h => h.slope===slope.v && dg.fn(h) && h.direction===dir.v && vg.fn(h),
               h => h.missDirection===miss.v);
             const z = zt2(n, sub.length, c.count, c.n);
             if (z < MIN_Z) return;
@@ -1714,12 +1965,12 @@ function generateInsights(rounds) {
         bd(sub, h=>LONG_VAR.includes(h.variance), nL/sub.length), sub, h=>LONG_VAR.includes(h.variance), ['1st Putt']);
     });
     distGroups.forEach(dg => {
-      const sub = varOldHoles.filter(h=>dg.set.has(h.length));
+      const sub = varOldHoles.filter(h=>dg.fn(h));
       if (sub.length < MIN_N) return;
       const nS=sub.filter(h=>SHORT_VAR.includes(h.variance)).length;
       const nL=sub.filter(h=>LONG_VAR.includes(h.variance)).length;
-      const cSh=comp(varOldHoles,h=>dg.set.has(h.length),h=>SHORT_VAR.includes(h.variance));
-      const cLo=comp(varOldHoles,h=>dg.set.has(h.length),h=>LONG_VAR.includes(h.variance));
+      const cSh=comp(varOldHoles,h=>dg.fn(h),h=>SHORT_VAR.includes(h.variance));
+      const cLo=comp(varOldHoles,h=>dg.fn(h),h=>LONG_VAR.includes(h.variance));
       if (dg.key!=='short') add(zt2(nS,sub.length,cSh.count,cSh.n),'📉',
         `Leaving ${dg.label} short`,
         `${pct(nS,sub.length)}% of ${dg.label} end up short (${nS}/${sub.length}) vs ${Math.round(cSh.rate*100)}% on all other putts`,
@@ -1739,7 +1990,7 @@ function generateInsights(rounds) {
   // One-sample z-test: for each distance band, is over-hit or under-hit the dominant pace error?
   distGroups.forEach(dg => {
     const paceHoles = allHoles.filter(h =>
-      dg.set.has(h.length) &&
+      dg.fn(h) &&
       parseInt(h.numPutts) >= 2 &&
       (SHORT_VAR.includes(h.variance) || LONG_VAR.includes(h.variance))
     );
@@ -1795,10 +2046,10 @@ function generateInsights(rounds) {
       });
 
       distGroups.forEach(dg => {
-        const sub = allHoles.filter(h=>dg.set.has(h.length));
+        const sub = allHoles.filter(h=>dg.fn(h));
         if (sub.length < MIN_N) return;
         const n3 = sub.filter(is3putt).length;
-        const c3 = comp(allHoles,h=>dg.set.has(h.length),is3putt);
+        const c3 = comp(allHoles,h=>dg.fn(h),is3putt);
         add(zt2(n3,sub.length,c3.count,c3.n),'🎯',
           `High 3-putt rate on ${dg.label}`,
           `${pct(n3,sub.length)}% 3-putt rate on ${dg.label} (${n3}/${sub.length}) vs ${Math.round(c3.rate*100)}% on all other putts`,
@@ -1831,13 +2082,13 @@ function generateInsights(rounds) {
         SLOPE_OPTS.forEach(s => distGroups.forEach(dg => DIR_OPTS.forEach(dir => {
           VAR_GROUPS.forEach(vg => {
             const sub = allHoles.filter(h =>
-              h.slope===s.v && dg.set.has(h.length) && h.direction===dir.v && vg.fn(h)
+              h.slope===s.v && dg.fn(h) && h.direction===dir.v && vg.fn(h)
             );
             if (sub.length < MIN_N) return;
             const n3 = sub.filter(is3putt).length;
             if (n3 === 0) return;
             const c3 = comp(allHoles,
-              h => h.slope===s.v && dg.set.has(h.length) && h.direction===dir.v && vg.fn(h),
+              h => h.slope===s.v && dg.fn(h) && h.direction===dir.v && vg.fn(h),
               is3putt);
             const z = zt2(n3, sub.length, c3.count, c3.n);
             if (z >= MIN_Z) quadCombos.push({ s, dg, dir, vg, sub, n3, z, c3 });
@@ -1852,7 +2103,7 @@ function generateInsights(rounds) {
           // "By condition" 1st Putt row shows 3-putt rate across all variance magnitudes,
           // and the main stat denominator matches the breakdown totals.
           const displayPool = allHoles.filter(h =>
-            h.slope===s.v && dg.set.has(h.length) && h.direction===dir.v
+            h.slope===s.v && dg.fn(h) && h.direction===dir.v
           );
           const n3_display = displayPool.filter(is3putt).length;
           add(z, '⚠️',
@@ -1884,7 +2135,7 @@ function generateInsights(rounds) {
 }
 
 let INSIGHT_FILTER = 'all';
-let TREND_TAB    = 'make';
+let TREND_TAB    = 'sg';
 let TREND_3P_TAB = 'dist';
 
 function setInsightFilter(val) {
@@ -1901,7 +2152,7 @@ function setTrendTab(name) {
   TREND_TAB = name;
   document.querySelectorAll('.tr-tab').forEach(b => b.classList.remove('on'));
   document.querySelectorAll(`.tr-tab[data-tab="${name}"]`).forEach(b => b.classList.add('on'));
-  ['make','pace','miss','3putt'].forEach(t => {
+  ['sg','make','pace','miss','3putt'].forEach(t => {
     const el = document.getElementById('tt-' + t);
     if (el) el.style.display = t === name ? 'block' : 'none';
   });
@@ -1919,12 +2170,7 @@ function set3pTrendTab(name) {
 
 // ── Impact-based insights engine ────────────────────────────────────────────
 function computeImpactInsights(rounds) {
-  const DG = [
-    { label:'≤3ft',  key:'short',   set:new Set(['≤3','1-3']) },
-    { label:'4–8ft', key:'scoring', set:new Set(['4-8','4-6','7-10']) },
-    { label:'9–20ft',key:'mid',     set:new Set(['9-20','11-15','16-20']) },
-    { label:'21ft+', key:'long',    set:new Set(['21+','21-30','30-50','50+']) },
-  ];
+  const DG = DIST_BANDS.map(b => ({ label:b.label, key:b.key, fn:b.fn }));
   const VG = [
     { label:'≥3ft short', fn: h => SHORT_VAR.filter(v=>v!=='-1').includes(h.variance) },
     { label:'1ft short',  fn: h => h.variance === '-1'  },
@@ -1973,7 +2219,7 @@ function computeImpactInsights(rounds) {
     short:   '3-putting from close range is a mental challenge. Slow your routine, take a breath, and commit to a single confident stroke.',
   };
   DG.forEach(dg => {
-    const sub = allH.filter(h => dg.set.has(h.length));
+    const sub = allH.filter(h => dg.fn(h));
     tryAdd({ type:'3putt_dist', emoji:'🎯', title:`3-putt rate: ${dg.label}`, pool:sub, testFn:is3, baseRate:overall3pR, rec:tpDistRec[dg.key] });
   });
 
@@ -2003,7 +2249,7 @@ function computeImpactInsights(rounds) {
     const baseOver  = rate(varHoles, isLongV)  || 0;
     const baseUnder = rate(varHoles, isShortV) || 0;
     DG.forEach(dg => {
-      const sub = varHoles.filter(h => dg.set.has(h.length));
+      const sub = varHoles.filter(h => dg.fn(h));
       if (sub.length < MIN_N) return;
       tryAdd({ type:'pace_over_'+dg.key,  emoji:'📈', title:`Over-hitting ${dg.label}`,  pool:sub, testFn:isLongV,  baseRate:baseOver,  rec:paceRec[dg.key+'_over']  || '' });
       tryAdd({ type:'pace_under_'+dg.key, emoji:'📉', title:`Leaving ${dg.label} short`, pool:sub, testFn:isShortV, baseRate:baseUnder, rec:paceRec[dg.key+'_under'] || '' });
@@ -2041,6 +2287,16 @@ function computeImpactInsights(rounds) {
   // ── Overall summary ──────────────────────────────────────────────────────
   const last5H = sorted.slice(0, 5).flatMap(r => (r.holes||[]).filter(h => h.numPutts));
   const totalPuttCount = allH.reduce((s, h) => s + parseInt(h.numPutts), 0);
+
+  // Strokes gained per 18 holes — the headline putting metric
+  const sgOf = pool => {
+    const p = pool.filter(h => h.distance && h.numPutts);
+    return p.length >= 5 ? (p.reduce((s,h) => s + holeSGP(h), 0) / p.length) * 18 : null;
+  };
+  const sgAll = sgOf(allH), sg5 = sgOf(last5H);
+  const feetOf = pool => pool.filter(h => h.numPutts==='1' && h.distance)
+                             .reduce((s,h) => s + h.distance, 0);
+
   const summary = {
     avgPutts:  (totalPuttCount / N).toFixed(2),
     makeR:     Math.round(overallMkR * 100),
@@ -2048,24 +2304,39 @@ function computeImpactInsights(rounds) {
     avgPutts5: last5H.length >= 5 ? (last5H.reduce((s,h)=>s+parseInt(h.numPutts),0)/last5H.length).toFixed(2) : null,
     makeR5:    last5H.length >= 5 ? Math.round((rate(last5H, is1)||0) * 100) : null,
     threePR5:  last5H.length >= 5 ? Math.round((rate(last5H, is3)||0) * 100) : null,
+    sg:        sgAll, sg5,
+    feetPerRd: R ? Math.round(feetOf(allH) / R) : null,
   };
 
   // ── Trend tables ─────────────────────────────────────────────────────────
   const periodDefs = [
-    { label:'All time', h: allH },
-    { label:'Last 20',  h: sorted.slice(0,20).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts)) },
-    { label:'Last 10',  h: sorted.slice(0,10).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts)) },
-    { label:'Last 5',   h: sorted.slice(0,5).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts))  },
+    { label:'All time', h: allH, r: R },
+    { label:'Last 20',  h: sorted.slice(0,20).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts)), r: Math.min(20,R) },
+    { label:'Last 10',  h: sorted.slice(0,10).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts)), r: Math.min(10,R) },
+    { label:'Last 5',   h: sorted.slice(0,5).flatMap(r=>(r.holes||[]).filter(h=>h.numPutts)),  r: Math.min(5,R)  },
   ].filter(p => p.h.length >= 5);
 
   const cell = (pool, fn, minN=5) => pool.length>=minN ? Math.round(pool.filter(fn).length/pool.length*100) : null;
 
   const trends = {
+    // Strokes gained per round, split by distance band. Expressed per round so
+    // the four bands add up to the Overall figure — that shows *where* the
+    // strokes are being won or lost, not just the net total.
+    sg: periodDefs.map(p => {
+      const per = pool => {
+        const q = pool.filter(h => h.distance && h.numPutts);
+        return (q.length >= 5 && p.r) ? q.reduce((s,h) => s + holeSGP(h), 0) / p.r : null;
+      };
+      return { period:p.label, n:p.h.length, cols:[
+        { label:'Overall', v: per(p.h) },
+        ...DG.map(dg => ({ label:dg.label, v: per(p.h.filter(dg.fn)) })),
+      ]};
+    }),
     make: periodDefs.map(p => ({
       period: p.label, n: p.h.length,
       cols: [
         { label:'Overall', v:cell(p.h, is1) },
-        ...DG.map(dg => ({ label:dg.label, v:cell(p.h.filter(h=>dg.set.has(h.length)), is1) })),
+        ...DG.map(dg => ({ label:dg.label, v:cell(p.h.filter(h=>dg.fn(h)), is1) })),
       ],
     })),
     pace: periodDefs.map(p => {
@@ -2089,7 +2360,7 @@ function computeImpactInsights(rounds) {
       period:p.label, n:p.h.length,
       cols:[
         { label:'Overall', v:cell(p.h, is3) },
-        ...DG.map(dg => ({ label:dg.label, v:cell(p.h.filter(h=>dg.set.has(h.length)), is3) })),
+        ...DG.map(dg => ({ label:dg.label, v:cell(p.h.filter(h=>dg.fn(h)), is3) })),
       ],
     })),
     tp_var: periodDefs.map(p => ({
@@ -2159,7 +2430,7 @@ function renderInsights() {
         <div style="font-size:11px;font-weight:800;color:${col}">${Math.round(r*100)}%</div>
         <div style="font-size:8px;color:#9ca3af">${n}/${sub.length}</div></div>`;
     };
-    const DGx = [{label:'≤3ft',set:new Set(['≤3','1-3'])},{label:'4–8ft',set:new Set(['4-8','4-6','7-10'])},{label:'9–20ft',set:new Set(['9-20','11-15','16-20'])},{label:'21ft+',set:new Set(['21+','21-30','30-50','50+'])}];
+    const DGx = DIST_BANDS.map(b => ({ label:b.label, fn:b.fn }));
     const VGx = [
       {label:'≥3ft short',fn:h=>SHORT_VAR.filter(v=>v!=='-1').includes(h.variance)},
       {label:'1ft short', fn:h=>h.variance==='-1'},{label:'On pace',fn:h=>h.variance==='0'},
@@ -2167,7 +2438,7 @@ function renderInsights() {
     ];
     const rows = [
       { lbl:'Slope', subs: SLOPE_OPTS.map(s => Object.assign(pool.filter(h=>h.slope===s.v), {_label:s.v==='flat'?'Flat':s.v==='up'?'Uphill':'Downhill'})) },
-      { lbl:'Dist',  subs: DGx.map(dg  => Object.assign(pool.filter(h=>dg.set.has(h.length)), {_label:dg.label})) },
+      { lbl:'Dist',  subs: DGx.map(dg  => Object.assign(pool.filter(h=>dg.fn(h)), {_label:dg.label})) },
       { lbl:'Break', subs: DIR_OPTS.map(d  => Object.assign(pool.filter(h=>h.direction===d.v), {_label:d.v==='straight'?'Str':d.v==='l-to-r'?'L→R':'R→L'})) },
       ...(skipVarRow ? [] : [{ lbl:'Pace', subs: VGx.map(vg => Object.assign(pool.filter(vg.fn), {_label:vg.label})) }]),
     ].filter(row => row.subs.filter(s=>s.length>=3).length >= 2);
@@ -2181,7 +2452,8 @@ function renderInsights() {
   // ── Trend table ───────────────────────────────────────────────────────────
   // higherIsBetter: true = green when newer period > all-time (make%)
   //                false = green when newer period < all-time (3-putt, miss%)
-  function trendTable(rows, higherIsBetter) {
+  function trendTable(rows, higherIsBetter, fmt) {
+    const fv = fmt || (v => v + '%');
     if (!rows.length) return '<p style="font-size:12px;color:#9ca3af;padding:4px 0">Not enough data yet</p>';
     const atv = rows[0].cols; // all-time reference
     const thStyle = 'text-align:center;padding:5px 3px;color:#9ca3af;font-weight:700;font-size:10px;white-space:nowrap';
@@ -2193,12 +2465,15 @@ function renderInsights() {
         let bg = 'transparent', color = '#374151', fw = '600';
         if (ri === 0) { fw = '700'; color = '#1f2937'; }
         else if (v !== null && ref !== null) {
-          const better = higherIsBetter ? v > ref : v < ref;
-          const worse  = higherIsBetter ? v < ref : v > ref;
+          // Compare what the reader actually sees — two cells that render the
+          // same rounded number must not be coloured as better/worse.
+          const same   = fv(v) === fv(ref);
+          const better = !same && (higherIsBetter ? v > ref : v < ref);
+          const worse  = !same && (higherIsBetter ? v < ref : v > ref);
           if (better) { bg='#f0fdf4'; color='#16a34a'; }
           else if (worse) { bg='#fef2f2'; color='#dc2626'; }
         }
-        return `<td style="text-align:center;padding:5px 3px;font-weight:${fw};color:${color};background:${bg};border-radius:4px">${v!==null?v+'%':'<span style="color:#d1d5db">—</span>'}</td>`;
+        return `<td style="text-align:center;padding:5px 3px;font-weight:${fw};color:${color};background:${bg};border-radius:4px">${v!==null?fv(v):'<span style="color:#d1d5db">—</span>'}</td>`;
       }).join('');
       return `<tr${ri>0?' style="border-top:1px solid #f3f4f6"':''}><td style="padding:5px 4px;font-weight:${ri===0?'700':'600'};color:#374151;white-space:nowrap">${row.period}</td>${cells}</tr>`;
     }).join('');
@@ -2211,11 +2486,25 @@ function renderInsights() {
     { label:'3-Putt %', v:summary.threePR+'%', v5:summary.threePR5!==null?summary.threePR5+'%':null, better:'lower'  },
     { label:'Avg Putts',v:summary.avgPutts,    v5:summary.avgPutts5, better:'lower', raw:true },
   ];
+  // v2 headline strip: strokes gained per 18 holes + feet holed per round
+  const sgHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div style="background:${summary.sg===null?'#f9fafb':summary.sg>=0?'#f0fdf4':'#fef2f2'};border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:${summary.sg===null?'#d1d5db':summary.sg>=0?'#16a34a':'#dc2626'}">${summary.sg===null?'—':fmtSG(summary.sg,1)}</div>
+      <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">SG Putting / 18 holes</div>
+      ${summary.sg5!==null&&summary.sg!==null?`<div style="font-size:9px;color:#6b7280;margin-top:2px">Last 5: ${fmtSG(summary.sg5,1)}${summary.sg5>summary.sg?' <span style="color:#16a34a">▲</span>':summary.sg5<summary.sg?' <span style="color:#dc2626">▼</span>':''}</div>`:''}
+    </div>
+    <div style="background:#f0fdfa;border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#0d9488">${summary.feetPerRd!==null?summary.feetPerRd+"'":'—'}</div>
+      <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">Feet holed / round</div>
+    </div>
+  </div>`;
   const summaryHTML = `
   <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:12px">
       Performance · ${data.N} putts · ${data.R} round${data.R!==1?'s':''}${INSIGHT_FILTER!=='all'?` · last ${INSIGHT_FILTER} rounds`:''}
     </div>
+    ${sgHTML}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
       ${kpis.map(k => {
         let arrowEl = '';
@@ -2276,7 +2565,7 @@ function renderInsights() {
   </div>`;
 
   // ── Trends section ────────────────────────────────────────────────────────
-  const tTabDefs = [{k:'make',l:'Make %'},{k:'pace',l:'Pace'},{k:'miss',l:'Miss Dir'},{k:'3putt',l:'3-Putt'}];
+  const tTabDefs = [{k:'sg',l:'Strokes Gained'},{k:'make',l:'Make %'},{k:'pace',l:'Pace'},{k:'miss',l:'Miss Dir'},{k:'3putt',l:'3-Putt'}];
   const tp3Defs  = [{k:'dist',l:'By Distance'},{k:'var',l:'By Variance'},{k:'slope',l:'By Slope'}];
 
   const trendsHTML = `
@@ -2284,6 +2573,14 @@ function renderInsights() {
   <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
     <div style="display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">
       ${tTabDefs.map(t=>`<button class="tr-tab${t.k===TREND_TAB?' on':''}" data-tab="${t.k}" onclick="setTrendTab('${t.k}')">${t.l}</button>`).join('')}
+    </div>
+    <div id="tt-sg" style="${TREND_TAB==='sg'?'':'display:none'}">
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">
+        Strokes gained per round vs the Tour benchmark, split by first-putt distance.
+        The four bands add up to Overall, so this shows <em>where</em> strokes are won or lost.
+        ↑ green = improving vs all-time.
+      </div>
+      ${trendTable(trends.sg, true, v => fmtSG(v, 2))}
     </div>
     <div id="tt-make" style="${TREND_TAB==='make'?'':'display:none'}">
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of holes holed with 1 putt. ↑ green = improving vs all-time.</div>
@@ -2352,11 +2649,15 @@ let modalRoundId = null;
 function exportCSV() {
   const rounds = loadRounds();
   if (!rounds.length) { alert('No rounds to export yet.'); return; }
-  const headers = ['Date','Course','Hole','Length','Slope','Direction','Putts','Variance','Miss','GIR'];
-  const rows = rounds.flatMap(r => r.holes.map(h => [
-    r.date, r.course||'', h.n, h.length ? h.length+'ft' : '', h.slope||'', h.direction||'',
-    h.numPutts||'', varDisplay(h.variance, h.missDirection)||h.variance||'', h.missDirection||'', h.gir||''
-  ]));
+  const headers = ['Date','Course','Hole','Feet','Slope','Direction','Putts','Variance','Miss','GIR','ExpPutts','StrokesGained'];
+  const rows = rounds.flatMap(r => r.holes.map(h => {
+    const sg = holeSGP(h);
+    return [
+      r.date, r.course||'', h.n, h.distance||'', h.slope||'', h.direction||'',
+      h.numPutts||'', varDisplay(h.variance, h.missDirection)||h.variance||'', h.missDirection||'', h.gir||'',
+      h.distance ? sgpExpected(h.distance).toFixed(3) : '', sg!==null ? sg.toFixed(3) : ''
+    ];
+  }));
   const csv = [headers, ...rows]
     .map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
     .join('\n');
@@ -2375,7 +2676,7 @@ function exportCSV() {
 function backupData() {
   const rounds = loadRounds();
   if (!rounds.length) { alert('No rounds to backup yet.'); return; }
-  const payload = { version: 'putttrack_v3', exportDate: new Date().toISOString(), rounds };
+  const payload = { version: 'putttrack_v4', exportDate: new Date().toISOString(), rounds };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2400,6 +2701,22 @@ function restoreData(e) {
       const parsed = JSON.parse(ev.target.result);
       const rounds = Array.isArray(parsed) ? parsed : (parsed.rounds && Array.isArray(parsed.rounds) ? parsed.rounds : null);
       if (!rounds) { alert('Invalid backup file. Please use a file exported from this app.'); return; }
+
+      // v1 backups store a distance *band* (h.length); v2 needs exact feet.
+      // Converting a band to a number would invent precision and corrupt
+      // strokes-gained, so those rounds are imported without distances.
+      const allHoles = rounds.flatMap(r => r.holes || []);
+      const v1Holes  = allHoles.filter(h => h.length && !h.distance).length;
+      if (v1Holes) {
+        const ok = confirm(
+          `This looks like a v1.0 backup (${v1Holes} of ${allHoles.length} holes use distance bands, not exact feet).\n\n` +
+          `Those holes will import WITHOUT a distance, so they won't count towards ` +
+          `strokes gained, feet made, or any distance breakdown. Everything else ` +
+          `(putts, slope, break, pace, misses) is kept.\n\n` +
+          `Import anyway?`);
+        if (!ok) return;
+      }
+
       if (!confirm(`Restore ${rounds.length} round(s)?\n\nThis will replace all current data.`)) return;
       saveRounds(rounds);
       renderHistory();
@@ -2435,7 +2752,8 @@ function renderHistory() {
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:12px;color:#6b7280">
         <span>🏌️ ${s.avgPutts}/hole</span>
         <span style="color:${parseInt(s.threePct)>15?'#f59e0b':'#6b7280'}">⚠ 3-putt ${s.threePct}%</span>
-        ${s.puttsPerGir?`<span>🟢 ${s.puttsPerGir}/GIR</span>`:''}
+        ${s.sgN>=5?`<span style="font-weight:700;color:${s.sgTotal>=0?'#16a34a':'#dc2626'}">SG ${fmtSG(s.sgTotal,1)}</span>`:''}
+        <span style="color:#0d9488">📏 ${s.feetMade}' made</span>
       </div>
     </div>`;
   }).join('');
@@ -2472,6 +2790,22 @@ function openModal(id) {
       <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
         <div style="font-size:18px;font-weight:800;color:#1f2937">${s.avgPutts}</div>
         <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Avg/Hole</div>
+      </div>
+    </div>
+
+    <!-- v2: round strokes gained + feet holed -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">
+      <div style="background:#f0f9ff;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:${s.sgTotal>=0?'#16a34a':'#dc2626'}">${s.sgN>=1?fmtSG(s.sgTotal,1):'—'}</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">SG Putting</div>
+      </div>
+      <div style="background:#f0fdfa;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:#0d9488">${s.feetMade}'</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Feet Made</div>
+      </div>
+      <div style="background:#fff7ed;border-radius:10px;padding:10px 4px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:#7c3010">${s.longestMade?s.longestMade+"'":'—'}</div>
+        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Longest</div>
       </div>
     </div>
 
@@ -2548,24 +2882,26 @@ function openModal(id) {
       <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="color:#9ca3af;border-bottom:1px solid #f3f4f6">
           <th style="text-align:left;padding:4px 2px">H</th>
-          <th style="padding:4px 3px">Len</th><th style="padding:4px 3px">Slp</th>
+          <th style="padding:4px 3px">Dist</th><th style="padding:4px 3px">Slp</th>
           <th style="padding:4px 3px">Dir</th><th style="padding:4px 3px">Pts</th>
           <th style="padding:4px 3px">Var</th><th style="padding:4px 3px">Miss</th>
-          <th style="padding:4px 3px">GIR</th>
+          <th style="padding:4px 3px">GIR</th><th style="padding:4px 3px">SG</th>
         </tr></thead>
         <tbody>
           ${r.holes.map(h=>{
             const p=parseInt(h.numPutts);
             const pc=p===1?'tc-g':p>=3?'tc-r':'tc-y';
+            const sg=holeSGP(h);
             return `<tr style="border-bottom:1px solid #f9fafb">
               <td style="padding:4px 2px;color:#9ca3af;font-weight:600">H${h.n}</td>
-              <td style="text-align:center;padding:4px 3px"><span class="tc tc-d">${h.length||'·'}</span></td>
+              <td style="text-align:center;padding:4px 3px"><span class="tc tc-b">${h.distance?h.distance+"'":'·'}</span></td>
               <td style="text-align:center;padding:4px 3px">${slopeIcon(h.slope)}</td>
               <td style="text-align:center;padding:4px 3px">${dirIcon(h.direction)}</td>
               <td style="text-align:center;padding:4px 3px"><span class="tc ${pc}">${h.numPutts}</span></td>
               <td style="text-align:center;padding:4px 3px"><span class="tc tc-b">${varDisplay(h.variance)||'·'}</span></td>
               <td style="text-align:center;padding:4px 3px">${h.missDirection ? missIcon(h.missDirection) : (p>=2?'—':'·')}</td>
               <td style="text-align:center;padding:4px 3px"><span class="tc ${h.gir==='yes'?'tc-g':'tc-d'}">${h.gir==='yes'?'Y':'N'}</span></td>
+              <td style="text-align:center;padding:4px 3px;font-weight:700;color:${sg===null?'#d1d5db':sg>=0?'#16a34a':'#dc2626'}">${sg===null?'·':fmtSG(sg)}</td>
             </tr>`;
           }).join('')}
         </tbody>

@@ -2,7 +2,7 @@
 // origin, so each service worker must only ever clean up ITS OWN caches —
 // a blanket "delete everything that isn't mine" makes the two evict each
 // other's offline data on every activation.
-const PREFIX = 'putting-tracker-v1';
+const PREFIX = 'putting-tracker-v2';
 const CACHE  = PREFIX + '-2';
 
 // The app shell. Paths are relative so this works under a GitHub Pages

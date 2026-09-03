@@ -1,0 +1,8 @@
+# Personal round data — this repo is public, never commit backups
+backup.json
+*-backup-*.json
+putts-*.csv
+
+# Local tooling / OS
+.claude/
+.DS_Store
