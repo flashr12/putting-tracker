@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="Putts 2"/>
-  <meta name="theme-color" content="#002855"/>
+  <meta name="theme-color" content="#14532d"/>
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon.svg"/>
   <title>Putting Tracker v2</title>
@@ -18,7 +18,7 @@
     body {
       height: 100%; margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f0f5fb;
+      background: #f2f9f4;
       display: flex; flex-direction: column;
       overflow: hidden; /* body never scrolls */
     }
@@ -26,7 +26,7 @@
     /* ── Fixed chrome pieces ── */
     #app-header {
       flex-shrink: 0;
-      background: #002855;
+      background: #14532d;
       color: #fff;
       padding: env(safe-area-inset-top) 16px 0;
       height: calc(48px + env(safe-area-inset-top));
@@ -46,7 +46,7 @@
       font-size: 13px; font-weight: 500; color: #6b7280;
       border-bottom: 2px solid transparent; cursor: pointer;
     }
-    .ntab.on { color: #003A72; border-bottom-color: #003A72; font-weight: 700; }
+    .ntab.on { color: #166534; border-bottom-color: #166534; font-weight: 700; }
 
     /* ── Main scroll area (dashboard + history only) ── */
     #scroll-main { flex: 1; overflow-y: auto; overflow-x: hidden; }
@@ -77,21 +77,37 @@
       display: flex; align-items: center; justify-content: center; cursor: pointer;
       transition: all .15s;
     }
-    .hp.done { background: #dbe8f5; border-color: #003A72; color: #002855; }
-    .hp.cur  { background: #003A72; border-color: #003A72; color: #fff; }
+    .hp.done { background: #dcfce7; border-color: #166534; color: #14532d; }
+    .hp.cur  { background: #166534; border-color: #166534; color: #fff; }
 
     /* ── Accordion hole list (form view) ── */
     #accordion-area {
       flex: 1; overflow-y: auto; overflow-x: hidden;
     }
-    .hole-row {
-      border-bottom: 1px solid #f0f5fb;
+    /* ── Active hole: pinned above the list ── */
+    #cur-hole { background:#fff; border-bottom:1px solid #e5e7eb; }
+    #cur-hole-head {
+      display:flex; align-items:center; gap:9px;
+      padding:9px 14px 0;
     }
+    .cur-hole-title { font-size:14px; font-weight:800; color:#1f2937; flex-shrink:0; }
+    .cur-hole-sum   { font-size:11px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* ── Hole list, below the form ── */
+    #holes-list { padding-bottom:6px; }
+    .hl-head {
+      font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+      color:#9ca3af; padding:12px 14px 6px;
+    }
+    .hole-row {
+      border-bottom: 1px solid #f2f9f4;
+    }
+    .hole-row.is-cur { background:#f5faf6; }
     /* Collapsed summary row */
     .hole-summary {
       display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; background: #fff; cursor: pointer;
-      min-height: 46px;
+      padding: 9px 14px; background: transparent; cursor: pointer;
+      min-height: 42px;
     }
     .hole-summary:active { background: #f9fafb; }
     .hole-num-badge {
@@ -118,12 +134,13 @@
     /* ── Chip system ── */
     .fl { margin-bottom: 10px; }
     .fl:last-child { margin-bottom: 0; }
+    /* Rounded on ALL corners — the old `0 4px 4px 0` left the left edge square */
     .fl-label {
       display: block; text-align: center;
       font-size: 10px; font-weight: 800; text-transform: uppercase;
       letter-spacing: .06em; color: #e8f0f8;
-      background: #1a4f8a; border-left: 3px solid #003A72;
-      padding: 7px 8px; border-radius: 0 4px 4px 0;
+      background: #15803d;
+      padding: 8px; border-radius: 8px;
       margin-bottom: 6px; line-height: 1.4;
     }
     /* Grid chips (4 per row) */
@@ -150,7 +167,7 @@
       -webkit-user-select: none; user-select: none;
     }
     .ch:active { transform: scale(0.94); }
-    .ch.on      { background: #003A72; color: #fff; border-color: #003A72; }
+    .ch.on      { background: #166534; color: #fff; border-color: #166534; }
     .ch.on-warn { background: #f59e0b; color: #fff; border-color: #f59e0b; }
     .ch.on-bad  { background: #ef4444; color: #fff; border-color: #ef4444; }
 
@@ -169,8 +186,8 @@
     }
     .rnav-btn:active { transform: scale(0.97); }
     .rnav-btn.secondary { background: #f3f4f6; color: #374151; }
-    .rnav-btn.primary   { background: #003A72; color: #fff; }
-    .rnav-btn.success   { background: #001d3d; color: #fff; }
+    .rnav-btn.primary   { background: #166534; color: #fff; }
+    .rnav-btn.success   { background: #0b3f1f; color: #fff; }
     .rnav-btn:disabled  { opacity: .35; pointer-events: none; }
 
     /* ── Table view ── */
@@ -192,10 +209,10 @@
       font-size: 12px; font-weight: 500; color: #374151;
     }
     .htable td:first-child { text-align: left; padding-left: 12px; color: #9ca3af; font-size: 11px; }
-    .htable tr.cur-row td { background: #f0f5fb; }
-    .htable tr:active td { background: #dbe8f5; }
+    .htable tr.cur-row td { background: #f2f9f4; }
+    .htable tr:active td { background: #dcfce7; }
     .tc { display:inline-block; padding: 1px 6px; border-radius:5px; font-size:11px; font-weight:600; }
-    .tc-g { background:#dbe8f5; color:#002855; }
+    .tc-g { background:#dcfce7; color:#14532d; }
     .tc-y { background:#fef9c3; color:#854d0e; }
     .tc-r { background:#fee2e2; color:#991b1b; }
     .tc-b { background:#dbeafe; color:#1e40af; }
@@ -208,7 +225,7 @@
       padding: 3px 10px; border-radius:6px; font-size:11px; font-weight:600;
       cursor:pointer; color:#6b7280; border:none; background:transparent; outline:none;
     }
-    .vbtn.on { background:#fff; color:#003A72; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .vbtn.on { background:#fff; color:#166534; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
 
     /* ── Completion pulse ── */
     @keyframes pulse-green {
@@ -223,19 +240,19 @@
     .kpi-l { font-size:10px; color:#9ca3af; margin-top:3px; text-transform:uppercase; letter-spacing:.05em; }
     .stab { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; color:#6b7280; background:#f3f4f6; white-space:nowrap; border:none; outline:none; }
     .ins-ftab { padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
-    .ins-ftab.on { background:#003A72; color:#fff; }
-    .stab.on { background:#003A72; color:#fff; }
+    .ins-ftab.on { background:#166534; color:#fff; }
+    .stab.on { background:#166534; color:#fff; }
     .tr-tab  { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
-    .tr-tab.on  { background:#003A72; color:#fff; }
+    .tr-tab.on  { background:#166534; color:#fff; }
     .tr3-tab { padding:3px 9px; border-radius:16px; font-size:10px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
-    .tr3-tab.on { background:#1a4f8a; color:#fff; }
+    .tr3-tab.on { background:#15803d; color:#fff; }
     .brk { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f9fafb; }
     .brk-l { min-width:72px; font-size:12px; color:#6b7280; }
     .brk-bg { flex:1; height:7px; background:#f3f4f6; border-radius:99px; overflow:hidden; }
     .brk-fill { height:100%; border-radius:99px; }
     .brk-p { width:34px; text-align:right; font-size:12px; font-weight:700; }
     .hcard { background:#fff; border-radius:16px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.07); cursor:pointer; border:1.5px solid transparent; }
-    .hcard:active { border-color:#003A72; }
+    .hcard:active { border-color:#166534; }
 
     /* Modal */
     #modal-wrap { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; display:flex; align-items:flex-end; }
@@ -246,11 +263,18 @@
     }
     .mhandle { width:36px; height:4px; background:#e5e7eb; border-radius:99px; margin:12px auto 14px; }
 
-    /* ── Putt input grid tables ── */
+    /* ── Putt input grid tables ──
+       Softens the spreadsheet look: a rounded, clipping wrapper gives the block
+       a card edge while the table keeps its own cell borders (including the
+       heavier separators between the Downhill / Flat / Uphill groups). */
+    .gwrap {
+      overflow:hidden; -webkit-overflow-scrolling:touch;
+      border-radius:10px; border:1.5px solid #d1d5db;
+    }
     .pgrid { border-collapse:collapse; font-size:10px; width:100%; table-layout:fixed; }
     .pgrid th {
       padding:3px 1px; text-align:center; font-weight:700; color:#6b7280;
-      background:#f0f5fb; border:1px solid #d1d5db; font-size:9px; white-space:nowrap;
+      background:#f2f9f4; border:1px solid #d1d5db; font-size:9px; white-space:nowrap;
       overflow:hidden;
     }
     .pgrid td.row-head {
@@ -262,8 +286,8 @@
       border:1px solid #d1d5db; cursor:pointer; background:#fff;
       transition:background .08s; -webkit-tap-highlight-color:transparent;
     }
-    .pgrid td.gcell:active { background:#dbe8f5; }
-    .pgrid td.gcell.on { background:#003A72; box-shadow:inset 0 0 0 1.5px #001d3d; }
+    .pgrid td.gcell:active { background:#dcfce7; }
+    .pgrid td.gcell.on { background:#166534; box-shadow:inset 0 0 0 1.5px #0b3f1f; }
     .pgrid td.gcell.on::after { content:'✓'; font-size:11px; color:#fff; font-weight:800; line-height:1; }
     .pgrid td.gcell.disabled { background:#f3f4f6; cursor:default; pointer-events:none; }
 
@@ -276,10 +300,10 @@
       -webkit-user-select:none; user-select:none;
       transition:background .1s, color .1s;
     }
-    .pgrid td.dcell:active { background:#dbe8f5; }
+    .pgrid td.dcell:active { background:#dcfce7; }
     .pgrid td.dcell.on {
-      background:#003A72; color:#fff;
-      box-shadow:inset 0 0 0 1.5px #001d3d;
+      background:#166534; color:#fff;
+      box-shadow:inset 0 0 0 1.5px #0b3f1f;
     }
 
     /* ── v2: horizontal distance drum ──────────────────────────────────────
@@ -290,13 +314,13 @@
       padding:6px 0 5px; margin-top:7px;
       transition:border-color .12s, box-shadow .12s;
     }
-    .hd-outer.set { border-color:#003A72; box-shadow:0 0 0 2px rgba(0,58,114,.12); }
+    .hd-outer.set { border-color:#166534; box-shadow:0 0 0 2px rgba(0,58,114,.12); }
     .hd-cap {
       display:flex; align-items:center; justify-content:center; gap:6px;
       font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
       color:#9ca3af; margin-bottom:4px;
     }
-    .hd-cap b { font-size:15px; font-weight:800; color:#003A72; letter-spacing:0; }
+    .hd-cap b { font-size:15px; font-weight:800; color:#166534; letter-spacing:0; }
 
     .hd-wrap { position:relative; height:46px; overflow:hidden; }
     .hd-scroller {
@@ -318,7 +342,7 @@
       transition:color .1s, font-size .1s;
     }
     /* the value sitting in the centre band */
-    .hd-item.hd-sel { font-size:18px; font-weight:800; color:#002855; }
+    .hd-item.hd-sel { font-size:18px; font-weight:800; color:#14532d; }
 
     /* centre band: bordered highlight marking the selected value */
     .hd-band {
@@ -327,7 +351,7 @@
       background:#eef4fb; border:1.5px solid #c7d7e8; border-radius:8px;
       pointer-events:none;
     }
-    .hd-outer.set .hd-band { background:#dbe8f5; border-color:#003A72; }
+    .hd-outer.set .hd-band { background:#dcfce7; border-color:#166534; }
     /* fade the values either side so the centre reads as selected */
     .hd-fade-l, .hd-fade-r { position:absolute; z-index:4; top:0; bottom:0; width:56px; pointer-events:none; }
     .hd-fade-l { left:0;  background:linear-gradient(to right,#fff 12%,rgba(255,255,255,0)); }
@@ -340,7 +364,7 @@
       padding:10px 12px; font-size:14px; outline:none;
       -webkit-appearance:none;
     }
-    .inp:focus { border-color:#003A72; }
+    .inp:focus { border-color:#166534; }
   </style>
 </head>
 <body>
@@ -349,8 +373,8 @@
 <div id="app-header">
   <span style="font-size:22px">⛳</span>
   <div>
-    <div style="font-size:16px;font-weight:700;line-height:1.2">Putting Tracker <span style="font-size:10px;background:#5eead4;color:#002855;border-radius:4px;padding:1px 5px;vertical-align:middle;font-weight:800">2.0</span></div>
-    <div style="font-size:11px;color:#5eead4">Exact distances · Strokes gained</div>
+    <div style="font-size:16px;font-weight:700;line-height:1.2">Putting Tracker <span style="font-size:10px;background:#86efac;color:#14532d;border-radius:4px;padding:1px 5px;vertical-align:middle;font-weight:800">2.0</span></div>
+    <div style="font-size:11px;color:#86efac">Exact distances · Strokes gained</div>
   </div>
 </div>
 
@@ -373,13 +397,13 @@
       <div style="font-size:52px">⛳</div>
       <p style="font-weight:600;color:#374151;margin:8px 0 4px">No rounds yet</p>
       <p style="font-size:13px;color:#9ca3af;margin-bottom:16px">Start a round to see your stats</p>
-      <button onclick="showMain('round')" style="background:#003A72;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
+      <button onclick="showMain('round')" style="background:#166534;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
     </div>
     <div id="db-content" style="display:none">
       <!-- KPIs -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="kpi" style="text-align:center">
-          <div class="kpi-v" id="kpi-ppr" style="color:#003A72">—</div>
+          <div class="kpi-v" id="kpi-ppr" style="color:#166534">—</div>
           <div class="kpi-l">Putts/Round</div>
         </div>
         <div class="kpi" style="text-align:center">
@@ -458,7 +482,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div style="font-size:15px;font-weight:700;color:#1f2937">Round History</div>
       <button onclick="exportCSV()"
-        style="background:#edf3fa;color:#002855;border:1.5px solid #003A72;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">
+        style="background:#f0fdf4;color:#14532d;border:1.5px solid #166534;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">
         ↓ Export CSV
       </button>
     </div>
@@ -487,7 +511,6 @@
 
   <!-- SETUP STEP -->
   <div id="step-setup" style="flex:1;overflow-y:auto;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))">
-    <div style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:12px">New Round</div>
     <div class="setup-card" style="display:flex;flex-direction:column;gap:14px">
       <div>
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Date</div>
@@ -507,14 +530,14 @@
             <span id="setup-hole-count" style="min-width:36px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
             <button onclick="adjustSetupHoles(1)"  style="width:38px;height:38px;border:none;background:#f9fafb;font-size:18px;font-weight:700;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
           </div>
+          <!-- 18 is already the default, so only the 9-hole shortcut earns its place -->
           <div style="display:flex;gap:6px">
-            <div class="ch" onclick="setSetupHoles(9)"  style="padding:6px 14px">9</div>
-            <div class="ch" onclick="setSetupHoles(18)" style="padding:6px 14px">18</div>
+            <div class="ch" onclick="setSetupHoles(9)" style="padding:6px 16px">9 holes</div>
           </div>
         </div>
       </div>
       <button onclick="startRound()"
-        style="background:#003A72;color:#fff;border:none;border-radius:10px;height:46px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-top:4px">
+        style="background:#166534;color:#fff;border:none;border-radius:10px;height:46px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-top:4px">
         Start Entering Putts →
       </button>
     </div>
@@ -529,8 +552,10 @@
         <span id="ri-course" style="font-weight:700;color:#1f2937"></span>
         <span id="ri-date"   style="color:#9ca3af;margin-left:4px"></span>
       </div>
+      <button id="snd-btn" onclick="toggleSound()" title="Drum click sound"
+        style="flex-shrink:0;border:none;background:none;font-size:15px;cursor:pointer;padding:2px 4px;line-height:1">🔊</button>
       <span id="ri-holecount" onclick="showHoleAdj()"
-        style="flex-shrink:0;font-size:11px;font-weight:700;color:#003A72;background:#dbe8f5;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 8px">
+        style="flex-shrink:0;font-size:11px;font-weight:700;color:#166534;background:#dcfce7;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 8px">
         18H ✎
       </span>
       <div class="vtoggle" style="flex-shrink:0">
@@ -540,12 +565,12 @@
     </div>
 
     <!-- Inline hole-count adjuster (hidden by default) -->
-    <div id="hole-adj-bar" style="display:none;flex-shrink:0;background:#f0f5fb;border-bottom:1px solid #e5e7eb;padding:8px 14px;align-items:center;justify-content:center;gap:10px">
+    <div id="hole-adj-bar" style="display:none;flex-shrink:0;background:#f2f9f4;border-bottom:1px solid #e5e7eb;padding:8px 14px;align-items:center;justify-content:center;gap:10px">
       <span style="font-size:12px;font-weight:600;color:#374151">Holes:</span>
       <button onclick="stepHoleAdj(-1)" style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">−</button>
       <span id="hole-adj-val" style="min-width:28px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
       <button onclick="stepHoleAdj(1)"  style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">+</button>
-      <button onclick="applyHoleAdj()"  style="height:32px;padding:0 14px;border:none;border-radius:8px;background:#003A72;color:#fff;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">Done</button>
+      <button onclick="applyHoleAdj()"  style="height:32px;padding:0 14px;border:none;border-radius:8px;background:#166534;color:#fff;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">Done</button>
       <button onclick="hideHoleAdj()"   style="height:32px;padding:0 10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;color:#6b7280;font-size:12px;font-weight:600;cursor:pointer">Cancel</button>
     </div>
 
@@ -591,7 +616,7 @@
     <button class="ins-ftab"   onclick="setInsightFilter(20)">Last 20</button>
     <button class="ins-ftab"   onclick="setInsightFilter(10)">Last 10</button>
     <button class="ins-ftab"   onclick="setInsightFilter(5)">Last 5</button>
-    <button onclick="printInsights()" style="margin-left:auto;flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#003A72;background:#dbe8f5;border:none;outline:none;white-space:nowrap">⬇ PDF</button>
+    <button onclick="printInsights()" style="margin-left:auto;flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#166534;background:#dcfce7;border:none;outline:none;white-space:nowrap">⬇ PDF</button>
   </div>
   <div id="insights-content" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
 </div>
@@ -792,6 +817,15 @@ function startRound() {
   setRoundView('form');
   renderPills();
   renderAccordion();
+  syncSoundBtn();
+}
+
+// Reflect the persisted sound preference on the toggle
+function syncSoundBtn() {
+  const b = document.getElementById('snd-btn');
+  if (!b) return;
+  b.textContent = SOUND_ON ? '🔊' : '🔇';
+  b.style.opacity = SOUND_ON ? '1' : '.45';
 }
 
 // ═══════════════════════════════════════
@@ -873,37 +907,52 @@ function renderPills() {
 // ═══════════════════════════════════════
 //  ACCORDION
 // ═══════════════════════════════════════
+// The active hole's form is pinned at the top of the scroll area and the list
+// of every hole sits BELOW it. Previously each hole rendered in document order
+// with the open one expanded in place, so entered holes stacked above the form
+// and pushed it further down the screen with every hole played.
 function renderAccordion() {
   const area = document.getElementById('accordion-area');
-  area.innerHTML = AR.holes.map((h,i) => buildHoleAccordionHTML(h,i)).join('');
+  area.innerHTML = buildCurrentHoleHTML(AH) + buildHolesListHTML();
   updateBottomNav();
-  // open active hole
-  openHoleForm(AH, false);
-  // Scroll active hole into view
-  setTimeout(() => {
-    const el = document.getElementById(`hr-${AH}`);
-    if (el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
-  }, 50);
+  initDrums(AH);
+  area.scrollTop = 0;   // form always starts at the top of the viewport
 }
 
-function buildHoleAccordionHTML(h, i) {
-  const done = isHoleDone(h);
-  const missed = h.numPutts && parseInt(h.numPutts) >= 2;
-  const puttNum = h.numPutts ? parseInt(h.numPutts) : null;
-  const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
-  const summaryChips = holeSummaryText(h);
-
+function buildCurrentHoleHTML(i) {
+  const h = AR.holes[i];
+  const txt = holeSummaryText(h);
   return `
-  <div class="hole-row" id="hr-${i}">
-    <div class="hole-summary" onclick="jumpHole(${i})">
-      <div class="hole-num-badge ${done?'tc-g':'tc-d'}" style="font-size:11px;font-weight:700">${h.n}</div>
-      <div class="hole-quick">${summaryChips || '<span style="color:#d1d5db">tap to enter</span>'}</div>
-      ${done ? `<span class="tc ${badgeCls}" style="min-width:28px;text-align:center">${h.numPutts}</span>` : ''}
+  <div id="cur-hole">
+    <div id="cur-hole-head">
+      <div class="cur-hole-title">Hole ${h.n}</div>
+      <div class="cur-hole-sum" id="cur-sum-${i}">${txt || ''}</div>
     </div>
-    <div class="hole-form-wrap" id="hfw-${i}">
-      <div class="hole-form-inner" id="hfi-${i}">
-        ${buildHoleFormHTML(h, i)}
-      </div>
+    <div class="hole-form-inner" id="hfi-${i}">
+      ${buildHoleFormHTML(h, i)}
+    </div>
+  </div>`;
+}
+
+function buildHolesListHTML() {
+  return `<div id="holes-list">
+    <div class="hl-head">All holes — tap to jump</div>
+    ${AR.holes.map((h,i) => buildHoleListRow(h,i)).join('')}
+  </div>`;
+}
+
+function buildHoleListRow(h, i) {
+  const done     = isHoleDone(h);
+  const puttNum  = h.numPutts ? parseInt(h.numPutts) : null;
+  const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
+  const txt      = holeSummaryText(h);
+  const isCur    = i === AH;
+  return `
+  <div class="hole-row${isCur?' is-cur':''}" id="hr-${i}" onclick="jumpHole(${i})">
+    <div class="hole-summary">
+      <div class="hole-num-badge ${isCur?'cur':done?'tc-g':'tc-d'}">${h.n}</div>
+      <div class="hole-quick">${txt || '<span style="color:#c7ccd3">tap to enter</span>'}</div>
+      ${done ? `<span class="tc ${badgeCls}" style="min-width:28px;text-align:center">${h.numPutts}</span>` : ''}
     </div>
   </div>`;
 }
@@ -924,13 +973,13 @@ function buildHoleFormHTML(h, i) {
   const grid1 = `
   <div class="fl">
     <div class="fl-label">🎯 Putt Distance + Slope + Break</div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <div class="gwrap">
       <table class="pgrid" id="grid1-${i}">
         <thead>
           <tr>
-            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#1e4d2b;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬇ Downhill</th>
+            <th colspan="3" style="border-left:2px solid #166534;color:#fff;background:#0f766e;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬇ Downhill</th>
             <th colspan="3" style="border-left:2px solid #6b7280;color:#fff;background:#374151;padding:10px 1px;font-size:11px;letter-spacing:.3px">— Flat</th>
-            <th colspan="3" style="border-left:2px solid #003A72;color:#fff;background:#7c3010;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬆ Uphill</th>
+            <th colspan="3" style="border-left:2px solid #166534;color:#fff;background:#7c3010;padding:10px 1px;font-size:11px;letter-spacing:.3px">⬆ Uphill</th>
           </tr>
         </thead>
         <tbody>
@@ -938,7 +987,7 @@ function buildHoleFormHTML(h, i) {
           <tr>
             ${COLS1.map((c,ci) => {
               const sel = h.slope===c.slope && h.direction===c.dir;
-              const bdr = ci===3 ? 'border-left:2px solid #6b7280;' : ci===6 ? 'border-left:2px solid #003A72;' : '';
+              const bdr = ci===3 ? 'border-left:2px solid #6b7280;' : ci===6 ? 'border-left:2px solid #166534;' : '';
               const lbl = c.dir==='l-to-r' ? 'L-R ↗' : c.dir==='straight' ? 'Str ↑' : 'R-L ↖';
               return `<td class="dcell${sel?' on':''}" id="gc1-${i}-${c.slope}-${c.dir}"
                           style="${bdr}" onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</td>`;
@@ -970,14 +1019,14 @@ function buildHoleFormHTML(h, i) {
   const grid2 = `
   <div class="fl">
     <div class="fl-label">🏌️ # Putts × 1st-putt variance</div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <div class="gwrap">
       <table class="pgrid" id="grid2-${i}">
         <thead>
           <tr>
             <th style="min-width:30px">Putts</th>
             ${VAR_COLS.map((v,vi) => {
               const isZero = v === '0';
-              const bg  = isZero ? 'background:#edf3fa;color:#002855;' : '';
+              const bg  = isZero ? 'background:#f0fdf4;color:#14532d;' : '';
               const label = isZero ? '0' : v + "'";
               return `<th style="${bg}">${label}</th>`;
             }).join('')}
@@ -1015,7 +1064,7 @@ function buildHoleFormHTML(h, i) {
   const grid3 = `
   <div class="fl" style="margin-bottom:4px">
     <div class="fl-label">📍 GIR? / Miss Side</div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <div class="gwrap">
       <table class="pgrid" id="grid3-${i}">
         <thead>
           <tr>
@@ -1048,47 +1097,27 @@ function buildHoleFormHTML(h, i) {
   return grid1 + grid2 + grid3;
 }
 
-// Refresh a single hole's accordion row without re-rendering everything
+// Refresh one row in the list below the form (no full re-render)
 function refreshHoleRow(i) {
-  const h = AR.holes[i];
   const row = document.getElementById(`hr-${i}`);
   if (!row) return;
-  const newHTML = buildHoleAccordionHTML(h, i);
   const tmp = document.createElement('div');
-  tmp.innerHTML = newHTML;
-  const newRow = tmp.firstElementChild;
-  // preserve open state
-  const wasOpen = document.getElementById(`hfw-${i}`)?.classList.contains('open');
-  row.replaceWith(newRow);
-  if (wasOpen) {
-    const fw = document.getElementById(`hfw-${i}`);
-    if (fw) fw.classList.add('open');
-  }
+  tmp.innerHTML = buildHoleListRow(AR.holes[i], i);
+  row.replaceWith(tmp.firstElementChild);
 }
 
-function openHoleForm(i, animate=true) {
-  // Close all
-  document.querySelectorAll('.hole-form-wrap.open').forEach(el => el.classList.remove('open'));
-  const fw = document.getElementById(`hfw-${i}`);
-  if (fw) fw.classList.add('open');
-  // Drums can only be scrolled once the wrapper has height — wait for the transition
-  trimDrums(i);
-  requestAnimationFrame(() => initDrums(i));
-  setTimeout(() => initDrums(i), 260);
-  // Scroll into view
-  if (animate) {
-    setTimeout(() => {
-      const el = document.getElementById(`hr-${i}`);
-      if (el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
-    }, 80);
-  }
+// Switch which hole the pinned form is showing
+function openHoleForm(i) {
+  AH = i;
+  renderAccordion();
 }
 
 function jumpHole(i) {
+  if (i === AH) return;
+  flushDrum(AH);        // don't lose a value mid-debounce
   AH = i;
-  openHoleForm(i);
+  renderAccordion();
   renderPills();
-  updateBottomNav();
 }
 
 function navHole(dir) {
@@ -1156,19 +1185,83 @@ function drumIdx(scroller) {
   return Math.max(0, Math.min(MAX_DIST, Math.round(scroller.scrollLeft / HD_ITEM_W)));
 }
 
-const DRUM_T = {};
+// ── Drum detent click ─────────────────────────────────────────────────────
+// A short filtered noise burst reads as a mechanical detent far better than a
+// tone does. iOS starts every AudioContext suspended, so it can only be
+// created/resumed from inside a real user gesture — hence the unlock listeners.
+let SOUND_ON = localStorage.getItem('putt_sound') !== 'off';
+let AC = null, NOISE = null;
+
+function unlockAudio() {
+  try {
+    if (!AC) {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      // 30ms of white noise, generated once and reused for every click
+      const n = Math.floor(AC.sampleRate * 0.03);
+      NOISE = AC.createBuffer(1, n, AC.sampleRate);
+      const d = NOISE.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    }
+    if (AC.state === 'suspended') AC.resume();
+  } catch (e) { AC = null; }
+}
+['touchstart','mousedown','keydown'].forEach(ev =>
+  document.addEventListener(ev, unlockAudio, { passive: true }));
+
+let lastTick = 0;
+function drumTick() {
+  if (!SOUND_ON || !AC || !NOISE || AC.state !== 'running') return;
+  const now = performance.now();
+  if (now - lastTick < 22) return;   // cap the rate on a fast flick
+  lastTick = now;
+  const t   = AC.currentTime;
+  const src = AC.createBufferSource(); src.buffer = NOISE;
+  const bp  = AC.createBiquadFilter(); bp.type = 'bandpass';
+  bp.frequency.value = 2200; bp.Q.value = 1.1;
+  const g   = AC.createGain();
+  g.gain.setValueAtTime(0.16, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+  src.connect(bp).connect(g).connect(AC.destination);
+  src.start(t); src.stop(t + 0.035);
+}
+
+function toggleSound() {
+  SOUND_ON = !SOUND_ON;
+  localStorage.setItem('putt_sound', SOUND_ON ? 'on' : 'off');
+  const b = document.getElementById('snd-btn');
+  if (b) { b.textContent = SOUND_ON ? '🔊' : '🔇'; b.style.opacity = SOUND_ON ? '1' : '.45'; }
+  if (SOUND_ON) { unlockAudio(); drumTick(); }
+}
+
+const DRUM_T = {}, DRUM_LAST = {};
 function onDistScroll(hi, scroller) {
   // Populated lazily — an empty scroller is mid-teardown, not user input.
   if (!scroller.firstElementChild) return;
-  // Repaint live while the finger is moving…
-  paintDrum(scroller, drumIdx(scroller));
+  // Repaint live while the finger is moving, clicking on each value crossed…
+  const live = drumIdx(scroller);
+  if (DRUM_LAST[hi] !== live) { DRUM_LAST[hi] = live; drumTick(); }
+  paintDrum(scroller, live);
   // …but only commit once scrolling settles.
   clearTimeout(DRUM_T[hi]);
   DRUM_T[hi] = setTimeout(() => {
+    delete DRUM_T[hi];
+    // If the hole was switched inside the debounce window the drum is already
+    // detached, and a detached element reports scrollLeft 0 — committing that
+    // would silently wipe the distance the user just dialled in.
+    if (!scroller.isConnected || !scroller.firstElementChild) return;
     const idx = drumIdx(scroller);
     paintDrum(scroller, idx);
     commitDist(hi, idx);
   }, 140);
+}
+
+// Commit a pending drum value immediately, before its element goes away.
+function flushDrum(hi) {
+  if (DRUM_T[hi] === undefined) return;
+  clearTimeout(DRUM_T[hi]);
+  delete DRUM_T[hi];
+  const sc = document.getElementById(`hds-${hi}`);
+  if (sc && sc.isConnected && sc.firstElementChild) commitDist(hi, drumIdx(sc));
 }
 
 function commitDist(hi, feet) {
@@ -1297,49 +1390,27 @@ function holeSummaryText(h) {
   ].filter(Boolean).join(' · ');
 }
 
-// Live-update a partially-filled hole's summary line (drum scroll, etc.)
+// Live-update the header above the form plus this hole's row in the list below
 function refreshHoleSummary(i) {
-  const h  = AR.holes[i];
-  const el = document.querySelector(`#hr-${i} .hole-quick`);
-  if (!el || !h) return;
-  const txt = holeSummaryText(h);
-  el.innerHTML = txt ? txt : '<span style="color:#d1d5db">tap to enter</span>';
+  const h = AR.holes[i];
+  if (!h) return;
+  const head = document.getElementById(`cur-sum-${i}`);
+  if (head) head.textContent = holeSummaryText(h);
+  refreshHoleRow(i);
 }
 
 function onHoleDone(i) {
-  // Refresh the summary row text (without disrupting open state)
-  const h = AR.holes[i];
-  const summaryEl = document.querySelector(`#hr-${i} .hole-quick`);
-  const puttNum = parseInt(h.numPutts);
-  const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
-  if (summaryEl) summaryEl.textContent = holeSummaryText(h);
-  // Update badge in summary row
-  const summaryRow = document.querySelector(`#hr-${i} .hole-summary`);
-  if (summaryRow) {
-    const numBadge = document.querySelector(`#hr-${i} .hole-num-badge`);
-    if (numBadge) numBadge.className = `hole-num-badge tc-g`;
-    // Add/update putt count badge
-    let pBadge = summaryRow.querySelector('.tc');
-    if (!pBadge) {
-      pBadge = document.createElement('span');
-      summaryRow.appendChild(pBadge);
-    }
-    pBadge.className = `tc ${badgeCls}`;
-    pBadge.style.minWidth = '28px';
-    pBadge.style.textAlign = 'center';
-    pBadge.textContent = h.numPutts;
-  }
+  refreshHoleSummary(i);
   // Update pill
   const pill = document.getElementById(`pill-${i}`);
   if (pill) pill.className = i===AH ? 'hp cur' : 'hp done';
-  // Auto-advance to next hole after short delay
+  // Auto-advance to the next hole after a short beat
   if (i < AR.holeCount - 1) {
     setTimeout(() => {
-      if (AH === i) { // only auto-advance if still on this hole
+      if (AH === i) {           // only advance if the user hasn't moved on themselves
         AH = i + 1;
-        openHoleForm(AH);
+        renderAccordion();
         renderPills();
-        updateBottomNav();
       }
     }, 600);
   }
@@ -1375,6 +1446,7 @@ function renderTable() {
 //  SAVE ROUND
 // ═══════════════════════════════════════
 function saveRound() {
+  flushDrum(AH);        // capture a distance still inside its debounce window
   const done = AR.holes.filter(isHoleDone);
   if (!done.length) { alert('Fill in at least one hole before saving.'); return; }
   const round = { ...AR, holes: done };
@@ -1392,7 +1464,7 @@ function saveRound() {
 function pct(n,d)  { return d ? Math.round(n/d*100) : null; }
 function colorForPct(p) {
   if (p===null) return '#d1d5db';
-  return p>=70?'#003A72':p>=40?'#f59e0b':'#ef4444';
+  return p>=70?'#166534':p>=40?'#f59e0b':'#ef4444';
 }
 
 function computeStats(holes) {
@@ -1637,7 +1709,7 @@ function renderDashboard() {
   charts.var = new Chart(document.getElementById('chart-var').getContext('2d'),{
     type:'bar',
     data:{labels:av.map(v=>v.v),
-      datasets:[{data:av.map(v=>v.n),backgroundColor:'#5eead4',borderRadius:4}]},
+      datasets:[{data:av.map(v=>v.n),backgroundColor:'#86efac',borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
@@ -1675,8 +1747,8 @@ function renderDashboard() {
   charts.trend = new Chart(document.getElementById('chart-trend').getContext('2d'),{
     type:'line',
     data:{labels:td.map(t=>t.l),
-      datasets:[{data:td.map(t=>t.v),borderColor:'#003A72',backgroundColor:'rgba(0,58,114,.1)',
-        tension:.3,fill:true,pointBackgroundColor:'#003A72',pointRadius:4}]},
+      datasets:[{data:td.map(t=>t.v),borderColor:'#166534',backgroundColor:'rgba(0,58,114,.1)',
+        tension:.3,fill:true,pointBackgroundColor:'#166534',pointRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
@@ -2390,7 +2462,7 @@ function renderInsights() {
       <div style="font-size:52px">💡</div>
       <p style="font-weight:600;color:#374151;margin:8px 0 4px">No data yet</p>
       <p style="font-size:13px">Complete a round to start getting insights</p>
-      <button onclick="showMain('round')" style="margin-top:16px;background:#003A72;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
+      <button onclick="showMain('round')" style="margin-top:16px;background:#166534;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
     </div>`;
     return;
   }
@@ -2549,7 +2621,7 @@ function renderInsights() {
         <div style="font-size:12px;color:#374151;line-height:1.5">${sr}% in this condition (${n}/${fa.pool.length}) vs your overall ${br}%</div>
       </div>
       <div style="font-size:12px;color:#1f2937;line-height:1.6;margin-bottom:10px">
-        <span style="font-weight:800;color:#002855">💡 Fix: </span>${fa.rec}
+        <span style="font-weight:800;color:#14532d">💡 Fix: </span>${fa.rec}
       </div>
       ${bd ? `<button onclick="(function(b,el){el.style.display=el.style.display==='none'?'block':'none';b.textContent=b.textContent.includes('▼')?'Hide details ▲':'Details by condition ▼';})(this,document.getElementById('${bdId}'))"
         style="border:none;background:rgba(0,0,0,.06);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;color:#374151;cursor:pointer;width:100%;text-align:center;margin-bottom:2px">
@@ -2626,7 +2698,7 @@ function printInsights() {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1f2937; padding: 24px 20px; max-width: 680px; margin: 0 auto; }
-    h1 { font-size: 22px; font-weight: 800; color: #002855; margin-bottom: 4px; }
+    h1 { font-size: 22px; font-weight: 800; color: #14532d; margin-bottom: 4px; }
     .sub { font-size: 12px; color: #9ca3af; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; }
     @media print { .no-print { display: none; } div { page-break-inside: avoid; } }
   </style>
@@ -2745,7 +2817,7 @@ function renderHistory() {
           <div style="font-size:11px;color:#9ca3af;margin-top:2px">${dt} · ${s.n} holes</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:22px;font-weight:800;color:#003A72">${s.makesPct}%</div>
+          <div style="font-size:22px;font-weight:800;color:#166534">${s.makesPct}%</div>
           <div style="font-size:10px;color:#9ca3af">make rate</div>
         </div>
       </div>
@@ -2776,7 +2848,7 @@ function openModal(id) {
         <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Putts</div>
       </div>
       <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#003A72">${s.makesPct}%</div>
+        <div style="font-size:18px;font-weight:800;color:#166534">${s.makesPct}%</div>
         <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Make</div>
       </div>
       <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
@@ -2936,7 +3008,12 @@ showMain('dashboard');
 // Register service worker for offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // updateViaCache:'none' stops the browser serving sw.js from its own HTTP
+    // cache (up to 24h by default), which would delay every app update. The
+    // explicit update() then checks for a new worker on each launch.
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then(reg => { reg.update().catch(() => {}); })
+      .catch(() => {});
   });
 }
 </script>

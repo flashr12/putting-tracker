@@ -2600,7 +2600,12 @@ showMain('dashboard');
 // Register service worker for offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // updateViaCache:'none' stops the browser serving sw.js from its own HTTP
+    // cache (up to 24h by default), which would delay every app update. The
+    // explicit update() then checks for a new worker on each launch.
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then(reg => { reg.update().catch(() => {}); })
+      .catch(() => {});
   });
 }
 </script>

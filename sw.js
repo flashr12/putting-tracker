@@ -3,7 +3,7 @@
 // a blanket "delete everything that isn't mine" makes the two evict each
 // other's offline data on every activation.
 const PREFIX = 'putting-tracker-v1';
-const CACHE  = PREFIX + '-2';
+const CACHE  = PREFIX + '-3';
 
 // The app shell. Paths are relative so this works under a GitHub Pages
 // project path (flashr12.github.io/putting-tracker/), not just a domain root.
@@ -49,25 +49,41 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Only handle same-origin GETs plus the two CDN assets we precache.
   if (e.request.method !== 'GET') return;
 
+  const isDoc = e.request.mode === 'navigate' || e.request.destination === 'document';
+
+  // The page itself is NETWORK-FIRST. Cache-first on the document means a
+  // published update is never seen: the worker keeps serving the stale HTML
+  // until sw.js itself happens to change. Falling back to cache preserves
+  // offline use.
+  if (isDoc) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() =>
+        caches.match(e.request).then(hit => hit || caches.match('./index.html'))
+      )
+    );
+    return;
+  }
+
+  // Static assets are cache-first — they're immutable enough and this keeps
+  // the app instant offline.
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
-      return fetch(e.request).then(response => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE).then(cache => cache.put(e.request, clone));
+      return fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
         }
-        return response;
-      }).catch(() => {
-        // Offline and not cached — fall back to the app shell.
-        // Relative, to match how PRECACHE stored it.
-        if (e.request.destination === 'document') {
-          return caches.match('./index.html');
-        }
-      });
+        return res;
+      }).catch(() => undefined);
     })
   );
 });
