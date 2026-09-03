@@ -29,9 +29,9 @@
       background: #14532d;
       color: #fff;
       padding: env(safe-area-inset-top) 16px 0;
-      height: calc(48px + env(safe-area-inset-top));
-      display: flex; align-items: flex-end; padding-bottom: 6px;
-      gap: 10px;
+      height: calc(60px + env(safe-area-inset-top));
+      display: flex; align-items: flex-end; padding-bottom: 9px;
+      gap: 11px;
     }
     #app-nav {
       flex-shrink: 0;
@@ -388,8 +388,22 @@
     .hd-fade-l { left:0;  background:linear-gradient(to right,#fff 12%,rgba(255,255,255,0)); }
     .hd-fade-r { right:0; background:linear-gradient(to left, #fff 12%,rgba(255,255,255,0)); }
 
-    /* Setup card */
-    .setup-card { background:#fff; border-radius:16px; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+    /* Setup screen. initSetup() sets display:flex on #step-setup, which
+       defaults to row direction — that pinned the card to the left and
+       stretched it to full height. Column + centre fixes both. */
+    #step-setup { flex-direction:column; align-items:center; }
+    .setup-card {
+      background:#fff; border-radius:16px; padding:18px;
+      box-shadow:0 1px 3px rgba(0,0,0,.07);
+      width:100%; max-width:440px; flex:0 0 auto;   /* height follows content */
+    }
+    .setup-lbl {
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.05em; color:#9ca3af; margin-bottom:6px; text-align:center;
+    }
+    .setup-date-note {
+      text-align:center; font-size:12px; font-weight:600; color:#166534; margin-top:6px;
+    }
     .inp {
       width:100%; border:1.5px solid #e5e7eb; border-radius:10px;
       padding:10px 12px; font-size:14px; outline:none;
@@ -402,10 +416,10 @@
 
 <!-- ── HEADER ── -->
 <div id="app-header">
-  <span style="font-size:22px">⛳</span>
+  <span style="font-size:27px;line-height:1">⛳</span>
   <div>
-    <div style="font-size:16px;font-weight:700;line-height:1.2">Putting Tracker <span style="font-size:10px;background:#86efac;color:#14532d;border-radius:4px;padding:1px 5px;vertical-align:middle;font-weight:800">2.0</span></div>
-    <div style="font-size:11px;color:#86efac">Exact distances · Strokes gained</div>
+    <div style="font-size:20px;font-weight:800;line-height:1.15;letter-spacing:-.2px">Putting Tracker <span style="font-size:11px;background:#86efac;color:#14532d;border-radius:5px;padding:2px 6px;vertical-align:middle;font-weight:800">2.0</span></div>
+    <div style="font-size:12.5px;color:#86efac;margin-top:1px">Exact distances · Strokes gained</div>
   </div>
 </div>
 
@@ -544,18 +558,20 @@
   <div id="step-setup" style="flex:1;overflow-y:auto;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))">
     <div class="setup-card" style="display:flex;flex-direction:column;gap:14px">
       <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Date</div>
-        <input type="date" id="inp-date" class="inp"/>
+        <div class="setup-lbl">Date</div>
+        <input type="date" id="inp-date" class="inp" onchange="updateDateNote()"/>
+        <!-- native date inputs can't show a weekday, so echo it underneath -->
+        <div class="setup-date-note" id="date-note"></div>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Course (optional)</div>
+        <div class="setup-lbl">Course (optional)</div>
         <input type="text" id="inp-course" class="inp" placeholder="e.g. Pebble Beach"
           autocomplete="off" list="course-suggestions"/>
         <datalist id="course-suggestions"></datalist>
       </div>
       <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Holes</div>
-        <div style="display:flex;align-items:center;gap:10px">
+        <div class="setup-lbl" style="margin-bottom:8px">Holes</div>
+        <div style="display:flex;align-items:center;gap:10px;justify-content:center">
           <div style="display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;height:38px">
             <button onclick="adjustSetupHoles(-1)" style="width:38px;height:38px;border:none;background:#f9fafb;font-size:18px;font-weight:700;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
             <span id="setup-hole-count" style="min-width:36px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
@@ -804,7 +820,7 @@ function showMain(name) {
         document.getElementById('step-setup').style.display = 'none';
         document.getElementById('step-holes').style.display = 'flex';
         document.getElementById('ri-course').textContent = AR.course || 'New Round';
-        document.getElementById('ri-date').textContent = new Date(AR.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        document.getElementById('ri-date').textContent = new Date(AR.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
         document.getElementById('ri-holecount').textContent = (AR.holeCount||18) + 'H ✎';
         setRoundView('form'); renderPills(); renderAccordion();
       } else { clearDraft(); initSetup(); }
@@ -815,11 +831,24 @@ function showMain(name) {
 // ═══════════════════════════════════════
 //  SETUP
 // ═══════════════════════════════════════
+// A native <input type="date"> renders per-locale and can't be told to show a
+// weekday, so spell the full date out beneath it.
+function updateDateNote() {
+  const v  = document.getElementById('inp-date')?.value;
+  const el = document.getElementById('date-note');
+  if (!el) return;
+  el.textContent = v
+    ? new Date(v + 'T12:00:00').toLocaleDateString('en-GB',
+        { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+    : '';
+}
+
 function initSetup() {
   document.getElementById('step-setup').style.display = 'flex';
   document.getElementById('step-holes').style.display = 'none';
   document.getElementById('inp-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('inp-course').value = '';
+  updateDateNote();
   // reset hole count chip
   document.querySelectorAll('[data-grp="setup-holes"]').forEach(c => c.classList.toggle('on', c.dataset.val==='18'));
   // populate course autocomplete from past rounds (sorted alphabetically, deduplicated)
@@ -843,7 +872,7 @@ function startRound() {
   document.getElementById('step-holes').style.display = 'flex';
   // info bar
   document.getElementById('ri-course').textContent = course || 'New Round';
-  document.getElementById('ri-date').textContent   = new Date(date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  document.getElementById('ri-date').textContent   = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   document.getElementById('ri-holecount').textContent = hc + 'H ✎';
   setRoundView('form');
   renderPills();
