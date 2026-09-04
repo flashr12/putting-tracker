@@ -463,9 +463,12 @@
 
 <!-- ── HEADER ── -->
 <div id="app-header">
-  <span style="font-size:27px;line-height:1">⛳</span>
-  <div>
-    <div style="font-size:20px;font-weight:800;line-height:1.15;letter-spacing:-.2px">Putting Tracker <span style="font-size:11px;background:#86efac;color:#14532d;border-radius:5px;padding:2px 6px;vertical-align:middle;font-weight:800">2.0</span></div>
+  <div style="width:100%;text-align:center">
+    <div style="font-size:20px;font-weight:800;line-height:1.15;letter-spacing:-.2px">
+      <span style="font-size:22px;vertical-align:-2px">⛳</span>
+      Putting Tracker <span style="font-size:11px;background:#86efac;color:#14532d;border-radius:5px;padding:2px 6px;vertical-align:middle;font-weight:800">2.0</span>
+      <span style="font-size:22px;vertical-align:-2px">⛳</span>
+    </div>
     <div style="font-size:12.5px;color:#86efac;margin-top:1px">Exact distances · Strokes gained</div>
   </div>
 </div>
@@ -605,7 +608,8 @@
 
   <!-- SETUP STEP -->
   <div id="step-setup" style="flex:1;overflow-y:auto;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))">
-    <div class="setup-card" style="display:flex;flex-direction:column;gap:14px">
+    <!-- gap alone spaces the three fields evenly; the button gets the same via CSS -->
+    <div class="setup-card" style="display:flex;flex-direction:column;gap:22px">
       <div>
         <div class="setup-lbl">Date</div>
         <div class="date-box">
@@ -615,9 +619,12 @@
       </div>
       <div>
         <div class="setup-lbl">Course (Optional)</div>
+        <!-- No datalist: iOS reserves space for its dropdown affordance, which
+             pushes the placeholder off-centre. Recent courses appear as chips
+             below instead, which is a better target on a phone anyway. -->
         <input type="text" id="inp-course" class="inp" placeholder="e.g. Pebble Beach"
-          style="text-align:center" autocomplete="off" list="course-suggestions"/>
-        <datalist id="course-suggestions"></datalist>
+          style="text-align:center" autocomplete="off"/>
+        <div id="course-chips" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px"></div>
       </div>
       <div>
         <div class="setup-lbl" style="margin-bottom:8px">Holes</div>
@@ -627,14 +634,12 @@
             <span id="setup-hole-count" style="min-width:36px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
             <button onclick="adjustSetupHoles(1)"  style="width:38px;height:38px;border:none;background:#f9fafb;font-size:18px;font-weight:700;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
           </div>
-          <!-- 18 is already the default, so only the 9-hole shortcut earns its place -->
-          <div style="display:flex;gap:6px">
-            <div class="ch" onclick="setSetupHoles(9)" style="padding:6px 16px">9 holes</div>
-          </div>
+          <!-- 18 is the default and "Holes" is already the label, so just "9" -->
+          <div class="ch" onclick="setSetupHoles(9)" style="padding:6px 18px">9</div>
         </div>
       </div>
       <button onclick="startRound()"
-        style="background:#166534;color:#fff;border:none;border-radius:10px;height:46px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-top:4px">
+        style="background:#166534;color:#fff;border:none;border-radius:10px;height:48px;font-size:15px;font-weight:700;cursor:pointer;width:100%">
         Start Entering Putts →
       </button>
     </div>
@@ -950,6 +955,11 @@ function updateDateNote() {
                    `${d.getDate()} ${MON_SHORT[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function pickCourse(name) {
+  const el = document.getElementById('inp-course');
+  if (el) { el.value = name; el.blur(); }
+}
+
 function initSetup() {
   document.getElementById('step-setup').style.display = 'flex';
   document.getElementById('step-holes').style.display = 'none';
@@ -958,12 +968,15 @@ function initSetup() {
   updateDateNote();
   // reset hole count chip
   document.querySelectorAll('[data-grp="setup-holes"]').forEach(c => c.classList.toggle('on', c.dataset.val==='18'));
-  // populate course autocomplete from past rounds (sorted alphabetically, deduplicated)
-  const past = [...new Set(
-    loadRounds().map(r => r.course).filter(Boolean)
-  )].sort((a,b) => a.localeCompare(b));
-  const dl = document.getElementById('course-suggestions');
-  dl.innerHTML = past.map(c => `<option value="${c.replace(/"/g,'&quot;')}">`).join('');
+  // Recent courses as tappable chips, most-played first
+  const counts = {};
+  loadRounds().forEach(r => { if (r.course) counts[r.course] = (counts[r.course]||0) + 1; });
+  const chips = Object.keys(counts).sort((a,b) => counts[b]-counts[a] || a.localeCompare(b)).slice(0,5);
+  const wrap = document.getElementById('course-chips');
+  if (wrap) wrap.innerHTML = chips.map(c =>
+    `<button onclick="pickCourse(this.dataset.c)" data-c="${c.replace(/"/g,'&quot;')}"
+      style="border:1.5px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${c}</button>`
+  ).join('');
 }
 
 function startRound() {
@@ -1123,7 +1136,7 @@ function buildHoleListRow(h, i) {
 }
 
 function slopeIcon(v) { return v==='up'?'⬆':v==='down'?'⬇':'—'; }
-function dirIcon(v)   { return v==='l-to-r'?'→':v==='r-to-l'?'←':'↑'; }
+function dirIcon(v)   { return v==='l-to-r'?'↗':v==='r-to-l'?'↖':'↑'; }
 
 // Section heading: symbol at both ends, text centred, and a small "i" that
 // toggles a one-line explanation. The "i" is positioned absolutely so it
@@ -1156,7 +1169,7 @@ function buildHoleFormHTML(h, i) {
   const grid1 = `
   <div class="fl">
     ${flLabel('🎯', 'Putt Distance + Slope + Break', `i1-${i}`)}
-    ${flInfo(`i1-${i}`, 'Tap the arrow under the slope that matches your putt — → breaks left-to-right, ↑ straight, ← right-to-left. Then scroll the drum to the distance from ball to hole, in feet.')}
+    ${flInfo(`i1-${i}`, 'Tap the arrow under the slope that matches your putt — ↗ breaks left-to-right, ↑ straight, ↖ right-to-left. Then scroll the drum to the distance from ball to hole, in feet.')}
     <div class="gwrap">
       <table class="pgrid" id="grid1-${i}">
         <thead>
@@ -1171,9 +1184,8 @@ function buildHoleFormHTML(h, i) {
           <tr>
             ${COLS1.map(c => {
               const sel = h.slope===c.slope && h.direction===c.dir;
-              // Horizontal arrows read as direction far more clearly than
-              // diagonals do: → breaks right, ← breaks left, ↑ is straight.
-              const lbl = c.dir==='l-to-r' ? '→' : c.dir==='straight' ? '↑' : '←';
+              // Slanting arrows for the break: ↗ left-to-right, ↖ right-to-left.
+              const lbl = c.dir==='l-to-r' ? '↗' : c.dir==='straight' ? '↑' : '↖';
               return `<td class="dcell${sel?' on':''}" id="gc1-${i}-${c.slope}-${c.dir}"
                           onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</td>`;
             }).join('')}
@@ -2583,6 +2595,8 @@ function setTrendTab(name) {
     const el = document.getElementById('tt-' + t);
     if (el) el.style.display = t === name ? 'block' : 'none';
   });
+  // a canvas inside a hidden box lays out at zero, so draw on reveal
+  drawTrendChart(name);
 }
 
 function set3pTrendTab(name) {
@@ -2745,6 +2759,32 @@ function computeImpactInsights(rounds) {
 
   const cell = (pool, fn, minN=5) => pool.length>=minN ? Math.round(pool.filter(fn).length/pool.length*100) : null;
 
+  // ── Round-by-round series, oldest first, for the trend charts ────────────
+  const chrono   = [...sorted].reverse();
+  const perRound = fn => chrono.map(r => {
+    const hs = (r.holes||[]).filter(h => h.numPutts);
+    return hs.length ? fn(hs) : null;
+  });
+  const pctOf = (pool, fn, minN=3) =>
+    pool.length >= minN ? Math.round(pool.filter(fn).length/pool.length*100) : null;
+
+  const series = {
+    labels: chrono.map(r => {
+      const d = new Date(r.date + 'T12:00:00');
+      return `${d.getDate()} ${MON_SHORT[d.getMonth()]}`;
+    }),
+    sg: perRound(hs => {
+      const q = hs.filter(h => h.distance);
+      return q.length >= 5 ? +((q.reduce((s,h)=>s+holeSGP(h),0)/q.length)*18).toFixed(2) : null;
+    }),
+    make:  perRound(hs => pctOf(hs, is1, 5)),
+    tp:    perRound(hs => pctOf(hs, is3, 5)),
+    short: perRound(hs => pctOf(hs.filter(h=>h.variance && parseInt(h.numPutts)>=2), isShortV)),
+    long:  perRound(hs => pctOf(hs.filter(h=>h.variance && parseInt(h.numPutts)>=2), isLongV)),
+    mLeft: perRound(hs => pctOf(hs.filter(isMissed), h=>h.missDirection==='left')),
+    mRight:perRound(hs => pctOf(hs.filter(isMissed), h=>h.missDirection==='right')),
+  };
+
   const trends = {
     // Strokes gained per round, split by distance band. Expressed per round so
     // the four bands add up to the Overall figure — that shows *where* the
@@ -2803,7 +2843,75 @@ function computeImpactInsights(rounds) {
     })),
   };
 
-  return { N, R, summary, focusAreas, trends };
+  return { N, R, summary, focusAreas, trends, series };
+}
+
+// ── Trend charts ──────────────────────────────────────────────────────────
+// Faint dots are individual rounds; the bold line is a 5-round rolling mean,
+// which is what you actually want to read — a single round is mostly noise.
+let TREND_SERIES = null;
+const trendCharts = {};
+
+function rollingMean(arr, w = 5) {
+  return arr.map((_, i) => {
+    const win = arr.slice(Math.max(0, i-w+1), i+1).filter(v => v !== null);
+    return win.length ? +(win.reduce((a,b)=>a+b,0)/win.length).toFixed(2) : null;
+  });
+}
+
+function drawTrendChart(tab) {
+  const s = TREND_SERIES;
+  if (!s || typeof Chart === 'undefined') return;
+  const cv = document.getElementById('tc-' + tab);
+  if (!cv) return;
+  if (trendCharts[tab]) { trendCharts[tab].destroy(); delete trendCharts[tab]; }
+
+  const SPECS = {
+    sg:    [{ k:'sg',    lbl:'SG / 18',  col:'#166534' }],
+    make:  [{ k:'make',  lbl:'Make %',   col:'#166534' }],
+    '3putt':[{ k:'tp',   lbl:'3-putt %', col:'#dc2626' }],
+    pace:  [{ k:'short', lbl:'% short',  col:'#2563eb' },
+            { k:'long',  lbl:'% long',   col:'#ea580c' }],
+    miss:  [{ k:'mLeft', lbl:'% left',   col:'#7c3aed' },
+            { k:'mRight',lbl:'% right',  col:'#0d9488' }],
+  };
+  const spec = SPECS[tab];
+  if (!spec) return;
+
+  const datasets = [];
+  spec.forEach(d => {
+    datasets.push({                                   // raw rounds, faint
+      label: d.lbl + ' (round)', data: s[d.k],
+      borderColor: d.col + '40', backgroundColor: d.col + '55',
+      borderWidth: 1, pointRadius: 2.5, tension: .25, spanGaps: true,
+    });
+    datasets.push({                                   // rolling mean, bold
+      label: d.lbl + ' (5-rd avg)', data: rollingMean(s[d.k]),
+      borderColor: d.col, backgroundColor: 'transparent',
+      borderWidth: 2.5, pointRadius: 0, tension: .35, spanGaps: true,
+    });
+  });
+
+  trendCharts[tab] = new Chart(cv.getContext('2d'), {
+    type: 'line',
+    data: { labels: s.labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { display: spec.length > 1, labels:{ font:{size:10}, boxWidth:10,
+                  filter: it => it.text.includes('avg') } },
+        tooltip: { callbacks: { label: c =>
+          `${c.dataset.label}: ${c.parsed.y}${tab==='sg' ? '' : '%'}` } },
+      },
+      scales: {
+        y: { ticks:{ font:{size:10}, callback: v => tab==='sg' ? v : v+'%' },
+             grid:{ color:'#f3f4f6' } },
+        x: { ticks:{ font:{size:9}, maxRotation:0, autoSkip:true, maxTicksLimit:6 },
+             grid:{ display:false } },
+      },
+    },
+  });
 }
 
 function renderInsights() {
@@ -3023,24 +3131,29 @@ function renderInsights() {
         The four bands add up to Overall, so this shows <em>where</em> strokes are won or lost.
         ↑ green = improving vs all-time.
       </div>
+      <div class="tc-wrap" id="tcw-sg" style="height:150px;margin-bottom:10px"><canvas id="tc-sg"></canvas></div>
       ${trendTable(trends.sg, true, v => fmtSG(v, 2))}
     </div>
     <div id="tt-make" style="${TREND_TAB==='make'?'':'display:none'}">
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of holes holed with 1 putt. ↑ green = improving vs all-time.</div>
+      <div class="tc-wrap" id="tcw-make" style="height:150px;margin-bottom:10px"><canvas id="tc-make"></canvas></div>
       ${trendTable(trends.make, true)}
     </div>
     <div id="tt-pace" style="${TREND_TAB==='pace'?'':'display:none'}">
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of 2+ putt holes where pace was short / on pace / long. On pace = ±1ft. ↓ Short/Long = improving.</div>
+      <div class="tc-wrap" id="tcw-pace" style="height:150px;margin-bottom:10px"><canvas id="tc-pace"></canvas></div>
       ${trendTable(trends.pace, false)}
     </div>
     <div id="tt-miss" style="${TREND_TAB==='miss'?'':'display:none'}">
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of missed putts by direction. ↓ green = fewer misses in that direction vs all-time.</div>
+      <div class="tc-wrap" id="tcw-miss" style="height:150px;margin-bottom:10px"><canvas id="tc-miss"></canvas></div>
       ${trendTable(trends.miss, false)}
     </div>
     <div id="tt-3putt" style="${TREND_TAB==='3putt'?'':'display:none'}">
       <div style="display:flex;gap:5px;margin-bottom:10px">
         ${tp3Defs.map(t=>`<button class="tr3-tab${t.k===TREND_3P_TAB?' on':''}" data-tab="${t.k}" onclick="set3pTrendTab('${t.k}')">${t.l}</button>`).join('')}
       </div>
+      <div class="tc-wrap" id="tcw-3putt" style="height:150px;margin-bottom:10px"><canvas id="tc-3putt"></canvas></div>
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">3-putt rate (%). ↓ green = improving vs all-time.</div>
       <div id="tt3-dist"  style="${TREND_3P_TAB==='dist'?'':'display:none'}">${trendTable(trends.tp_dist,  false)}</div>
       <div id="tt3-var"   style="${TREND_3P_TAB==='var'?'':'display:none'}">${trendTable(trends.tp_var,   false)}</div>
@@ -3054,6 +3167,12 @@ function renderInsights() {
       Conditions with fewer than 15 putts excluded from focus areas.<br>Trend cells require 5+ putts.
     </div>
   </div>`;
+
+  // charts need the canvases to exist first
+  TREND_SERIES = data.series;
+  const enoughRounds = data.R >= 3;
+  document.querySelectorAll('.tc-wrap').forEach(w => { w.style.display = enoughRounds ? 'block' : 'none'; });
+  if (enoughRounds) drawTrendChart(TREND_TAB);
 }
 
 function printInsights() {

@@ -3,7 +3,7 @@
 // a blanket "delete everything that isn't mine" makes the two evict each
 // other's offline data on every activation.
 const PREFIX = 'putting-tracker-v2';
-const CACHE  = PREFIX + '-11';
+const CACHE  = PREFIX + '-12';
 
 // The app shell. Paths are relative so this works under a GitHub Pages
 // project path (flashr12.github.io/putting-tracker/), not just a domain root.
