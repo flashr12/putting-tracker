@@ -848,6 +848,29 @@ function sgpExpected(feet, baseKey) {
   // A Tour pro is at least as good at every distance, so clamp to that.
   return Math.max(val, lookupExpected(SG_BASELINES.tour.table, feet));
 }
+// ── Feet of putts holed ───────────────────────────────────────────────────
+// Every hole ends with a putt going in, but only the FIRST putt's length is
+// recorded. Counting just one-putts scored a 40ft lag to a tap-in as zero feet
+// holed, which read far too low. Later putts are estimated from the first-putt
+// variance — that is literally how far from the hole the ball finished.
+function varianceFeet(v) {
+  if (!v) return null;
+  if (v === '0') return 1;              // pin-high but off line: a short one
+  const m = String(v).match(/(\d+)/);
+  if (!m) return null;
+  const n = parseInt(m[1]);
+  return String(v).startsWith('>') ? n + 1 : n;   // ">7" is at least 7
+}
+
+// Feet holed on one hole: exact for a one-putt, estimated beyond that.
+function holeFeetMade(h) {
+  if (!h || !h.numPutts) return 0;
+  if (h.numPutts === '1') return h.distance || 0;
+  const vf = varianceFeet(h.variance);
+  if (h.numPutts === '2') return Math.max(1, vf || 1);
+  return 1;   // 3+ putts: the last one is a tap-in, length unknown
+}
+
 // Strokes gained for a single hole (null when data is incomplete)
 function holeSGP(h, baseKey) {
   if (!h || !h.distance || !h.numPutts) return null;
@@ -1855,8 +1878,7 @@ function computeStats(holes) {
   const sgH      = holes.filter(h => h.distance && h.numPutts);
   const sgTotal  = sgH.reduce((s,h) => s + holeSGP(h), 0);
   const sgPerHole= sgH.length ? sgTotal / sgH.length : null;
-  const feetMade = holes.filter(h => h.numPutts === '1' && h.distance)
-                        .reduce((s,h) => s + h.distance, 0);
+  const feetMade = holes.reduce((s,h) => s + holeFeetMade(h), 0);
   const longestMade = holes.filter(h => h.numPutts === '1' && h.distance)
                            .reduce((m,h) => Math.max(m, h.distance), 0);
   const avgDist  = sgH.length ? (sgH.reduce((s,h)=>s+h.distance,0) / sgH.length) : null;
@@ -2018,7 +2040,10 @@ function renderDashboard() {
       <b>SG Putting / 18</b> — strokes gained vs the benchmark chosen in Insights.
       Compares you from the <i>same distance</i>, so it is not affected by how
       close your approach shots finish. 0 means you match that benchmark.<br>
-      <b>Feet Made / 18</b> — total length of putts holed. Rewards holing long ones.<br>
+      <b>Feet Made / 18</b> — total length of every putt you holed. First putts use
+      the exact distance you entered; later putts are estimated from the first-putt
+      variance, since that is where the ball finished. A 3-putt counts a nominal
+      1ft for the tap-in.<br>
       <b>Longest Made</b> — your best single make.<br>
       <b>Avg 1st Putt</b> — mean distance you are left with. Mostly a measure of
       your approach play, but it sets how hard your putting day was.`);
@@ -2821,8 +2846,7 @@ function computeImpactInsights(rounds) {
     return p.length >= 5 ? (p.reduce((s,h) => s + holeSGP(h), 0) / p.length) * 18 : null;
   };
   const sgAll = sgOf(allH), sg5 = sgOf(last5H);
-  const feetOf = pool => pool.filter(h => h.numPutts==='1' && h.distance)
-                             .reduce((s,h) => s + h.distance, 0);
+  const feetOf = pool => pool.reduce((s,h) => s + holeFeetMade(h), 0);
 
   const summary = {
     avgPutts:  (totalPuttCount / N).toFixed(2),
