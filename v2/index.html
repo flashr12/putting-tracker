@@ -496,11 +496,16 @@
     </div>
     <div id="backup-banner" style="display:none"></div>
     <div id="db-content" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px">
+        <span style="font-size:11px;color:#9ca3af">What do these mean?</span>
+        <span id="kpi-info-dot"></span>
+      </div>
+      <div id="kpi-info"></div>
       <!-- KPIs -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="kpi" style="text-align:center">
           <div class="kpi-v" id="kpi-ppr" style="color:#166534">—</div>
-          <div class="kpi-l">Putts/Round</div>
+          <div class="kpi-l">Putts / 18 Holes</div>
         </div>
         <div class="kpi" style="text-align:center">
           <div class="kpi-v" id="kpi-3p" style="color:#f59e0b">—</div>
@@ -515,12 +520,12 @@
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="kpi" style="text-align:center">
           <div class="kpi-v" id="kpi-sgp" style="font-size:22px">—</div>
-          <div class="kpi-l">SG Putting / Rd</div>
+          <div class="kpi-l">SG Putting / 18</div>
           <div style="font-size:9px;color:#9ca3af;margin-top:1px" id="kpi-sgp-base">—</div>
         </div>
         <div class="kpi" style="text-align:center">
           <div class="kpi-v" id="kpi-feet" style="color:#0d9488;font-size:22px">—</div>
-          <div class="kpi-l">Feet Made / Rd</div>
+          <div class="kpi-l">Feet Made / 18</div>
         </div>
         <div class="kpi" style="text-align:center">
           <div class="kpi-v" id="kpi-longest" style="color:#7c3010;font-size:22px">—</div>
@@ -544,7 +549,7 @@
 
       <!-- Breakdown card -->
       <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
-        <div style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #f3f4f6;overflow-x:auto">
+        <div style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #f3f4f6;overflow-x:auto;justify-content:center">
           <button class="stab on" onclick="setStab(this,'dist')">Distance</button>
           <button class="stab"    onclick="setStab(this,'slope')">Slope</button>
           <button class="stab"    onclick="setStab(this,'dir')">Direction</button>
@@ -552,6 +557,11 @@
           <button class="stab"    onclick="setStab(this,'var')">Variance</button>
         </div>
         <div style="padding:12px">
+          <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:4px">
+            <span style="font-size:11px;color:#9ca3af">About this breakdown</span>
+            <span id="brk-info-dot"></span>
+          </div>
+          <div id="brk-info"></div>
           <div id="stab-dist">
             <div style="height:170px"><canvas id="chart-dist"></canvas></div>
             <div id="tbl-dist" style="margin-top:8px"></div>
@@ -568,7 +578,7 @@
 
       <!-- Trend -->
       <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Putts / Round Trend</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Putts / 18 Holes — Trend</div>
         <div style="height:140px"><canvas id="chart-trend"></canvas></div>
       </div>
     </div>
@@ -788,11 +798,17 @@ const SG_BASELINES = {
     [6,1.357],[7,1.443],[8,1.515],[9,1.575],[10,1.626],
     [12,1.706],[15,1.788],[20,1.883],[25,1.940],[30,1.977],
     [35,2.009],[40,2.037],[50,2.087],[60,2.132],[75,2.192],[100,2.290] ] },
-  h0:  { label:'0 handicap',  table:[[1,1.010],[3,1.074],[9,1.582],[15,1.773],[21,1.899],[27,1.971],[40,2.064],[60,2.150],[100,2.250]] },
-  h5:  { label:'5 handicap',  table:[[1,1.015],[3,1.101],[9,1.598],[15,1.790],[21,1.922],[27,1.984],[40,2.085],[60,2.175],[100,2.280]] },
-  h10: { label:'10 handicap', table:[[1,1.020],[3,1.111],[9,1.627],[15,1.837],[21,1.959],[27,2.034],[40,2.141],[60,2.240],[100,2.350]] },
-  h15: { label:'15 handicap', table:[[1,1.025],[3,1.161],[9,1.631],[15,1.848],[21,1.979],[27,2.063],[40,2.190],[60,2.300],[100,2.420]] },
-  h20: { label:'20 handicap', table:[[1,1.030],[3,1.166],[9,1.645],[15,1.869],[21,1.991],[27,2.081],[40,2.229],[60,2.350],[100,2.480]] },
+  // CALIBRATED so that, over a realistic spread of first-putt distances, each
+  // curve sits the published distance below Tour in SG putting per round:
+  //   0:-0.4  5:-0.8  10:-1.2  15:-1.5  20:-1.8   (Broadie, via golfity)
+  // One shape (the 20-handicap profile, which carries the extra long-range
+  // 3-putts) scaled per handicap — monotonic by construction, where scaling
+  // each curve independently reordered them.
+  h0:  { label:'0 handicap',  table:[[1,1.008],[3,1.079],[9,1.591],[15,1.806],[21,1.916],[27,1.984],[40,2.081],[60,2.182],[100,2.333]] },
+  h5:  { label:'5 handicap',  table:[[1,1.014],[3,1.104],[9,1.607],[15,1.825],[21,1.938],[27,2.012],[40,2.124],[60,2.231],[100,2.376]] },
+  h10: { label:'10 handicap', table:[[1,1.021],[3,1.130],[9,1.623],[15,1.843],[21,1.960],[27,2.041],[40,2.168],[60,2.281],[100,2.420]] },
+  h15: { label:'15 handicap', table:[[1,1.026],[3,1.149],[9,1.635],[15,1.857],[21,1.977],[27,2.063],[40,2.201],[60,2.318],[100,2.452]] },
+  h20: { label:'20 handicap', table:[[1,1.031],[3,1.169],[9,1.647],[15,1.871],[21,1.993],[27,2.084],[40,2.234],[60,2.355],[100,2.485]] },
 };
 const SG_BASE_KEYS = ['tour','h0','h5','h10','h15','h20'];
 let SG_BASE = SG_BASELINES[localStorage.getItem('putt_sgbase')] ? localStorage.getItem('putt_sgbase') : 'tour';
@@ -1151,6 +1167,19 @@ function flInfo(infoId, text) {
 function toggleInfo(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// Small grey "i" for dashboard/insights sections (the green one suits the
+// coloured hole-form headings; this one sits on white cards).
+function infoDot(id) {
+  return `<button onclick="toggleInfo('${id}')" aria-label="What does this mean?"
+    style="width:17px;height:17px;border-radius:50%;border:1.5px solid #cbd5e1;background:transparent;
+    color:#94a3b8;font-size:10px;font-weight:800;font-style:italic;line-height:1;cursor:pointer;
+    padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px">i</button>`;
+}
+function infoPanel(id, html) {
+  return `<div id="${id}" style="display:none;font-size:11px;font-style:italic;color:#4b5563;line-height:1.5;
+    background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;margin:8px 0 2px">${html}</div>`;
 }
 
 function buildHoleFormHTML(h, i) {
@@ -1855,9 +1884,14 @@ function computeStats(holes) {
              right:dm.filter(h=>h.missDirection==='right').length };
   });
 
-  const byVar = VAR_OPTS.map(v => {
-    const vh = holes.filter(h=>h.variance===v);
-    return { v, n:vh.length, mp:pct(vh.filter(h=>h.numPutts==='1').length,vh.length) };
+  // Variance is only recorded for putts that missed, so "make %" here was
+  // structurally always 0. Show the DISTRIBUTION instead — which pace errors
+  // happen most — including 0 (pin-high but off line).
+  const VAR_ALL  = ['>-7','-5','-3','-1','0','+1','+3','+5','>+7'];
+  const varTotal = holes.filter(h => h.variance && parseInt(h.numPutts) >= 2).length;
+  const byVar = VAR_ALL.map(v => {
+    const n = holes.filter(h => h.variance === v && parseInt(h.numPutts) >= 2).length;
+    return { v, n, share: pct(n, varTotal) };
   });
 
   // Variance cross-analysis: short vs long by distance, slope, direction
@@ -1970,6 +2004,43 @@ function renderBackupBanner() {
 
 function renderDashboard() {
   renderBackupBanner();
+
+  const dot = document.getElementById('kpi-info-dot');
+  if (dot && !dot.innerHTML) {
+    dot.innerHTML = infoDot('kpi-info-panel');
+    document.getElementById('kpi-info').innerHTML = infoPanel('kpi-info-panel', `
+      <b>Everything here is per 18 holes</b>, so 9- and 18-hole rounds mix fairly —
+      a 9-hole round is scaled up rather than dragging the average down.<br><br>
+      <b>Putts / 18</b> — total putts at an 18-hole rate. Tour ≈ 29.<br>
+      <b>3-Putt %</b> — share of holes taking 3 or more putts.<br>
+      <b>Putts / GIR</b> — putts on greens hit in regulation; strips out chip-ins
+      and short-game rescues, so it is the cleaner read on pure putting.<br>
+      <b>SG Putting / 18</b> — strokes gained vs the benchmark chosen in Insights.
+      Compares you from the <i>same distance</i>, so it is not affected by how
+      close your approach shots finish. 0 means you match that benchmark.<br>
+      <b>Feet Made / 18</b> — total length of putts holed. Rewards holing long ones.<br>
+      <b>Longest Made</b> — your best single make.<br>
+      <b>Avg 1st Putt</b> — mean distance you are left with. Mostly a measure of
+      your approach play, but it sets how hard your putting day was.`);
+  }
+
+  const bdot = document.getElementById('brk-info-dot');
+  if (bdot && !bdot.innerHTML) {
+    bdot.innerHTML = infoDot('brk-info-panel');
+    document.getElementById('brk-info').innerHTML = infoPanel('brk-info-panel', `
+      <b>Distance</b> — make % and 3-putt % by how far the first putt was. Bands are
+      for display only; the exact feet you entered are what get stored.<br>
+      <b>Slope / Direction</b> — the same split by uphill/downhill/flat and by which
+      way the putt broke.<br>
+      <b>Miss</b> — which side missed putts finished on. A strong lean one way usually
+      points at face angle rather than read.<br>
+      <b>Variance</b> — where your first putt finished when you did not hole out:
+      negative feet short, positive past, 0 pin-high. Consistently short means
+      pace, not line.<br><br>
+      Small samples swing wildly — treat anything under about 20 putts in a band
+      as a hint, not a finding.`);
+  }
+
   const rounds = loadRounds();
   const allHoles = rounds.flatMap(r=>r.holes);
   const s = computeStats(allHoles);
@@ -1982,8 +2053,10 @@ function renderDashboard() {
   document.getElementById('db-empty').style.display = 'none';
   document.getElementById('db-content').style.display = 'block';
 
-  const puttsPerRound = rounds.length ? (rounds.reduce((sum,r)=>sum+r.holes.reduce((a,h)=>a+parseInt(h.numPutts),0),0)/rounds.length).toFixed(1) : null;
-  document.getElementById('kpi-ppr').textContent    = puttsPerRound ?? '—';
+  // Per 18 HOLES, not per round: averaging a 9-hole round with an 18-hole one
+  // gives a figure that describes neither. Rate x 18 is comparable either way.
+  const puttsPer18 = s.n ? ((s.totalPutts / s.n) * 18).toFixed(1) : null;
+  document.getElementById('kpi-ppr').textContent    = puttsPer18 ?? '—';
   document.getElementById('kpi-3p').textContent     = s.threePct!==null  ? s.threePct+'%' : '—';
   document.getElementById('kpi-gir').textContent    = s.puttsPerGir ?? '—';
   document.getElementById('kpi-avg').textContent    = s.avgPutts;
@@ -2001,7 +2074,7 @@ function renderDashboard() {
   if (sgBaseEl) sgBaseEl.textContent = 'vs ' + sgBaseLabel();
 
   document.getElementById('kpi-feet').textContent =
-    rounds.length ? Math.round(s.feetMade / rounds.length) + "'" : '—';
+    s.n ? Math.round((s.feetMade / s.n) * 18) + "'" : '—';
   document.getElementById('kpi-longest').textContent = s.longestMade ? s.longestMade + "'" : '—';
   document.getElementById('kpi-avgdist').textContent = s.avgDist ? s.avgDist.toFixed(1) + "'" : '—';
 
@@ -2082,20 +2155,32 @@ function renderDashboard() {
       scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
               x:{ticks:{font:{size:10}},grid:{display:false}}}}
   });
+  const varMax = Math.max(1, ...s.byVar.map(v=>v.n));
   document.getElementById('tbl-var').innerHTML = `
+    <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">Where your first putt finished, on holes you did not hole out. 0 = pin-high.</div>
     <table style="width:100%;font-size:11px;border-collapse:collapse">
       <thead><tr style="color:#9ca3af">
-        <th style="text-align:left;padding:3px 2px">Variance</th>
+        <th style="text-align:left;padding:3px 2px">1st putt</th>
         <th style="text-align:center;padding:3px 2px">Count</th>
-        <th style="text-align:right;padding:3px 2px">Make%</th>
+        <th style="text-align:left;padding:3px 6px">Share</th>
+        <th style="text-align:right;padding:3px 2px">%</th>
       </tr></thead>
       <tbody>
-        ${s.byVar.filter(v=>v.n>0).map(v=>`
+        ${s.byVar.filter(v=>v.n>0).map(v=>{
+          const isZero = v.v==='0';
+          const col = isZero ? '#166534' : v.v.startsWith('+') || v.v==='>+7' ? '#ea580c' : '#2563eb';
+          return `
           <tr style="border-top:1px solid #f3f4f6">
-            <td style="padding:4px 2px;font-weight:600;color:#374151">${v.v}</td>
+            <td style="padding:4px 2px;font-weight:700;color:${col}">${isZero?'0 (pin-high)':v.v+"'"}</td>
             <td style="text-align:center;color:#9ca3af">${v.n}</td>
-            <td style="text-align:right;font-weight:700;color:${colorForPct(v.mp)}">${v.mp!==null?v.mp+'%':'—'}</td>
-          </tr>`).join('')}
+            <td style="padding:4px 6px">
+              <div style="height:7px;background:#f3f4f6;border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${Math.round(v.n/varMax*100)}%;background:${col};border-radius:4px"></div>
+              </div>
+            </td>
+            <td style="text-align:right;font-weight:700;color:#374151">${v.share}%</td>
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:16px 0 10px;letter-spacing:.05em">Short vs Long by Distance</div>
@@ -2107,9 +2192,10 @@ function renderDashboard() {
 
   // Trend
   if (charts.trend) charts.trend.destroy();
-  const td = rounds.slice().reverse().map((r,i)=>({
-    l: r.course||(r.date.slice(5)),
-    v: r.holes.reduce((s,h)=>s+parseInt(h.numPutts),0)
+  // normalise each round to 18 holes so 9-hole rounds do not dip the line
+  const td = rounds.slice().reverse().map(r => ({
+    l: r.course || (r.date.slice(5)),
+    v: r.holes.length ? +((r.holes.reduce((s,h)=>s+parseInt(h.numPutts),0)/r.holes.length)*18).toFixed(1) : null
   }));
   charts.trend = new Chart(document.getElementById('chart-trend').getContext('2d'),{
     type:'line',
@@ -2746,7 +2832,7 @@ function computeImpactInsights(rounds) {
     makeR5:    last5H.length >= 5 ? Math.round((rate(last5H, is1)||0) * 100) : null,
     threePR5:  last5H.length >= 5 ? Math.round((rate(last5H, is3)||0) * 100) : null,
     sg:        sgAll, sg5,
-    feetPerRd: R ? Math.round(feetOf(allH) / R) : null,
+    feetPerRd: N ? Math.round((feetOf(allH) / N) * 18) : null,
   };
 
   // ── Trend tables ─────────────────────────────────────────────────────────
@@ -3047,7 +3133,7 @@ function renderInsights() {
     </div>
     <div style="background:#f0fdfa;border-radius:10px;padding:10px;text-align:center">
       <div style="font-size:20px;font-weight:800;color:#0d9488">${summary.feetPerRd!==null?summary.feetPerRd+"'":'—'}</div>
-      <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">Feet holed / round</div>
+      <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">Feet holed / 18 holes</div>
     </div>
   </div>`;
   const summaryHTML = `
@@ -3072,8 +3158,25 @@ function renderInsights() {
         </div>`;
       }).join('')}
     </div>
-    <div style="font-size:10px;color:#9ca3af;line-height:1.5;border-top:1px solid #f3f4f6;padding-top:10px">
-      📌 <strong>Priority method:</strong> (your rate in condition − your overall rate) × frequency ÷ rounds played. Conditions with fewer than 15 putts excluded.
+    <div style="border-top:1px solid #f3f4f6;padding-top:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:10px;color:#9ca3af">📌 <strong>Priority method:</strong> (rate in condition − overall rate) × frequency ÷ rounds.</span>
+        ${infoDot('sg-info-panel')}
+      </div>
+      ${infoPanel('sg-info-panel', `
+        <b>Strokes gained</b> compares your putts against a benchmark's expected
+        putts <i>from the same distance</i>, so it is unaffected by how close your
+        approaches finish. −1.5 means you cost yourself 1.5 shots on the greens
+        versus that benchmark over 18 holes.<br><br>
+        <b>Choosing a benchmark.</b> Putting separates handicaps far less than people
+        expect: the published gap from Tour is about −0.4 for a scratch player and
+        only −1.8 for a 20-handicap. Approach play is where the strokes actually go
+        (a 20-handicap loses roughly 7.5 there). So a small SG number against Tour
+        is normal, and picking a handicap benchmark makes it read around zero.<br><br>
+        <b>Accuracy.</b> The Tour curve is published data. The handicap curves are
+        derived — real tracked make percentages, a modelled 3-putt term, then
+        calibrated so each sits the published distance below Tour. Good as a
+        yardstick; the trend over time is more reliable than the exact figure.`)}
     </div>
   </div>`;
 
