@@ -370,7 +370,10 @@
     .hd-item {
       flex:0 0 48px; height:38px;
       display:flex; align-items:center; justify-content:center;
-      scroll-snap-align:center; scroll-snap-stop:always;
+      /* NOT scroll-snap-stop:always — that forces the scroll to halt at every
+         single value, so a fast flick moved one foot instead of twenty. With
+         it off, momentum carries across many values and still snaps on rest. */
+      scroll-snap-align:center;
       font-size:12px; font-weight:600; color:#b6bcc6; line-height:1;
       transition:color .1s, font-size .1s;
     }
@@ -1254,7 +1257,8 @@ function buildHoleFormHTML(h, i) {
         <div class="hd-band"></div>
         <div class="hd-fade-l"></div>
         <div class="hd-fade-r"></div>
-        <div class="hd-scroller" id="hds-${i}" onscroll="onDistScroll(${i},this)"></div>
+        <div class="hd-scroller" id="hds-${i}" onscroll="onDistScroll(${i},this)"
+           onclick="onDrumTap(${i},event,this)"></div>
       </div>
     </div>
   </div>`;
@@ -1410,6 +1414,7 @@ function selChip(el) {
 // Tapping a cell sets slope + break. Distance comes from the drum below.
 function onGrid1(hi, slope, dir) {
   const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
   h.slope = slope; h.direction = dir;
   const tbl = document.getElementById(`grid1-${hi}`);
   if (tbl) {
@@ -1417,7 +1422,10 @@ function onGrid1(hi, slope, dir) {
     const cell = document.getElementById(`gc1-${hi}-${slope}-${dir}`);
     if (cell) cell.classList.add('on');
   }
-  if (isHoleDone(h)) onHoleDone(hi);
+  // Advance only when the hole GOES from incomplete to complete. Firing on
+  // any edit meant returning to a finished hole bounced you forward again
+  // the moment you touched anything, making corrections impossible.
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
   else refreshHoleSummary(hi);
   saveDraft();
 }
@@ -1536,14 +1544,35 @@ function flushDrum(hi) {
   if (sc && sc.isConnected && sc.firstElementChild) commitDist(hi, drumIdx(sc));
 }
 
+// Tap any visible value to jump straight to it, rather than only scrolling.
+function onDrumTap(hi, ev, scroller) {
+  const item = ev.target.closest('.hd-item');
+  if (!item || !scroller.firstElementChild) return;
+  const idx = Array.prototype.indexOf.call(scroller.children, item);
+  if (idx < 0) return;
+  // Direct assignment, not scrollTo({behavior:'smooth'}) — mandatory scroll-snap
+  // fights the smooth animation and the scroll never lands.
+  scroller.scrollLeft = idx * HD_ITEM_W;
+  // A programmatic scroll does not reliably raise a scroll event, so commit
+  // here rather than waiting on the debounced handler.
+  clearTimeout(DRUM_T[hi]); delete DRUM_T[hi];
+  DRUM_LAST[hi] = idx;
+  paintDrum(scroller, idx);
+  commitDist(hi, idx);
+}
+
 function commitDist(hi, feet) {
   const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
   h.distance = feet > 0 ? feet : null;
 
   const outer = document.getElementById(`hdo-${hi}`);
   if (outer) outer.classList.toggle('set', feet > 0);
 
-  if (isHoleDone(h)) onHoleDone(hi);
+  // Advance only when the hole GOES from incomplete to complete. Firing on
+  // any edit meant returning to a finished hole bounced you forward again
+  // the moment you touched anything, making corrections impossible.
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
   else refreshHoleSummary(hi);
   saveDraft();
 }
@@ -1571,6 +1600,7 @@ function trimDrums(keep) {
 // Table 2: Putts × Distance — sets numPutts + variance
 function onGrid2(hi, numPutts, variance) {
   const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
   h.numPutts = numPutts; h.variance = variance;
   const isPuttHoled   = numPutts === '1';
   const isPacePerfect = variance === '0' && !isPuttHoled; // pin-high miss: L/R only
@@ -1613,13 +1643,15 @@ function onGrid2(hi, numPutts, variance) {
     const cell = document.getElementById(`gc2-${hi}-${safePts}-${safeVar}`);
     if (cell) cell.classList.add('on');
   }
-  if (isHoleDone(h)) onHoleDone(hi);
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
+  else refreshHoleSummary(hi);
   saveDraft();
 }
 
 // Table 3: Result × GIR — sets missDirection + gir
 function onGrid3(hi, missDir, gir) {
   const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
   // Auto-fill 1-putt + variance=0 if 'made' tapped before Grid 2 is set
   if (missDir === 'made' && !h.numPutts) {
     h.numPutts = '1'; h.variance = '0';
@@ -1643,7 +1675,8 @@ function onGrid3(hi, missDir, gir) {
     const cell = document.getElementById(`gc3-${hi}-${missDir}-${gir}`);
     if (cell) cell.classList.add('on');
   }
-  if (isHoleDone(h)) onHoleDone(hi);
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
+  else refreshHoleSummary(hi);
   saveDraft();
 }
 
