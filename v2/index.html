@@ -3000,16 +3000,24 @@ function computeImpactInsights(rounds) {
         ...DG.map(dg => ({ label:dg.label, v:cell(p.h.filter(h=>dg.fn(h)), is3) })),
       ],
     })),
+    // Every 3-putt sub-tab leads with Overall, so the splits always have the
+    // headline rate to be read against — it used to appear only By Distance.
     tp_var: periodDefs.map(p => ({
       period:p.label, n:p.h.length,
-      cols: VG.map(vg => ({ label:vg.label, v:cell(p.h.filter(vg.fn), is3) })),
+      cols: [
+        { label:'Overall', v:cell(p.h, is3) },
+        ...VG.map(vg => ({ label:vg.label, v:cell(p.h.filter(vg.fn), is3) })),
+      ],
     })),
     tp_slope: periodDefs.map(p => ({
       period:p.label, n:p.h.length,
-      cols: SLOPE_OPTS.map(s => ({
-        label: s.v==='flat'?'Flat':s.v==='up'?'Uphill':'Downhill',
-        v: cell(p.h.filter(h=>h.slope===s.v), is3),
-      })),
+      cols: [
+        { label:'Overall', v:cell(p.h, is3) },
+        ...SLOPE_OPTS.map(s => ({
+          label: s.v==='flat'?'Flat':s.v==='up'?'Uphill':'Downhill',
+          v: cell(p.h.filter(h=>h.slope===s.v), is3),
+        })),
+      ],
     })),
   };
 
