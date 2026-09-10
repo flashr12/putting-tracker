@@ -258,6 +258,16 @@
     .kpi-v { font-size:26px; font-weight:800; line-height:1; }
     .kpi-l { font-size:10px; color:#9ca3af; margin-top:3px; text-transform:uppercase; letter-spacing:.05em; }
     .stab { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; color:#6b7280; background:#f3f4f6; white-space:nowrap; border:none; outline:none; }
+    /* Centre the tab strip when it fits, but never clip it when it does not.
+       Plain `justify-content:center` on an overflowing flex row cuts off BOTH
+       ends and the start becomes unreachable; `safe center` falls back to
+       flex-start once the content overflows. */
+    .stab-row {
+      display:flex; gap:6px; overflow-x:auto;
+      justify-content:center;
+      justify-content:safe center;
+    }
+    .stab-row::-webkit-scrollbar { display:none; }
     .ins-ftab { padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
     .ins-ftab.on { background:#166534; color:#fff; }
     .stab.on { background:#166534; color:#fff; }
@@ -272,6 +282,23 @@
     .brk-p { width:34px; text-align:right; font-size:12px; font-weight:700; }
     .hcard { background:#fff; border-radius:16px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.07); cursor:pointer; border:1.5px solid transparent; }
     .hcard:active { border-color:#166534; }
+
+    /* ── Round-detail tiles ──────────────────────────────────────────────
+       The dashboard gets its definition from white cards on a tinted page.
+       These sit on a WHITE sheet, so a near-white fill left them barely
+       visible — they need a real border and darker label text instead. */
+    .mkpi {
+      background:#f8fafc; border:1.5px solid #dde3ea; border-radius:11px;
+      padding:10px 4px; text-align:center;
+    }
+    .mkpi-v { font-size:18px; font-weight:800; line-height:1.1; }
+    .mkpi-l {
+      font-size:9px; color:#64748b; font-weight:700;
+      text-transform:uppercase; letter-spacing:.03em; margin-top:3px;
+    }
+    .mkpi.sg   { background:#f0f9ff; border-color:#bae6fd; }
+    .mkpi.feet { background:#f0fdfa; border-color:#99f6e4; }
+    .mkpi.long { background:#fff7ed; border-color:#fed7aa; }
 
     /* Modal */
     #modal-wrap { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; display:flex; align-items:flex-end; }
@@ -552,7 +579,7 @@
 
       <!-- Breakdown card -->
       <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
-        <div style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #f3f4f6;overflow-x:auto;justify-content:center">
+        <div class="stab-row" style="padding:10px 12px;border-bottom:1px solid #f3f4f6">
           <button class="stab on" onclick="setStab(this,'dist')">Distance</button>
           <button class="stab"    onclick="setStab(this,'slope')">Slope</button>
           <button class="stab"    onclick="setStab(this,'dir')">Direction</button>
@@ -3522,47 +3549,47 @@ function openModal(id) {
   document.getElementById('modal-body').innerHTML = `
     <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">${dt} · ${s.n} holes</p>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:14px">
-      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#1f2937">${s.totalPutts}</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Putts</div>
+      <div class="mkpi">
+        <div class="mkpi-v" style="color:#1f2937">${s.totalPutts}</div>
+        <div class="mkpi-l">Putts</div>
       </div>
-      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#166534">${s.makesPct}%</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Make</div>
+      <div class="mkpi">
+        <div class="mkpi-v" style="color:#166534">${s.makesPct}%</div>
+        <div class="mkpi-l">Make</div>
       </div>
-      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#f59e0b">${s.threePct}%</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">3-Putt</div>
+      <div class="mkpi">
+        <div class="mkpi-v" style="color:#f59e0b">${s.threePct}%</div>
+        <div class="mkpi-l">3-Putt</div>
       </div>
-      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#3b82f6">${s.puttsPerGir??'—'}</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">P/GIR</div>
+      <div class="mkpi">
+        <div class="mkpi-v" style="color:#3b82f6">${s.puttsPerGir??'—'}</div>
+        <div class="mkpi-l">P/GIR</div>
       </div>
-      <div style="background:#f9fafb;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#1f2937">${s.avgPutts}</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Avg/Hole</div>
+      <div class="mkpi">
+        <div class="mkpi-v" style="color:#1f2937">${s.avgPutts}</div>
+        <div class="mkpi-l">Avg/Hole</div>
       </div>
     </div>
 
     <!-- v2: round strokes gained + feet holed -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">
-      <div style="background:#f0f9ff;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:${s.sgTotal>=0?'#16a34a':'#dc2626'}">${s.sgN>=1?fmtSG(s.sgTotal,1):'—'}</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">SG Putting</div>
+      <div class="mkpi sg">
+        <div class="mkpi-v" style="color:${s.sgTotal>=0?'#16a34a':'#dc2626'}">${s.sgN>=1?fmtSG(s.sgTotal,1):'—'}</div>
+        <div class="mkpi-l">SG Putting</div>
       </div>
-      <div style="background:#f0fdfa;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#0d9488">${s.feetMade}'</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Feet Made</div>
+      <div class="mkpi feet">
+        <div class="mkpi-v" style="color:#0d9488">${s.feetMade}'</div>
+        <div class="mkpi-l">Feet Made</div>
       </div>
-      <div style="background:#fff7ed;border-radius:10px;padding:10px 4px;text-align:center">
-        <div style="font-size:18px;font-weight:800;color:#7c3010">${s.longestMade?s.longestMade+"'":'—'}</div>
-        <div style="font-size:9px;color:#9ca3af;text-transform:uppercase">Longest</div>
+      <div class="mkpi long">
+        <div class="mkpi-v" style="color:#7c3010">${s.longestMade?s.longestMade+"'":'—'}</div>
+        <div class="mkpi-l">Longest</div>
       </div>
     </div>
 
     <!-- Breakdown tabs -->
-    <div style="background:#f9fafb;border-radius:12px;overflow:hidden;margin-bottom:16px">
-      <div style="display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid #f3f4f6;overflow-x:auto">
+    <div style="background:#fff;border:1.5px solid #dde3ea;border-radius:12px;overflow:hidden;margin-bottom:16px">
+      <div class="stab-row" style="padding:8px 10px;border-bottom:1px solid #f3f4f6">
         <button class="stab on" onclick="setModalStab(this,'dist')">Distance</button>
         <button class="stab"    onclick="setModalStab(this,'slope')">Slope</button>
         <button class="stab"    onclick="setModalStab(this,'dir')">Direction</button>
