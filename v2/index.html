@@ -2001,28 +2001,24 @@ function computeStats(holes) {
   });
 
   // Variance cross-analysis: short vs long by distance, slope, direction
-  const varHoles = holes.filter(h=>h.variance);
-  const varByDist = DIST_BANDS.map(band => {
-    const bh = varHoles.filter(h=>h.distance && band.fn(h));
-    const sc = bh.filter(h=>SHORT_VAR.includes(h.variance)).length;
-    const lo = bh.filter(h=>LONG_VAR.includes(h.variance)).length;
-    return { b:band.label, n:bh.length, short:sc, long:lo,
-             shortPct:pct(sc,bh.length), longPct:pct(lo,bh.length) };
-  });
-  const varBySlope = SLOPE_OPTS.map(s => {
-    const sh = varHoles.filter(h=>h.slope===s.v);
-    const sc = sh.filter(h=>SHORT_VAR.includes(h.variance)).length;
-    const lo = sh.filter(h=>LONG_VAR.includes(h.variance)).length;
-    return { ...s, n:sh.length, short:sc, long:lo,
-             shortPct:pct(sc,sh.length), longPct:pct(lo,sh.length) };
-  });
-  const varByDir = DIR_OPTS.map(d => {
-    const dh = varHoles.filter(h=>h.direction===d.v);
-    const sc = dh.filter(h=>SHORT_VAR.includes(h.variance)).length;
-    const lo = dh.filter(h=>LONG_VAR.includes(h.variance)).length;
-    return { ...d, n:dh.length, short:sc, long:lo,
-             shortPct:pct(sc,dh.length), longPct:pct(lo,dh.length) };
-  });
+  // Missed first putts only. This previously filtered on `h.variance` alone,
+  // which kept 1-putts (they store variance '0') in the denominator — every
+  // putt you HOLED diluted the pace percentages, worst at short range.
+  const varHoles = holes.filter(h => h.variance && parseInt(h.numPutts) >= 2);
+  const paceSplit = pool => {
+    const sc = pool.filter(h=>SHORT_VAR.includes(h.variance)).length;
+    const lo = pool.filter(h=>LONG_VAR.includes(h.variance)).length;
+    const pn = pool.filter(h=>h.variance === '0').length;
+    return { n:pool.length, short:sc, long:lo, pin:pn,
+             shortPct:pct(sc,pool.length), longPct:pct(lo,pool.length),
+             pinPct:pct(pn,pool.length) };
+  };
+  const varByDist  = DIST_BANDS.map(band =>
+    ({ b:band.label, ...paceSplit(varHoles.filter(h=>h.distance && band.fn(h))) }));
+  const varBySlope = SLOPE_OPTS.map(s =>
+    ({ ...s, ...paceSplit(varHoles.filter(h=>h.slope===s.v)) }));
+  const varByDir = DIR_OPTS.map(d =>
+    ({ ...d, ...paceSplit(varHoles.filter(h=>h.direction===d.v)) }));
 
   return {
     n, makes, makesPct:pct(makes,n), three, threePct:pct(three,n),
@@ -2270,8 +2266,48 @@ function renderDashboard() {
       </div>
     </div>`;
 
+  // One stacked bar per condition — short / pin-high / long read together,
+  // which is what shows whether pace failure is universal or situational.
+  const paceStack = (label, o) => (!o.n || o.n < 3) ? '' : `
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;margin-bottom:3px">
+        <span style="font-weight:700;color:#374151">${label}</span>
+        <span style="font-size:9.5px;color:#cbd5e1">${o.n} miss${o.n!==1?'es':''}</span>
+      </div>
+      <div style="display:flex;height:11px;border-radius:6px;overflow:hidden;background:#f3f4f6">
+        <div style="width:${o.shortPct}%;background:#2563eb"></div>
+        <div style="width:${o.pinPct}%;background:#166534"></div>
+        <div style="width:${o.longPct}%;background:#ea580c"></div>
+      </div>
+      <div style="display:flex;gap:9px;font-size:9.5px;margin-top:3px">
+        <span style="color:#2563eb;font-weight:600">${o.shortPct}% short</span>
+        <span style="color:#166534;font-weight:600">${o.pinPct}% pin</span>
+        <span style="color:#ea580c;font-weight:600">${o.longPct}% long</span>
+      </div>
+    </div>`;
+
+  const group = (title, rows) => {
+    const body = rows.join('');
+    return body ? `<div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#9ca3af;margin-bottom:6px">${title}</div>
+      ${body}</div>` : '';
+  };
+
+  const paceByCondHTML = !pv.n ? '' : `
+    <div style="background:#fff;border:1.5px solid #dde3ea;border-radius:12px;padding:12px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#334155;margin-bottom:3px">Pace by condition</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:1.45;margin-bottom:10px">
+        The same short / pin-high / long split, by where the putt was from.
+        Conditions with fewer than 3 misses are hidden.
+      </div>
+      ${group('By distance',  s.varByDist.map(d => paceStack(d.b, d)))}
+      ${group('By slope',     s.varBySlope.map(d => paceStack(d.v==='flat'?'Flat':d.v==='up'?'Uphill':'Downhill', d)))}
+      ${group('By break',     s.varByDir.map(d => paceStack(d.v==='straight'?'Straight':d.v==='l-to-r'?'L→R':'R→L', d)))}
+    </div>`;
+
   document.getElementById('stab-miss').innerHTML = `
     ${paceVsLineHTML}
+    ${paceByCondHTML}
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Miss Side <span style="font-weight:400;text-transform:none;color:#cbd5e1">— the tag you picked</span></div>
     ${mt?brkHTML('◀ Left',pct(s.mL,mt),s.mL)+brkHTML('▶ Right',pct(s.mR,mt),s.mR)+brkHTML('▼ Short',pct(s.mS,mt),s.mS)+brkHTML('▲ Long',pct(s.mLo,mt),s.mLo)
        :'<p style="font-size:12px;color:#9ca3af">No miss data yet</p>'}
@@ -2326,12 +2362,11 @@ function renderDashboard() {
         }).join('')}
       </tbody>
     </table>
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:16px 0 10px;letter-spacing:.05em">Short vs Long by Distance</div>
-    ${s.varByDist.filter(d=>d.n>0).map(d=>varCrossHTML(d.b,d.shortPct,d.longPct,d.n)).join('')||'<p style="font-size:12px;color:#9ca3af">No variance data yet</p>'}
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:14px 0 10px;letter-spacing:.05em">Short vs Long by Slope</div>
-    ${s.varBySlope.filter(d=>d.n>0).map(d=>varCrossHTML(d.l,d.shortPct,d.longPct,d.n)).join('')||'<p style="font-size:12px;color:#9ca3af">No variance data yet</p>'}
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:14px 0 10px;letter-spacing:.05em">Short vs Long by Break</div>
-    ${s.varByDir.filter(d=>d.n>0).map(d=>varCrossHTML(d.l,d.shortPct,d.longPct,d.n)).join('')||'<p style="font-size:12px;color:#9ca3af">No variance data yet</p>'}`;
+    <div style="margin-top:14px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:11px;color:#64748b;line-height:1.5">
+      Pace split by distance, slope and break now lives under
+      <b style="color:#166534">Miss → Pace by condition</b>, where it also shows
+      pin-high rather than only short vs long.
+    </div>`;
 
   // Trend
   if (charts.trend) charts.trend.destroy();
