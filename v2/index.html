@@ -300,6 +300,36 @@
     .mkpi.feet { background:#f0fdfa; border-color:#99f6e4; }
     .mkpi.long { background:#fff7ed; border-color:#fed7aa; }
 
+    /* ── Print / PDF overlay ────────────────────────────────────────────── */
+    #print-overlay {
+      position:fixed; inset:0; z-index:200; background:#fff;
+      overflow-y:auto; -webkit-overflow-scrolling:touch;
+    }
+    #print-bar {
+      position:sticky; top:0; z-index:2;
+      background:#14532d; color:#fff;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:calc(10px + env(safe-area-inset-top)) 12px 10px;
+    }
+    #print-bar button {
+      border:none; border-radius:8px; cursor:pointer;
+      font-size:12px; font-weight:700; padding:7px 12px;
+      background:rgba(255,255,255,.18); color:#fff;
+    }
+    #print-bar button:last-child { background:#86efac; color:#14532d; }
+    #print-content {
+      padding:18px 16px calc(28px + env(safe-area-inset-bottom));
+      max-width:720px; margin:0 auto;
+    }
+    @media print {
+      /* only the report prints — no app chrome, no toolbar */
+      body > *:not(#print-overlay) { display:none !important; }
+      #print-overlay { position:static; overflow:visible; }
+      #print-bar { display:none !important; }
+      #print-content { padding:0; max-width:none; }
+      div { page-break-inside:avoid; }
+    }
+
     /* Modal */
     #modal-wrap { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; display:flex; align-items:flex-end; }
     #modal-box {
@@ -769,6 +799,16 @@
   <div id="insights-content" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
 </div>
 
+<!-- ── PRINT / PDF VIEW (in-app, so there is always a way back) ── -->
+<div id="print-overlay" style="display:none">
+  <div id="print-bar">
+    <button onclick="closePrintView()">← Back</button>
+    <span style="font-size:13px;font-weight:700">Insights</span>
+    <button onclick="window.print()">Save as PDF</button>
+  </div>
+  <div id="print-content"></div>
+</div>
+
 <!-- ── TOASTS ── -->
 <div id="toast-wrap"></div>
 
@@ -834,11 +874,16 @@ const SG_BASELINES = {
   // One shape (the 20-handicap profile, which carries the extra long-range
   // 3-putts) scaled per handicap — monotonic by construction, where scaling
   // each curve independently reordered them.
-  h0:  { label:'0 handicap',  table:[[1,1.008],[3,1.079],[9,1.591],[15,1.806],[21,1.916],[27,1.984],[40,2.081],[60,2.182],[100,2.333]] },
-  h5:  { label:'5 handicap',  table:[[1,1.014],[3,1.104],[9,1.607],[15,1.825],[21,1.938],[27,2.012],[40,2.124],[60,2.231],[100,2.376]] },
-  h10: { label:'10 handicap', table:[[1,1.021],[3,1.130],[9,1.623],[15,1.843],[21,1.960],[27,2.041],[40,2.168],[60,2.281],[100,2.420]] },
-  h15: { label:'15 handicap', table:[[1,1.026],[3,1.149],[9,1.635],[15,1.857],[21,1.977],[27,2.063],[40,2.201],[60,2.318],[100,2.452]] },
-  h20: { label:'20 handicap', table:[[1,1.031],[3,1.169],[9,1.647],[15,1.871],[21,1.993],[27,2.084],[40,2.234],[60,2.355],[100,2.485]] },
+  // Defined on the SAME distance grid as the Tour curve. With sparse anchors
+  // (1,3,9,15,...) a straight line between 3 and 9 undershot the steep Tour
+  // curve through 4-8ft, and the Tour floor below then clamped the amateur
+  // curves flat onto Tour — scratch was clamped at a third of all distances,
+  // wiping out the difference between benchmarks exactly where most putts are.
+  h0:  { label:'0 handicap',  table:[[1,1.008],[2,1.029],[3,1.079],[4,1.169],[5,1.272],[6,1.368],[7,1.453],[8,1.526],[9,1.591],[10,1.639],[12,1.718],[15,1.806],[20,1.903],[25,1.965],[30,2.008],[35,2.046],[40,2.081],[50,2.133],[60,2.182],[75,2.239],[100,2.333]] },
+  h5:  { label:'5 handicap',  table:[[1,1.014],[2,1.050],[3,1.104],[4,1.192],[5,1.288],[6,1.379],[7,1.462],[8,1.538],[9,1.607],[10,1.652],[12,1.729],[15,1.825],[20,1.923],[25,1.990],[30,2.040],[35,2.083],[40,2.124],[50,2.179],[60,2.231],[75,2.286],[100,2.377]] },
+  h10: { label:'10 handicap', table:[[1,1.021],[2,1.070],[3,1.130],[4,1.214],[5,1.304],[6,1.390],[7,1.472],[8,1.549],[9,1.623],[10,1.665],[12,1.741],[15,1.843],[20,1.943],[25,2.016],[30,2.071],[35,2.120],[40,2.168],[50,2.225],[60,2.281],[75,2.333],[100,2.420]] },
+  h15: { label:'15 handicap', table:[[1,1.026],[2,1.085],[3,1.149],[4,1.231],[5,1.315],[6,1.398],[7,1.479],[8,1.558],[9,1.635],[10,1.674],[12,1.750],[15,1.857],[20,1.958],[25,2.035],[30,2.095],[35,2.148],[40,2.201],[50,2.260],[60,2.318],[75,2.368],[100,2.452]] },
+  h20: { label:'20 handicap', table:[[1,1.031],[2,1.100],[3,1.169],[4,1.248],[5,1.327],[6,1.407],[7,1.486],[8,1.566],[9,1.647],[10,1.684],[12,1.758],[15,1.871],[20,1.973],[25,2.054],[30,2.119],[35,2.176],[40,2.234],[50,2.294],[60,2.355],[75,2.404],[100,2.485]] },
 };
 const SG_BASE_KEYS = ['tour','h0','h5','h10','h15','h20'];
 let SG_BASE = SG_BASELINES[localStorage.getItem('putt_sgbase')] ? localStorage.getItem('putt_sgbase') : 'tour';
@@ -2268,23 +2313,31 @@ function renderDashboard() {
 
   // One stacked bar per condition — short / pin-high / long read together,
   // which is what shows whether pace failure is universal or situational.
-  const paceStack = (label, o) => (!o.n || o.n < 3) ? '' : `
-    <div style="margin-bottom:8px">
+  const paceStack = (label, o) => {
+    if (!o.n || o.n < 3) return '';
+    // Empty segments are dropped so a 0% slice cannot leave a stray divider
+    const segs = [
+      { p:o.shortPct, c:'#2563eb', t:'short' },
+      { p:o.pinPct,   c:'#166534', t:'pin'   },
+      { p:o.longPct,  c:'#ea580c', t:'long'  },
+    ].filter(x => x.p > 0);
+    // The word only fits on a wide enough slice; narrow ones keep just the %
+    const text = x => x.p >= 20 ? `${x.p}% ${x.t}` : `${x.p}%`;
+    return `
+    <div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;margin-bottom:3px">
         <span style="font-weight:700;color:#374151">${label}</span>
         <span style="font-size:9.5px;color:#cbd5e1">${o.n} miss${o.n!==1?'es':''}</span>
       </div>
-      <div style="display:flex;height:11px;border-radius:6px;overflow:hidden;background:#f3f4f6">
-        <div style="width:${o.shortPct}%;background:#2563eb"></div>
-        <div style="width:${o.pinPct}%;background:#166534"></div>
-        <div style="width:${o.longPct}%;background:#ea580c"></div>
+      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f3f4f6">
+        ${segs.map((x,i) => `<div style="width:${x.p}%;background:${x.c};box-sizing:border-box${
+          i < segs.length-1 ? ';border-right:1.5px solid #fff' : ''}"></div>`).join('')}
       </div>
-      <div style="display:flex;gap:9px;font-size:9.5px;margin-top:3px">
-        <span style="color:#2563eb;font-weight:600">${o.shortPct}% short</span>
-        <span style="color:#166534;font-weight:600">${o.pinPct}% pin</span>
-        <span style="color:#ea580c;font-weight:600">${o.longPct}% long</span>
+      <div style="display:flex;font-size:9px;font-weight:700;margin-top:3px">
+        ${segs.map(x => `<div style="width:${x.p}%;color:${x.c};text-align:center;white-space:nowrap;overflow:hidden">${text(x)}</div>`).join('')}
       </div>
     </div>`;
+  };
 
   const group = (title, rows) => {
     const body = rows.join('');
@@ -3463,32 +3516,33 @@ function renderInsights() {
   if (enoughRounds) drawTrendChart(TREND_TAB);
 }
 
+// Renders the printable view as a full-screen overlay INSIDE the app.
+// It used to window.open() a blank tab — but in a standalone PWA there is no
+// browser chrome, so that new window had no back button and the only way out
+// was to force-quit the app.
 function printInsights() {
   const content = document.getElementById('insights-content').innerHTML;
   if (!content.trim()) { alert('No insights to print yet.'); return; }
   const filterLabel = INSIGHT_FILTER === 'all' ? 'All Rounds' : `Last ${INSIGHT_FILTER} Rounds`;
-  const w = window.open('', '_blank');
-  w.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Putting Insights — ${filterLabel}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1f2937; padding: 24px 20px; max-width: 680px; margin: 0 auto; }
-    h1 { font-size: 22px; font-weight: 800; color: #14532d; margin-bottom: 4px; }
-    .sub { font-size: 12px; color: #9ca3af; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; }
-    @media print { .no-print { display: none; } div { page-break-inside: avoid; } }
-  </style>
-</head>
-<body>
-  <h1>&#9971; Putting Insights</h1>
-  <div class="sub">${filterLabel} &middot; Generated ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}</div>
-  ${content}
-  <script>setTimeout(function(){ window.print(); }, 400);<\/script>
-</body>
-</html>`);
-  w.document.close();
+  const when = new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  document.getElementById('print-content').innerHTML = `
+    <h1 style="font-size:21px;font-weight:800;color:#14532d;margin:0 0 4px">&#9971; Putting Insights</h1>
+    <div style="font-size:12px;color:#9ca3af;margin-bottom:18px;border-bottom:1px solid #e5e7eb;padding-bottom:12px">
+      ${filterLabel} &middot; vs ${sgBaseLabel()} &middot; ${when}
+    </div>
+    ${content}`;
+
+  const ov = document.getElementById('print-overlay');
+  ov.style.display = 'block';
+  ov.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+}
+
+function closePrintView() {
+  document.getElementById('print-overlay').style.display = 'none';
+  document.getElementById('print-content').innerHTML = '';
+  document.body.style.overflow = '';
 }
 
 // ═══════════════════════════════════════
