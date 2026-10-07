@@ -4302,7 +4302,7 @@ function backupData() {
   if (!rounds.length) { alert('No rounds to backup yet.'); return; }
   markBackedUp(rounds.length);
   renderBackupBanner();
-  const payload = { version: 'putttrack_v4', exportDate: new Date().toISOString(), rounds };
+  const payload = { version: STORAGE_KEY, exportDate: new Date().toISOString(), rounds };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -4343,6 +4343,25 @@ function restoreData(e) {
         if (!ok) return;
       }
 
+      // A Putting Tracker (v2) backup has no scores in it. Replacing the
+      // store with one would wipe any scoring rounds already logged here,
+      // and the holes would arrive un-normalised — a missing `par` reads as
+      // par 4 all the way down. Merge those instead.
+      if (isV2Backup(parsed, rounds)) {
+        const pending = countNew(rounds);
+        if (!pending) { alert('Those rounds are already here.'); return; }
+        if (!confirm(
+          `This is a Putting Tracker backup (${rounds.length} round(s), ${pending} not yet here).\n\n` +
+          `They will be ADDED to your rounds, not replace them. Putting data comes ` +
+          `across in full; they have no score or fairway, so they stay out of the ` +
+          `scoring stats.\n\nImport?`)) return;
+        const added = mergeRounds(rounds.map(normalizeV2Round));
+        renderHistory(); renderDashboard();
+        alert(`✅ ${added} round(s) imported.`);
+        e.target.value = '';
+        return;
+      }
+
       if (!confirm(`Restore ${rounds.length} round(s)?\n\nThis will replace all current data.`)) return;
       saveRounds(rounds);
       renderHistory();
@@ -4366,30 +4385,59 @@ function v2RoundCount() {
   try { const r = JSON.parse(localStorage.getItem(V2_KEY)); return Array.isArray(r) ? r.length : 0; }
   catch { return 0; }
 }
+
+// Rounds are identified by date + course, both here and in the History list.
+const roundKey = r => r.date + '|' + (r.course || '');
+function countNew(incoming) {
+  const have = new Set(loadRounds().map(roundKey));
+  return incoming.filter(r => !have.has(roundKey(r))).length;
+}
+
+// Add what isn't here already, newest first. A round that is already present
+// is skipped rather than overwritten — the copy in this app may have been
+// edited since the backup was taken. Returns how many were added.
+function mergeRounds(incoming) {
+  const mine = loadRounds();
+  const have = new Set(mine.map(roundKey));
+  const add  = incoming.filter(r => !have.has(roundKey(r)));
+  if (add.length) saveRounds([...add, ...mine].sort((a,b) => b.date.localeCompare(a.date)));
+  return add.length;
+}
+
+// A v2 round carries putting data only. Stamping par/score/fairway/penalty
+// as null is what keeps it out of the scoring stats — leaving `par` absent
+// would make every hole read as a par 4.
+function normalizeV2Round(r) {
+  return {
+    ...r,
+    id: 'v2-' + (r.id != null ? r.id : r.date + '-' + Math.random().toString(36).slice(2, 8)),
+    importedFrom: 'v2',
+    pars: null,
+    holes: (r.holes || []).map(h => ({
+      ...h, par: null, score: null, fairway: null, penalty: null,
+    })),
+  };
+}
+
+// v3's own exports name the store in `version`; a v2 file says 'putttrack_v4'
+// or nothing. Fall back to the data itself — no scores anywhere means v2.
+function isV2Backup(parsed, rounds) {
+  if (parsed && parsed.version === STORAGE_KEY) return false;
+  return !rounds.some(r => (r.holes || []).some(h => h.score != null));
+}
+
 function importFromV2() {
   let src = [];
   try { src = JSON.parse(localStorage.getItem(V2_KEY)) || []; } catch { src = []; }
   if (!src.length) { alert('No Putting Tracker rounds found to import.'); return; }
-  const mine = loadRounds();
-  const have = new Set(mine.map(r => r.date + '|' + (r.course||'')));
-  const add = src
-    .filter(r => !have.has(r.date + '|' + (r.course||'')))
-    .map(r => ({
-      ...r,
-      id: 'v2-' + r.id,
-      importedFrom: 'v2',
-      pars: null,                       // unknown — scoring stats skip these
-      holes: (r.holes||[]).map(h => ({
-        ...h, par: null, score: null, fairway: null, penalty: null,
-      })),
-    }));
-  if (!add.length) { alert('Those rounds are already here.'); return; }
-  if (!confirm(`Import ${add.length} round${add.length!==1?'s':''} from Putting Tracker?\n\n` +
+  const pending = countNew(src);
+  if (!pending) { alert('Those rounds are already here.'); return; }
+  if (!confirm(`Import ${pending} round${pending!==1?'s':''} from Putting Tracker?\n\n` +
                `Putting data comes across in full. They have no score or fairway, so they ` +
                `will not appear in the scoring stats — only in putting.`)) return;
-  saveRounds([...add, ...mine].sort((a,b) => b.date.localeCompare(a.date)));
+  const added = mergeRounds(src.map(normalizeV2Round));
   renderHistory(); renderDashboard();
-  showToast('📥', `${add.length} rounds imported from Putting Tracker.`, 'good', { ms: 5000 });
+  showToast('📥', `${added} rounds imported from Putting Tracker.`, 'good', { ms: 5000 });
 }
 
 function renderHistory() {
