@@ -1,0 +1,12 @@
+{
+  "name": "Scratch!",
+  "short_name": "Scratch!",
+  "description": "Full-round golf tracking with strokes gained",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0fdfa",
+  "theme_color": "#134e4a",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
