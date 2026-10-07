@@ -3850,6 +3850,97 @@ function drawTrendChart(tab) {
   });
 }
 
+
+// ═══════════════════════════════════════
+//  WHAT IMPROVEMENT IS WORTH
+// ═══════════════════════════════════════
+// Measured per EVENT, not in aggregate. "Frequency x cost" was tried first and
+// is misleading: missing 11 greens a round at 0.83 each reads as 9 shots lost,
+// but that is the cost of missing every green versus hitting all 18, which no
+// one does. Asking instead what ONE unit of improvement is worth gives a figure
+// that is both honest and reachable, and lets categories be compared directly.
+function shotsLostBreakdown(rounds) {
+  const holes = rounds.flatMap(r => r.holes || []).filter(h => h.score != null && h.par);
+  if (holes.length < 27) return null;          // under ~1.5 rounds says nothing
+  const n = holes.length;
+  const avgTP = p => p.length ? p.reduce((a,h) => a + (h.score - h.par), 0) / p.length : null;
+  const out = [];
+
+  const add = (key, label, unit, bad, good, costOverride) => {
+    if (bad.length < 6 || good.length < 6) return;
+    const value = costOverride != null ? costOverride : (avgTP(bad) - avgTP(good));
+    if (!(value > 0)) return;
+    out.push({ key, label, unit, value: +value.toFixed(2),
+               perRound: +((bad.length / n) * 18).toFixed(1), n: bad.length });
+  };
+
+  add('gir', 'Hit one more green',   'missed greens',
+      holes.filter(h => h.gir === 'no'), holes.filter(h => h.gir === 'yes'));
+  const fwPool = holes.filter(h => fairwayApplies(h) && h.fairway);
+  add('fw',  'Hit one more fairway', 'missed fairways',
+      fwPool.filter(h => h.fairway !== 'hit'), fwPool.filter(h => h.fairway === 'hit'));
+  add('pen', 'Avoid one penalty',    'penalties',
+      holes.filter(h => h.penalty), holes.filter(h => !h.penalty));
+  // A three-putt's cost is not open to interpretation: it is one extra stroke.
+  add('tp',  'Avoid one three-putt', 'three-putts',
+      holes.filter(h => parseInt(h.numPutts) >= 3),
+      holes.filter(h => h.numPutts && parseInt(h.numPutts) < 3), 1);
+
+  const FIX = {
+    gir: 'Approach play moves handicaps more than anything else. Aim at the middle of the green rather than the flag, and take one more club than feels right — most amateurs miss short.',
+    fw:  'A fairway finder costs a little distance and saves far more. Try a 3-wood or long iron on the holes where you lose it most.',
+    pen: 'The cheapest shots to save, because they need no new skill — only club choice. Take the safe line whenever water or out of bounds is in play.',
+    tp:  'Three-putts are a pace problem far more than a line one. Lag to a 3-foot circle from 30-40ft rather than at the hole.',
+  };
+  out.forEach(o => o.fix = FIX[o.key]);
+  return out.sort((a,b) => b.value - a.value);
+}
+
+function shotsLostHTML(rounds) {
+  const rows = shotsLostBreakdown(rounds);
+  if (!rows || !rows.length) {
+    const scored = rounds.flatMap(r => r.holes || []).filter(h => h.score != null).length;
+    return `<div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;
+      box-shadow:0 1px 3px rgba(0,0,0,.07);text-align:center">
+      <div style="font-size:30px;margin-bottom:7px">📋</div>
+      <p style="font-weight:700;color:#374151;margin:0 0 5px">What improvement is worth</p>
+      <p style="font-size:12.5px;color:#9ca3af;line-height:1.5;margin:0">
+        ${scored ? `${scored} scored holes so far — needs about two full rounds.`
+                 : 'Log a round in Scratch! and this will rank where your shots are going.'}</p></div>`;
+  }
+  const max = rows[0].value;
+  const COL = { gir:'#dc2626', fw:'#2563eb', pen:'#b45309', tp:'#7c3aed' };
+  return `
+  <div style="background:#fff;border-radius:16px;padding:15px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">What improvement is worth</div>
+    <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:12px">
+      Shots saved per single improvement, measured on your own rounds. Ranked by
+      what one change is worth, with how many chances you get each round.
+    </div>
+    ${rows.map(r => `
+      <div style="margin-bottom:11px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:800;color:#1f2937">${r.label}</span>
+          <span style="font-size:14px;font-weight:800;color:${COL[r.key]}">−${r.value} <span style="font-size:10px;font-weight:600;color:#94a3b8">shots</span></span>
+        </div>
+        <div style="height:9px;background:#f3f4f6;border-radius:5px;overflow:hidden">
+          <div style="height:100%;width:${Math.round(r.value/max*100)}%;background:${COL[r.key]};border-radius:5px"></div>
+        </div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:3px">
+          ${r.perRound} ${r.unit} a round, so there is room
+        </div>
+      </div>`).join('')}
+    <div style="font-size:11px;color:#64748b;line-height:1.55;border-top:1px solid #f3f4f6;padding-top:10px;margin-top:3px">
+      <b style="color:#1f2937">💡 ${rows[0].label} — worth ${rows[0].value} shots.</b> ${rows[0].fix}
+    </div>
+    <div style="font-size:9.5px;color:#cbd5e1;line-height:1.5;margin-top:8px;font-style:italic">
+      Per-event figures, so they do not add up to your score. A category can be worth
+      a lot per event but be rare, or little per event but happen often — the second
+      line shows which.
+    </div>
+  </div>`;
+}
+
 function renderInsights() {
   const container = document.getElementById('insights-content');
 
@@ -4032,7 +4123,7 @@ function renderInsights() {
 
   // ── Focus area cards ──────────────────────────────────────────────────────
   const focusHTML = focusAreas.length ? `
-  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:10px">Focus areas — ranked by impact</div>
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:10px">Putting focus areas — ranked by impact</div>
   ${focusAreas.map((fa, i) => {
     const st = badge(fa);
     const n  = fa.pool.filter(fa.testFn).length;
@@ -4115,7 +4206,7 @@ function renderInsights() {
   </div>`;
 
   container.innerHTML = `<div style="padding:14px;padding-bottom:calc(20px + env(safe-area-inset-bottom))">
-    ${summaryHTML}${focusHTML}${trendsHTML}
+    ${summaryHTML}${shotsLostHTML(rounds)}${focusHTML}${trendsHTML}
     <div style="font-size:11px;color:#9ca3af;text-align:center;line-height:1.6;margin-top:14px">
       Conditions with fewer than 15 putts excluded from focus areas.<br>Trend cells require 5+ putts.
     </div>
