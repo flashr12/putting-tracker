@@ -608,91 +608,100 @@
     </div>
     <div id="backup-banner" style="display:none"></div>
     <div id="db-content" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px">
-        <span style="font-size:11px;color:#9ca3af">What do these mean?</span>
-        <span id="kpi-info-dot"></span>
+
+      <!-- dashboard sub-tabs -->
+      <div class="stab-row" style="margin-bottom:12px">
+        <button class="stab on" onclick="setDashTab(this,'trends')">Trends</button>
+        <button class="stab"    onclick="setDashTab(this,'scoring')">Scoring</button>
+        <button class="stab"    onclick="setDashTab(this,'bypar')">By Par</button>
+        <button class="stab"    onclick="setDashTab(this,'putting')">Putting</button>
       </div>
-      <div id="kpi-info"></div>
-      <!-- KPIs -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-        <div class="kpi" style="text-align:center">
-          <div class="kpi-v" id="kpi-ppr" style="color:#0f766e">—</div>
-          <div class="kpi-l">Putts / 18 Holes</div>
+
+      <!-- ══ TRENDS ══ -->
+      <div id="dtab-trends">
+        <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+          <div class="stab-row" style="margin-bottom:10px">
+            <button class="stab on" onclick="setTrendMetric(this,'score')">Scoring</button>
+            <button class="stab"    onclick="setTrendMetric(this,'gir')">GIR</button>
+            <button class="stab"    onclick="setTrendMetric(this,'fw')">Fairways</button>
+            <button class="stab"    onclick="setTrendMetric(this,'putts')">Putts</button>
+            <button class="stab"    onclick="setTrendMetric(this,'sg')">SG Putt</button>
+            <button class="stab"    onclick="setTrendMetric(this,'dbl')">Doubles</button>
+          </div>
+          <div id="dtrend-cap" style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:8px"></div>
+          <div style="height:190px"><canvas id="chart-dtrend"></canvas></div>
+          <div id="dtrend-note" style="font-size:10px;color:#cbd5e1;text-align:center;margin-top:8px"></div>
         </div>
-        <div class="kpi" style="text-align:center">
-          <div class="kpi-v" id="kpi-3p" style="color:#f59e0b">—</div>
-          <div class="kpi-l">3-Putt %</div>
-        </div>
-        <div class="kpi" style="text-align:center">
-          <div class="kpi-v" id="kpi-gir" style="color:#3b82f6">—</div>
-          <div class="kpi-l">Putts/GIR</div>
-        </div>
+        <div id="dtrend-summary"></div>
       </div>
-      <!-- v2: strokes gained + feet holed -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-        <div class="kpi" style="text-align:center">
-          <div class="kpi-v" id="kpi-sgp" style="font-size:22px">—</div>
-          <div class="kpi-l">SG Putting / 18</div>
-          <div style="font-size:9px;color:#9ca3af;margin-top:1px" id="kpi-sgp-base">—</div>
+
+      <!-- ══ SCORING ══ -->
+      <div id="dtab-scoring" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px">
+          <span style="font-size:11px;color:#9ca3af">What do these mean?</span>
+          <span id="kpi-info-dot"></span>
         </div>
-        <div class="kpi" style="text-align:center">
-          <div class="kpi-v" id="kpi-feet" style="color:#0d9488;font-size:22px">—</div>
-          <div class="kpi-l">Feet Made / 18</div>
-        </div>
-        <div class="kpi" style="text-align:center">
-          <div class="kpi-v" id="kpi-longest" style="color:#7c3010;font-size:22px">—</div>
-          <div class="kpi-l">Longest Made</div>
-        </div>
+        <div id="kpi-info"></div>
+        <div id="scoring-kpis"></div>
+        <div id="scoring-empty" style="display:none"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-        <div class="kpi">
-          <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-avg">—</div>
-          <div class="kpi-l">Avg Putts / Hole</div>
+
+      <!-- ══ BY PAR ══ -->
+      <div id="dtab-bypar" style="display:none">
+        <div id="bypar-body"></div>
+      </div>
+
+      <!-- ══ PUTTING ══ -->
+      <div id="dtab-putting" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+          <div class="kpi"><div class="kpi-v" id="kpi-ppr" style="color:#0f766e">—</div><div class="kpi-l">Putts / 18 Holes</div></div>
+          <div class="kpi"><div class="kpi-v" id="kpi-3p" style="color:#f59e0b">—</div><div class="kpi-l">3-Putt %</div></div>
+          <div class="kpi"><div class="kpi-v" id="kpi-gir" style="color:#3b82f6">—</div><div class="kpi-l">Putts/GIR</div></div>
         </div>
-        <div class="kpi">
-          <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-avgdist">—</div>
-          <div class="kpi-l">Avg 1st Putt</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+          <div class="kpi">
+            <div class="kpi-v" id="kpi-sgp" style="font-size:22px">—</div>
+            <div class="kpi-l">SG Putting / 18</div>
+            <div style="font-size:9px;color:#9ca3af;margin-top:1px" id="kpi-sgp-base">—</div>
+          </div>
+          <div class="kpi"><div class="kpi-v" id="kpi-feet" style="color:#0d9488;font-size:22px">—</div><div class="kpi-l">Feet Made / 18</div></div>
+          <div class="kpi"><div class="kpi-v" id="kpi-longest" style="color:#9a3412;font-size:22px">—</div><div class="kpi-l">Longest Made</div></div>
         </div>
-        <div class="kpi">
-          <div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-rounds">—</div>
-          <div class="kpi-l">Rounds / Holes</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+          <div class="kpi"><div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-avg">—</div><div class="kpi-l">Avg Putts / Hole</div></div>
+          <div class="kpi"><div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-avgdist">—</div><div class="kpi-l">Avg 1st Putt</div></div>
+          <div class="kpi"><div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-rounds">—</div><div class="kpi-l">Rounds / Holes</div></div>
+        </div>
+
+        <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+          <div class="stab-row" style="padding:10px 12px;border-bottom:1px solid #f3f4f6">
+            <button class="stab on" onclick="setStab(this,'dist')">Distance</button>
+            <button class="stab"    onclick="setStab(this,'slope')">Slope</button>
+            <button class="stab"    onclick="setStab(this,'dir')">Direction</button>
+            <button class="stab"    onclick="setStab(this,'miss')">Miss</button>
+            <button class="stab"    onclick="setStab(this,'var')">Variance</button>
+          </div>
+          <div style="padding:12px">
+            <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:4px">
+              <span style="font-size:11px;color:#9ca3af">About this breakdown</span>
+              <span id="brk-info-dot"></span>
+            </div>
+            <div id="brk-info"></div>
+            <div id="stab-dist">
+              <div style="height:170px"><canvas id="chart-dist"></canvas></div>
+              <div id="tbl-dist" style="margin-top:8px"></div>
+            </div>
+            <div id="stab-slope"  style="display:none"></div>
+            <div id="stab-dir"    style="display:none"></div>
+            <div id="stab-miss"   style="display:none"></div>
+            <div id="stab-var"    style="display:none">
+              <div style="height:150px"><canvas id="chart-var"></canvas></div>
+              <div id="tbl-var"  style="margin-top:8px"></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Breakdown card -->
-      <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
-        <div class="stab-row" style="padding:10px 12px;border-bottom:1px solid #f3f4f6">
-          <button class="stab on" onclick="setStab(this,'dist')">Distance</button>
-          <button class="stab"    onclick="setStab(this,'slope')">Slope</button>
-          <button class="stab"    onclick="setStab(this,'dir')">Direction</button>
-          <button class="stab"    onclick="setStab(this,'miss')">Miss</button>
-          <button class="stab"    onclick="setStab(this,'var')">Variance</button>
-        </div>
-        <div style="padding:12px">
-          <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:4px">
-            <span style="font-size:11px;color:#9ca3af">About this breakdown</span>
-            <span id="brk-info-dot"></span>
-          </div>
-          <div id="brk-info"></div>
-          <div id="stab-dist">
-            <div style="height:170px"><canvas id="chart-dist"></canvas></div>
-            <div id="tbl-dist" style="margin-top:8px"></div>
-          </div>
-          <div id="stab-slope"  style="display:none"></div>
-          <div id="stab-dir"    style="display:none"></div>
-          <div id="stab-miss"   style="display:none"></div>
-          <div id="stab-var"    style="display:none">
-            <div style="height:150px"><canvas id="chart-var"></canvas></div>
-            <div id="tbl-var"  style="margin-top:8px"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Trend -->
-      <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:8px">Putts / 18 Holes — Trend</div>
-        <div style="height:140px"><canvas id="chart-trend"></canvas></div>
-      </div>
     </div>
   </div>
 
@@ -2503,6 +2512,267 @@ function renderBackupBanner() {
     </div>`;
 }
 
+
+// ═══════════════════════════════════════
+//  DASHBOARD TABS + TRENDS
+// ═══════════════════════════════════════
+let DASH_TAB = 'trends', TREND_METRIC = 'score';
+let dashTrendChart = null;
+
+function setDashTab(btn, name) {
+  DASH_TAB = name;
+  const row = btn.parentElement;
+  [...row.children].forEach(b => b.classList.toggle('on', b === btn));
+  ['trends','scoring','bypar','putting'].forEach(t => {
+    const el = document.getElementById('dtab-' + t);
+    if (el) el.style.display = t === name ? 'block' : 'none';
+  });
+  // a canvas inside a hidden box lays out at zero, so draw on reveal
+  if (name === 'trends') drawDashTrend();
+}
+
+function setTrendMetric(btn, m) {
+  TREND_METRIC = m;
+  [...btn.parentElement.children].forEach(b => b.classList.toggle('on', b === btn));
+  drawDashTrend();
+}
+
+// Per-round series, oldest first. Each entry is null when that round cannot
+// support the metric (e.g. an imported putting-only round has no score).
+function roundSeries() {
+  const rounds = [...loadRounds()].sort((a,b) => a.date.localeCompare(b.date));
+  const per18 = (v, n) => n ? +((v / n) * 18).toFixed(2) : null;
+  return {
+    labels: rounds.map(r => {
+      const d = new Date(r.date + 'T12:00:00');
+      return `${d.getDate()} ${MON_SHORT[d.getMonth()]}`;
+    }),
+    rounds,
+    score: rounds.map(r => { const h = r.holes.filter(x => x.score != null && x.par);
+      return h.length >= 5 ? per18(h.reduce((a,x) => a + (x.score - x.par), 0), h.length) : null; }),
+    gir:   rounds.map(r => { const h = r.holes.filter(x => x.score != null && x.gir);
+      return h.length >= 5 ? Math.round(h.filter(x => x.gir === 'yes').length / h.length * 100) : null; }),
+    fw:    rounds.map(r => { const h = r.holes.filter(x => x.score != null && fairwayApplies(x) && x.fairway);
+      return h.length >= 5 ? Math.round(h.filter(x => x.fairway === 'hit').length / h.length * 100) : null; }),
+    putts: rounds.map(r => { const h = r.holes.filter(x => x.numPutts);
+      return h.length >= 5 ? per18(h.reduce((a,x) => a + (x.numPutts === '4+' ? 4 : parseInt(x.numPutts)), 0), h.length) : null; }),
+    sg:    rounds.map(r => { const h = r.holes.filter(x => x.distance && x.numPutts);
+      return h.length >= 5 ? per18(h.reduce((a,x) => a + holeSGP(x), 0), h.length) : null; }),
+    dbl:   rounds.map(r => { const h = r.holes.filter(x => x.score != null && x.par);
+      return h.length >= 5 ? Math.round(h.filter(isDoublePlus).length / h.length * 100) : null; }),
+  };
+}
+
+const TREND_SPECS = {
+  score: { lbl:'Score to par / 18', col:'#0f766e', fmt:v => (v>0?'+':'') + v,
+           cap:'Strokes over or under par per 18 holes. Lower is better.' },
+  gir:   { lbl:'GIR %',    col:'#15803d', fmt:v => v + '%', higher:true,
+           cap:'Greens in regulation. The stat most tied to scoring at your level — higher is better.' },
+  fw:    { lbl:'Fairways %', col:'#2563eb', fmt:v => v + '%', higher:true,
+           cap:'Tee shots finding the fairway, on par 4s and 5s. Higher is better.' },
+  putts: { lbl:'Putts / 18', col:'#7c3aed', fmt:v => String(v),
+           cap:'Putts per 18 holes, counting only strokes played on the green. Lower is better.' },
+  sg:    { lbl:'SG Putting / 18', col:'#0d9488', fmt:v => (v>0?'+':'') + v, higher:true,
+           cap:'Strokes gained putting against the benchmark chosen in Insights. Higher is better.' },
+  dbl:   { lbl:'Double+ %', col:'#dc2626', fmt:v => v + '%',
+           cap:'Holes taking two or more over par. Eliminating these is the fastest route down a handicap.' },
+};
+
+function drawDashTrend() {
+  const cv = document.getElementById('chart-dtrend');
+  if (!cv || typeof Chart === 'undefined') return;
+  const S = roundSeries(), spec = TREND_SPECS[TREND_METRIC];
+  const data = S[TREND_METRIC];
+  const have = data.filter(v => v !== null).length;
+
+  document.getElementById('dtrend-cap').textContent = spec.cap;
+  const noteEl = document.getElementById('dtrend-note');
+
+  if (dashTrendChart) { dashTrendChart.destroy(); dashTrendChart = null; }
+  if (have < 2) {
+    cv.style.display = 'none';
+    noteEl.innerHTML = have === 0
+      ? `No rounds with this data yet.${TREND_METRIC!=='putts'&&TREND_METRIC!=='sg' ? ' Scoring stats start from your first round logged in Scratch!' : ''}`
+      : 'Need at least two rounds to show a trend.';
+    renderTrendSummary(S);
+    return;
+  }
+  cv.style.display = '';
+  noteEl.textContent = 'Faint dots are single rounds; the bold line is a 5-round average.';
+
+  dashTrendChart = new Chart(cv.getContext('2d'), {
+    type: 'line',
+    data: { labels: S.labels, datasets: [
+      { label: spec.lbl + ' (round)', data,
+        borderColor: spec.col + '40', backgroundColor: spec.col + '55',
+        borderWidth: 1, pointRadius: 2.8, tension: .25, spanGaps: true },
+      { label: spec.lbl + ' (5-rd avg)', data: rollingMean(data),
+        borderColor: spec.col, backgroundColor: 'transparent',
+        borderWidth: 2.8, pointRadius: 0, tension: .35, spanGaps: true },
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: { legend: { display:false },
+        tooltip: { callbacks: { label: c => `${spec.lbl}: ${spec.fmt(c.parsed.y)}` } } },
+      scales: {
+        y: { ticks:{ font:{size:10}, callback:v => spec.fmt(v) }, grid:{ color:'#f3f4f6' } },
+        x: { ticks:{ font:{size:9}, maxRotation:0, autoSkip:true, maxTicksLimit:6 }, grid:{ display:false } },
+      },
+    },
+  });
+  renderTrendSummary(S);
+}
+
+// last 5 vs everything before, per metric
+function renderTrendSummary(S) {
+  const el = document.getElementById('dtrend-summary');
+  if (!el) return;
+  const rows = Object.keys(TREND_SPECS).map(k => {
+    const vals = S[k].filter(v => v !== null);
+    if (vals.length < 3) return null;
+    const last = vals.slice(-5), prior = vals.slice(0, -5);
+    const avg = a => a.length ? a.reduce((x,y)=>x+y,0) / a.length : null;
+    const l = avg(last), p = avg(prior);
+    const spec = TREND_SPECS[k];
+    let dir = '', col = '#94a3b8';
+    if (p !== null) {
+      const better = spec.higher ? l > p : l < p;
+      const worse  = spec.higher ? l < p : l > p;
+      if (Math.abs(l - p) >= 0.05) { dir = better ? '▲' : worse ? '▼' : '';
+        col = better ? '#16a34a' : worse ? '#dc2626' : '#94a3b8'; }
+    }
+    return `<tr style="border-top:1px solid #f3f4f6">
+      <td style="padding:7px 4px;font-size:11.5px;font-weight:600;color:#374151">${spec.lbl}</td>
+      <td style="padding:7px 4px;text-align:right;font-size:12px;font-weight:800;color:#1f2937">${spec.fmt(+l.toFixed(2))}</td>
+      <td style="padding:7px 4px;text-align:right;font-size:11px;color:#9ca3af">${p===null?'—':spec.fmt(+p.toFixed(2))}</td>
+      <td style="padding:7px 6px;text-align:right;font-size:12px;font-weight:800;color:${col}">${dir||'·'}</td></tr>`;
+  }).filter(Boolean).join('');
+  el.innerHTML = !rows ? '' : `
+    <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">Last 5 rounds vs before</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:#cbd5e1;font-size:9.5px;text-transform:uppercase">
+          <th style="text-align:left;padding:3px 4px">Metric</th>
+          <th style="text-align:right;padding:3px 4px">Last 5</th>
+          <th style="text-align:right;padding:3px 4px">Before</th>
+          <th style="padding:3px 6px"></th></tr></thead>
+        <tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+
+// ── Scoring + By Par tab bodies ───────────────────────────────────────────
+function renderScoringTab(s, roundsCount) {
+  const el = document.getElementById('scoring-kpis');
+  const sc = s.scoring;
+  if (!el) return;
+  if (!sc) {
+    el.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;text-align:center;
+      box-shadow:0 1px 3px rgba(0,0,0,.07)">
+      <div style="font-size:34px;margin-bottom:8px">📋</div>
+      <p style="font-weight:700;color:#374151;margin:0 0 6px">No scored rounds yet</p>
+      <p style="font-size:12.5px;color:#9ca3af;line-height:1.5;margin:0">
+        Scoring stats start from your first round logged in Scratch!.
+        Rounds imported from Putting Tracker have putting data only.</p></div>`;
+    document.getElementById('bypar-body').innerHTML = el.innerHTML;
+    return;
+  }
+  const tp  = sc.per18;
+  const tpT = (tp > 0 ? '+' : '') + tp;
+  const card = (v, l, col, sub) => `<div class="kpi">
+      <div class="kpi-v" style="color:${col};font-size:22px">${v}</div>
+      <div class="kpi-l">${l}</div>
+      ${sub ? `<div style="font-size:9px;color:#9ca3af;margin-top:1px">${sub}</div>` : ''}</div>`;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      ${card(tpT, 'Score to par / 18', tp <= 0 ? '#16a34a' : '#0f766e')}
+      ${card(sc.girPct + '%', 'Greens in reg', '#15803d')}
+      ${card(sc.fwPct === null ? '—' : sc.fwPct + '%', 'Fairways', '#2563eb', sc.fwN ? sc.fwN + ' tee shots' : '')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      ${card(sc.scramblePct === null ? '—' : sc.scramblePct + '%', 'Scrambling', '#0d9488',
+             sc.scrambleN ? sc.scrambleN + ' missed greens' : '')}
+      ${card(sc.dblPct + '%', 'Double or worse', '#dc2626')}
+      ${card(sc.birdiePct + '%', 'Birdie or better', '#16a34a')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      ${card(sc.penPerRound, 'Penalties / 18', '#b45309')}
+      ${card(`${roundsCount} / ${sc.n}`, 'Rounds / scored holes', '#1f2937')}
+    </div>
+    ${costOfMissHTML(sc)}`;
+}
+
+// What each kind of miss actually costs, measured on your own rounds.
+function costOfMissHTML(sc) {
+  const holes = loadRounds().flatMap(r => r.holes).filter(h => h.score != null && h.par);
+  if (holes.length < 18) return '';
+  const avg = a => a.length ? +(a.reduce((x,h) => x + (h.score - h.par), 0) / a.length).toFixed(2) : null;
+  const fmt = v => v === null ? '—' : (v > 0 ? '+' : '') + v;
+  const rows = [
+    ['Green hit',    avg(holes.filter(h => h.gir === 'yes'))],
+    ['Green missed', avg(holes.filter(h => h.gir === 'no'))],
+    ['Fairway hit',    avg(holes.filter(h => fairwayApplies(h) && h.fairway === 'hit'))],
+    ['Fairway missed', avg(holes.filter(h => fairwayApplies(h) && h.fairway && h.fairway !== 'hit'))],
+    ['No penalty', avg(holes.filter(h => !h.penalty))],
+    ['Penalty',    avg(holes.filter(h => h.penalty))],
+  ];
+  const gap = (a,b) => (rows[a][1] !== null && rows[b][1] !== null)
+      ? ` <span style="color:#dc2626;font-weight:800">${(rows[b][1]-rows[a][1]).toFixed(2)} shots</span>` : '';
+  return `
+  <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">What a miss costs</div>
+    <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:9px">
+      Your average score to par in each case — measured on your own rounds, not a model.
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      ${rows.map(([l,v],i) => `<tr${i%2?'':' style="border-top:1px solid #f3f4f6"'}>
+        <td style="padding:6px 4px;color:#374151;font-weight:${i%2?'700':'600'}">${l}</td>
+        <td style="padding:6px 4px;text-align:right;font-weight:800;color:${v===null?'#cbd5e1':v>0.5?'#dc2626':v>0.2?'#b45309':'#16a34a'}">${fmt(v)}</td>
+      </tr>`).join('')}
+    </table>
+    <div style="font-size:11px;color:#64748b;line-height:1.6;margin-top:9px;border-top:1px solid #f3f4f6;padding-top:9px">
+      Missing a green costs${gap(0,1)}.
+      Missing a fairway costs${gap(2,3)}.
+      A penalty costs${gap(4,5)}.
+    </div>
+  </div>`;
+}
+
+function renderByParTab(s) {
+  const el = document.getElementById('bypar-body');
+  const sc = s.scoring;
+  if (!el || !sc) return;
+  const rows = sc.byPar.filter(p => p.n > 0);
+  if (!rows.length) { el.innerHTML = ''; return; }
+  const worst = rows.reduce((a,b) => (b.toPar > a.toPar ? b : a), rows[0]);
+  el.innerHTML = `
+  <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:9px">Scoring by hole type</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:#cbd5e1;font-size:9.5px;text-transform:uppercase">
+        <th style="text-align:left;padding:4px">Hole</th>
+        <th style="text-align:right;padding:4px">Holes</th>
+        <th style="text-align:right;padding:4px">Avg</th>
+        <th style="text-align:right;padding:4px">To par</th>
+        <th style="text-align:right;padding:4px">GIR</th></tr></thead>
+      <tbody>
+        ${rows.map(p => `<tr style="border-top:1px solid #f3f4f6${p===worst?';background:#fef2f2':''}">
+          <td style="padding:8px 4px;font-weight:800;color:#374151">Par ${p.par}</td>
+          <td style="padding:8px 4px;text-align:right;color:#9ca3af">${p.n}</td>
+          <td style="padding:8px 4px;text-align:right;font-weight:700;color:#1f2937">${p.avg}</td>
+          <td style="padding:8px 4px;text-align:right;font-weight:800;color:${p.toPar>0.5?'#dc2626':p.toPar>0.2?'#b45309':'#16a34a'}">${p.toPar>0?'+':''}${p.toPar}</td>
+          <td style="padding:8px 4px;text-align:right;font-weight:700;color:${colorForPct(p.girPct)}">${p.girPct}%</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    ${rows.length > 1 ? `<div style="font-size:11px;color:#64748b;line-height:1.55;margin-top:10px;border-top:1px solid #f3f4f6;padding-top:9px">
+      <b>Par ${worst.par}s are costing you most</b> at ${worst.toPar>0?'+':''}${worst.toPar} a hole${
+        worst.girPct !== null ? `, with ${worst.girPct}% greens hit` : ''}.
+    </div>` : ''}
+  </div>`;
+}
+
 function renderDashboard() {
   renderBackupBanner();
 
@@ -2581,6 +2851,10 @@ function renderDashboard() {
     s.n ? Math.round((s.feetMade / s.n) * 18) + "'" : '—';
   document.getElementById('kpi-longest').textContent = s.longestMade ? s.longestMade + "'" : '—';
   document.getElementById('kpi-avgdist').textContent = s.avgDist ? s.avgDist.toFixed(1) + "'" : '—';
+
+  renderScoringTab(s, rounds.length);
+  renderByParTab(s);
+  if (DASH_TAB === 'trends') drawDashTrend();
 
   // Distance chart + table
   const ad = s.byDist.filter(d=>d.n>0);
@@ -2775,23 +3049,7 @@ function renderDashboard() {
       pin-high rather than only short vs long.
     </div>`;
 
-  // Trend
-  if (charts.trend) charts.trend.destroy();
-  // normalise each round to 18 holes so 9-hole rounds do not dip the line
-  const td = rounds.slice().reverse().map(r => ({
-    l: r.course || (r.date.slice(5)),
-    v: r.holes.length ? +((r.holes.reduce((s,h)=>s+parseInt(h.numPutts),0)/r.holes.length)*18).toFixed(1) : null
-  }));
-  charts.trend = new Chart(document.getElementById('chart-trend').getContext('2d'),{
-    type:'line',
-    data:{labels:td.map(t=>t.l),
-      datasets:[{data:td.map(t=>t.v),borderColor:'#0f766e',backgroundColor:'rgba(15,118,110,.12)',
-        tension:.3,fill:true,pointBackgroundColor:'#0f766e',pointRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
-              x:{ticks:{font:{size:10},maxRotation:30},grid:{display:false}}}}
-  });
+  // (the old single putts chart is replaced by the Trends tab above)
 }
 
 // ═══════════════════════════════════════
