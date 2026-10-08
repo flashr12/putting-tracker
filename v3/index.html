@@ -14,9 +14,11 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html { height: 100%; }
+    html { height: 100%; height: 100dvh; }
     body {
-      height: 100%; margin: 0;
+      height: 100%;          /* fallback for anything without dvh */
+      height: 100dvh;        /* follows the viewport as browser chrome moves */
+      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #fff;
       display: flex; flex-direction: column;
@@ -64,7 +66,7 @@
       padding: 0 14px; gap: 8px;
     }
     #hole-pills-strip {
-      flex-shrink: 0; height: 40px;
+      flex-shrink: 0; height: 36px;
       background: #fff; border-bottom: 1px solid #f3f4f6;
       overflow-x: auto; overflow-y: hidden;
       display: flex; align-items: center;
@@ -101,32 +103,6 @@
     .cur-hole-title { font-size:14px; font-weight:800; color:#1f2937; flex-shrink:0; }
     .cur-hole-sum   { font-size:11px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-    /* ── Hole list, below the form ── */
-    #holes-list { padding-bottom:6px; }
-    .hl-head {
-      font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
-      color:#9ca3af; padding:12px 14px 6px;
-    }
-    .hole-row {
-      border-bottom: 1px solid #eff6ff;
-    }
-    .hole-row.is-cur { background:#f5f8ff; }
-    /* Collapsed summary row */
-    .hole-summary {
-      display: flex; align-items: center; gap: 10px;
-      padding: 9px 14px; background: transparent; cursor: pointer;
-      min-height: 42px;
-    }
-    .hole-summary:active { background: #f9fafb; }
-    .hole-num-badge {
-      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
-      font-size: 11px; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .hole-quick { flex: 1; font-size: 12px; color: #6b7280; }
-    .hole-putt-badge {
-      padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 700;
-    }
     /* Expanded hole form */
     .hole-form-wrap {
       overflow: hidden;
@@ -365,7 +341,7 @@
       background:transparent; border:1px solid #dfe5ed; border-radius:4px;
       padding:3px 0; margin-top:4px;
     }
-    .hd-wrap { position:relative; height:30px; overflow:hidden; }
+    .hd-wrap { position:relative; height:27px; overflow:hidden; }
     .hd-scroller {
       position:relative; z-index:3;
       display:flex; height:100%; align-items:center;
@@ -497,7 +473,7 @@
        ══════════════════════════════════════════════════════════════════ */
 
     /* ── the slate scoring card ── */
-    .scard{background:#1e293b;border-radius:4px;padding:7px 11px;margin-bottom:8px}
+    .scard{background:#1e293b;border-radius:4px;padding:6px 11px;margin-bottom:7px}
     .scard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
     .scard-h{font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;text-transform:uppercase}
     .scard-h.warnd{color:#facc15}
@@ -545,7 +521,7 @@
     .gbtn.warn.on{background:#ea580c;color:#fff}
 
     /* ── section headings: tinted rows, no border, centred ── */
-    .sect-h{text-align:center;margin:2px 0 2px;background:#e4eaf2;border-radius:4px;padding:3px 0;
+    .sect-h{text-align:center;margin:1px 0 2px;background:#e4eaf2;border-radius:4px;padding:2px 0;
             font-size:10px;font-weight:800;letter-spacing:.15em;color:#1d4ed8;text-transform:uppercase}
     .sub-h{font-size:9px;font-weight:800;color:#1d4ed8;letter-spacing:.09em;
            margin:6px 0 4px;text-transform:uppercase;text-align:center;
@@ -564,15 +540,20 @@
     .tile.off{background:transparent;border-color:transparent;color:transparent;
               cursor:default;pointer-events:none}
     .tile.arrow{font-size:15px}
-    .t-h{font-size:8px;font-weight:800;color:#94a3b8;text-align:center;padding:1px 0;
+    .t-h{font-size:8.5px;font-weight:800;color:#475569;text-align:center;padding:1px 0;
          letter-spacing:-.02em}
     .t-rl{font-size:9.5px;font-weight:800;color:#475569;height:23px;
           display:flex;align-items:center;justify-content:center}
     .band{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:3px}
     .band i{grid-column:span 3;text-align:center;font-size:8px;font-weight:800;letter-spacing:.07em;
             color:#fff;padding:3px 0;border-radius:4px;font-style:normal}
-    .missrow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
-    .missb{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:23px;
+    .missrow{display:grid;grid-template-columns:repeat(3,1fr);
+             grid-template-rows:repeat(3,21px);gap:3px;margin-top:3px}
+    .missrow .pad-l{grid-area:1/1;display:flex;align-items:center;
+                    font-size:8.5px;font-weight:800;color:#1d4ed8;letter-spacing:.09em}
+    .missrow .pad-i{grid-area:1/3;display:flex;align-items:center;justify-content:flex-end}
+    .missrow .pad-i .fl-i{position:static;transform:none;border-color:#b9c4d4;color:#64748b}
+    .missb{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:21px;
            display:flex;align-items:center;justify-content:center;
            font-size:9.5px;font-weight:700;color:#475569;cursor:pointer;
            -webkit-tap-highlight-color:transparent}
@@ -1074,7 +1055,16 @@ const NUM_OPTS    = ['1','2','3','4+'];
 // Laid out around the hole rather than grouped by axis: Made sits in the
 // middle and every miss reads outwards from it — short and long either side,
 // left and right at the ends. Order here IS the on-screen order.
-const MISS_OPTS   = [{v:'left',l:'◀ Left'},{v:'short',l:'▼ Short'},{v:'made',l:'✓ Made'},{v:'long',l:'▲ Long'},{v:'right',l:'▶ Right'}];
+// Laid out as a pad around the hole, seen looking down the line: past the
+// hole is beyond you (top), short is nearer you (bottom), the hole itself in
+// the middle. `at` is the grid cell — row / column.
+const MISS_OPTS   = [
+  {v:'left', l:'◀ Left',  at:'2/1'},
+  {v:'short',l:'▼ Short', at:'3/2'},
+  {v:'made', l:'✓ Made',  at:'2/2'},
+  {v:'long', l:'▲ Long',  at:'1/2'},
+  {v:'right',l:'Right ▶', at:'2/3'},
+];
 const GIR_OPTS    = [{v:'yes',l:'✓ Yes'},{v:'no',l:'✗ No'}];
 const STORAGE_KEY = 'scratch_v1';   // v3 has its own store; v1/v2 are untouched
 
@@ -1464,7 +1454,7 @@ function renderPills() {
 // and pushed it further down the screen with every hole played.
 function renderAccordion() {
   const area = document.getElementById('accordion-area');
-  area.innerHTML = buildCurrentHoleHTML(AH) + buildHolesListHTML();
+  area.innerHTML = buildCurrentHoleHTML(AH);
   updateBottomNav();
   initDrums(AH);
   area.scrollTop = 0;   // form always starts at the top of the viewport
@@ -1478,29 +1468,6 @@ function buildCurrentHoleHTML(i) {
   <div id="cur-hole">
     <div class="hole-form-inner" id="hfi-${i}">
       ${buildHoleFormHTML(h, i)}
-    </div>
-  </div>`;
-}
-
-function buildHolesListHTML() {
-  return `<div id="holes-list">
-    <div class="hl-head">All holes — tap to jump</div>
-    ${AR.holes.map((h,i) => buildHoleListRow(h,i)).join('')}
-  </div>`;
-}
-
-function buildHoleListRow(h, i) {
-  const done     = isHoleDone(h);
-  const puttNum  = h.numPutts ? parseInt(h.numPutts) : null;
-  const badgeCls = puttNum===1?'tc-g':puttNum>=3?'tc-r':'tc-y';
-  const txt      = holeSummaryText(h);
-  const isCur    = i === AH;
-  return `
-  <div class="hole-row${isCur?' is-cur':''}" id="hr-${i}" onclick="jumpHole(${i})">
-    <div class="hole-summary">
-      <div class="hole-num-badge ${isCur?'cur':done?'tc-g':'tc-d'}">${h.n}</div>
-      <div class="hole-quick">${txt || '<span style="color:#c7ccd3">tap to enter</span>'}</div>
-      ${done ? `<span class="tc ${badgeCls}" style="min-width:28px;text-align:center">${h.numPutts}</span>` : ''}
     </div>
   </div>`;
 }
@@ -1574,13 +1541,18 @@ function missRowHTML(h, i) {
     const disabled = !missAllowed(h, m.v);
     const sel = !disabled && h.missDirection === m.v;
     return `<div class="missb${sel?' on':''}${disabled?' off':''}" id="gc3-${i}-${m.v}"` +
+           ` style="grid-area:${m.at}"` +
            `${disabled ? '' : ` onclick="onGrid3(${i},'${m.v}')"`}>${m.l}</div>`;
   }).join('');
 }
 
+// Only the five buttons are rebuilt — the label and the info button share
+// the same grid and have to survive.
 function refreshMissRow(i) {
   const row = document.getElementById(`grid3-${i}`);
-  if (row) row.innerHTML = missRowHTML(AR.holes[i], i);
+  if (!row) return;
+  row.querySelectorAll('.missb').forEach(b => b.remove());
+  row.insertAdjacentHTML('beforeend', missRowHTML(AR.holes[i], i));
 }
 
 function buildHoleFormHTML(h, i) {
@@ -1715,24 +1687,20 @@ function buildHoleFormHTML(h, i) {
   // ── Miss side ───────────────────────────────────────────────────────────
   // Five labelled pills; no header row, because the labels are the header.
   const grid3 = `
-  <div style="margin-bottom:4px">
-    ${subHead('Miss Side', `i3-${i}`)}
-    ${flInfo(`i3-${i}`, 'Where the first putt finished. Use Made when you holed it. Only the sides that agree with the pace above are offered — a putt left short cannot also be long, and on a pin-high miss only the line was wrong.')}
-    <div class="missrow" id="grid3-${i}">${missRowHTML(h, i)}</div>
+  <div>
+    <div class="missrow" id="grid3-${i}">
+      <span class="pad-l">MISS SIDE</span>
+      <span class="pad-i"><button class="fl-i" onclick="toggleInfo('i3-${i}')"
+            aria-label="What goes here?">i</button></span>
+      ${missRowHTML(h, i)}
+    </div>
+    ${flInfo(`i3-${i}`, 'Where the first putt finished, laid out as you saw it: long is past the hole, short is nearer you. Use Made when you holed it. Only the sides that agree with the pace above are offered — a putt left short cannot also be long, and on a pin-high miss only the line was wrong.')}
   </div>`;
 
   return scorecard + `<div class="sect-h">Putting</div>` + grid1 + grid2 + grid3;
 }
 
 // Refresh one row in the list below the form (no full re-render)
-function refreshHoleRow(i) {
-  const row = document.getElementById(`hr-${i}`);
-  if (!row) return;
-  const tmp = document.createElement('div');
-  tmp.innerHTML = buildHoleListRow(AR.holes[i], i);
-  row.replaceWith(tmp.firstElementChild);
-}
-
 // Switch which hole the pinned form is showing
 function openHoleForm(i) {
   AH = i;
@@ -2268,10 +2236,11 @@ function holeSummaryText(h) {
   ].filter(Boolean).join(' · ');
 }
 
-// Live-update the header above the form plus this hole's row in the list below
+// Nothing on the hole screen echoes the summary any more — the inputs
+// themselves show their state — but holeSummaryText still feeds the Table
+// view, so this stays as the single hook the handlers call.
 function refreshHoleSummary(i) {
   if (!AR.holes[i]) return;
-  refreshHoleRow(i);   // the list row below is the only place the summary shows
 }
 
 function onHoleDone(i) {
