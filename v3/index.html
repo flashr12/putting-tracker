@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="Scratch!"/>
-  <meta name="theme-color" content="#134e4a"/>
+  <meta name="theme-color" content="#1d4ed8"/>
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon.svg"/>
   <title>Scratch!</title>
@@ -18,7 +18,7 @@
     body {
       height: 100%; margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f0fdfa;
+      background: #fff;
       display: flex; flex-direction: column;
       overflow: hidden; /* body never scrolls */
     }
@@ -26,7 +26,7 @@
     /* ── Fixed chrome pieces ── */
     #app-header {
       flex-shrink: 0;
-      background: #134e4a;
+      background: #1d4ed8;
       color: #fff;
       /* padding-top reserves the notch, then the row centres in what is left */
       padding: env(safe-area-inset-top) 14px 0;
@@ -48,7 +48,7 @@
       font-size: 13px; font-weight: 500; color: #6b7280;
       border-bottom: 2px solid transparent; cursor: pointer;
     }
-    .ntab.on { color: #0f766e; border-bottom-color: #0f766e; font-weight: 700; }
+    .ntab.on { color: #2563eb; border-bottom-color: #2563eb; font-weight: 700; }
 
     /* ── Main scroll area (dashboard + history only) ── */
     #scroll-main { flex: 1; overflow-y: auto; overflow-x: hidden; }
@@ -64,7 +64,7 @@
       padding: 0 14px; gap: 8px;
     }
     #hole-pills-strip {
-      flex-shrink: 0; height: 46px;
+      flex-shrink: 0; height: 40px;
       background: #fff; border-bottom: 1px solid #f3f4f6;
       overflow-x: auto; overflow-y: hidden;
       display: flex; align-items: center;
@@ -72,15 +72,21 @@
     }
     #hole-pills-strip::-webkit-scrollbar { display: none; }
     .hp {
-      flex-shrink: 0;
-      width: 30px; height: 30px; border-radius: 50%;
-      font-size: 11px; font-weight: 700;
-      border: 1.5px solid #d1d5db; background: #fff; color: #9ca3af;
+      position: relative; flex-shrink: 0;
+      min-width: 29px; height: 26px; border-radius:4px;
+      font-size: 12px; font-weight: 700;
+      border: 1.5px solid #e5e7eb; background: #fff; color: #9ca3af;
       display: flex; align-items: center; justify-content: center; cursor: pointer;
       transition: all .15s;
     }
-    .hp.done { background: #ccfbf1; border-color: #0f766e; color: #134e4a; }
-    .hp.cur  { background: #0f766e; border-color: #0f766e; color: #fff; }
+    /* score still sitting on the assumed par — visible from any hole */
+    .hp.unsure::after {
+      content: ''; position: absolute; top: -3px; right: -3px;
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #facc15; border: 1.5px solid #fff;
+    }
+    .hp.done { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; }
+    .hp.cur  { background: #2563eb; border-color: #2563eb; color: #fff; }
 
     /* ── Accordion hole list (form view) ── */
     #accordion-area {
@@ -102,9 +108,9 @@
       color:#9ca3af; padding:12px 14px 6px;
     }
     .hole-row {
-      border-bottom: 1px solid #f0fdfa;
+      border-bottom: 1px solid #eff6ff;
     }
-    .hole-row.is-cur { background:#f5faf6; }
+    .hole-row.is-cur { background:#f5f8ff; }
     /* Collapsed summary row */
     .hole-summary {
       display: flex; align-items: center; gap: 10px;
@@ -126,7 +132,7 @@
       overflow: hidden;
       max-height: 0;
       transition: max-height .22s ease;
-      background: #fafafa;
+      background: #fff;
     }
     .hole-form-wrap.open { max-height: 820px; }
     .hole-form-inner {
@@ -143,8 +149,8 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 12.5px; font-weight: 800; text-transform: uppercase;
       letter-spacing: .04em; color: #fff; text-align: center;
-      background: #0d9488;
-      min-height: 40px; padding: 8px 34px; border-radius: 9px;
+      background: #1d4ed8;
+      min-height: 40px; padding: 8px 34px; border-radius:4px;
       margin-bottom: 6px; line-height: 1.3;
     }
     /* small round "i" — absolute, so the heading text stays truly centred */
@@ -159,8 +165,8 @@
     .fl-i:active { background: rgba(255,255,255,.22); }
     .fl-info {
       font-size: 11px; color: #4b5563; line-height: 1.45; font-style: italic;
-      background: #f0fdfa; border: 1px solid #99f6e4;
-      border-radius: 8px; padding: 8px 10px; margin: -2px 0 6px;
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      border-radius:4px; padding: 8px 10px; margin: -2px 0 6px;
     }
     /* Grid chips (4 per row) */
     .cg4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; }
@@ -175,7 +181,7 @@
 
     /* The chip button itself */
     .ch {
-      height: 36px; border-radius: 9px;
+      height: 36px; border-radius:4px;
       border: 1.5px solid #e5e7eb;
       background: #fff; color: #374151;
       font-size: 12px; font-weight: 500;
@@ -186,7 +192,7 @@
       -webkit-user-select: none; user-select: none;
     }
     .ch:active { transform: scale(0.94); }
-    .ch.on      { background: #0f766e; color: #fff; border-color: #0f766e; }
+    .ch.on      { background: #2563eb; color: #fff; border-color: #2563eb; }
     .ch.on-warn { background: #f59e0b; color: #fff; border-color: #f59e0b; }
     .ch.on-bad  { background: #ef4444; color: #fff; border-color: #ef4444; }
 
@@ -199,14 +205,14 @@
       display: flex; gap: 8px;
     }
     .rnav-btn {
-      flex: 1; height: 42px; border-radius: 10px;
+      flex: 1; height: 42px; border-radius:4px;
       font-size: 14px; font-weight: 600; cursor: pointer; border: none; outline: none;
       transition: opacity .15s, transform .1s;
     }
     .rnav-btn:active { transform: scale(0.97); }
     .rnav-btn.secondary { background: #f3f4f6; color: #374151; }
-    .rnav-btn.primary   { background: #0f766e; color: #fff; }
-    .rnav-btn.success   { background: #0b3b38; color: #fff; }
+    .rnav-btn.primary   { background: #2563eb; color: #fff; }
+    .rnav-btn.success   { background: #1e40af; color: #fff; }
     .rnav-btn:disabled  { opacity: .35; pointer-events: none; }
 
     /* ── Table view ── */
@@ -228,10 +234,10 @@
       font-size: 12px; font-weight: 500; color: #374151;
     }
     .htable td:first-child { text-align: left; padding-left: 12px; color: #9ca3af; font-size: 11px; }
-    .htable tr.cur-row td { background: #f0fdfa; }
-    .htable tr:active td { background: #ccfbf1; }
-    .tc { display:inline-block; padding: 1px 6px; border-radius:5px; font-size:11px; font-weight:600; }
-    .tc-g { background:#ccfbf1; color:#134e4a; }
+    .htable tr.cur-row td { background: #eff6ff; }
+    .htable tr:active td { background: #dbeafe; }
+    .tc { display:inline-block; padding: 1px 6px; border-radius:4px; font-size:11px; font-weight:600; }
+    .tc-g { background:#dbeafe; color:#1d4ed8; }
     .tc-y { background:#fef9c3; color:#854d0e; }
     .tc-r { background:#fee2e2; color:#991b1b; }
     .tc-b { background:#dbeafe; color:#1e40af; }
@@ -239,12 +245,12 @@
     .tc-e { color:#d1d5db; font-size:10px; }
 
     /* ── View toggle pill ── */
-    .vtoggle { display:flex; background:#f3f4f6; border-radius:8px; padding:2px; }
+    .vtoggle { display:flex; background:#f3f4f6; border-radius:4px; padding:2px; }
     .vbtn {
-      padding: 3px 10px; border-radius:6px; font-size:11px; font-weight:600;
+      padding: 3px 10px; border-radius:4px; font-size:11px; font-weight:600;
       cursor:pointer; color:#6b7280; border:none; background:transparent; outline:none;
     }
-    .vbtn.on { background:#fff; color:#0f766e; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .vbtn.on { background:#fff; color:#2563eb; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
 
     /* ── Completion pulse ── */
     @keyframes pulse-green {
@@ -256,7 +262,7 @@
     /* ── Dashboard / History ── */
     /* centred by default so every KPI box matches — the third row was relying
        on an inline style the others had and it did not */
-    .kpi { background:#fff; border-radius:14px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.07); text-align:center; }
+    .kpi { background:#fff; border-radius:6px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.07); text-align:center; }
     .kpi-v { font-size:26px; font-weight:800; line-height:1; }
     .kpi-l { font-size:10px; color:#9ca3af; margin-top:3px; text-transform:uppercase; letter-spacing:.05em; }
     .stab { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; color:#6b7280; background:#f3f4f6; white-space:nowrap; border:none; outline:none; }
@@ -271,26 +277,26 @@
     }
     .stab-row::-webkit-scrollbar { display:none; }
     .ins-ftab { padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
-    .ins-ftab.on { background:#0f766e; color:#fff; }
-    .stab.on { background:#0f766e; color:#fff; }
+    .ins-ftab.on { background:#2563eb; color:#fff; }
+    .stab.on { background:#2563eb; color:#fff; }
     .tr-tab  { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
-    .tr-tab.on  { background:#0f766e; color:#fff; }
-    .tr3-tab { padding:3px 9px; border-radius:16px; font-size:10px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
-    .tr3-tab.on { background:#0d9488; color:#fff; }
+    .tr-tab.on  { background:#2563eb; color:#fff; }
+    .tr3-tab { padding:3px 9px; border-radius:20px; font-size:10px; font-weight:600; cursor:pointer; color:#6b7280; background:#f3f4f6; border:none; outline:none; white-space:nowrap; flex-shrink:0; }
+    .tr3-tab.on { background:#1d4ed8; color:#fff; }
     .brk { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f9fafb; }
     .brk-l { min-width:72px; font-size:12px; color:#6b7280; }
     .brk-bg { flex:1; height:7px; background:#f3f4f6; border-radius:99px; overflow:hidden; }
     .brk-fill { height:100%; border-radius:99px; }
     .brk-p { width:34px; text-align:right; font-size:12px; font-weight:700; }
-    .hcard { background:#fff; border-radius:16px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.07); cursor:pointer; border:1.5px solid transparent; }
-    .hcard:active { border-color:#0f766e; }
+    .hcard { background:#fff; border-radius:6px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.07); cursor:pointer; border:1.5px solid transparent; }
+    .hcard:active { border-color:#2563eb; }
 
     /* ── Round-detail tiles ──────────────────────────────────────────────
        The dashboard gets its definition from white cards on a tinted page.
        These sit on a WHITE sheet, so a near-white fill left them barely
        visible — they need a real border and darker label text instead. */
     .mkpi {
-      background:#f8fafc; border:1.5px solid #dde3ea; border-radius:11px;
+      background:#f8fafc; border:1.5px solid #dde3ea; border-radius:4px;
       padding:10px 4px; text-align:center;
     }
     .mkpi-v { font-size:18px; font-weight:800; line-height:1.1; }
@@ -301,12 +307,12 @@
     /* Section heading inside the round sheet — the scoring and putting
        halves need telling apart now that both are there. */
     .msec-h {
-      font-size:10px; font-weight:800; color:#0f766e; text-transform:uppercase;
+      font-size:10px; font-weight:800; color:#2563eb; text-transform:uppercase;
       letter-spacing:.08em; margin:0 0 7px; padding-bottom:5px;
-      border-bottom:2px solid #ccfbf1;
+      border-bottom:2px solid #dbeafe;
     }
     .mkpi.sg   { background:#f0f9ff; border-color:#bae6fd; }
-    .mkpi.feet { background:#f0fdfa; border-color:#99f6e4; }
+    .mkpi.feet { background:#eff6ff; border-color:#bfdbfe; }
     .mkpi.long { background:#fff7ed; border-color:#fed7aa; }
 
     /* ── Print / PDF overlay ────────────────────────────────────────────── */
@@ -316,16 +322,16 @@
     }
     #print-bar {
       position:sticky; top:0; z-index:2;
-      background:#134e4a; color:#fff;
+      background:#1d4ed8; color:#fff;
       display:flex; align-items:center; justify-content:space-between; gap:10px;
       padding:calc(10px + env(safe-area-inset-top)) 12px 10px;
     }
     #print-bar button {
-      border:none; border-radius:8px; cursor:pointer;
+      border:none; border-radius:4px; cursor:pointer;
       font-size:12px; font-weight:700; padding:7px 12px;
       background:rgba(255,255,255,.18); color:#fff;
     }
-    #print-bar button:last-child { background:#5eead4; color:#134e4a; }
+    #print-bar button:last-child { background:#93c5fd; color:#1d4ed8; }
     #print-content {
       padding:18px 16px calc(28px + env(safe-area-inset-bottom));
       max-width:720px; margin:0 auto;
@@ -352,76 +358,14 @@
        Softens the spreadsheet look: a rounded, clipping wrapper gives the block
        a card edge while the table keeps its own cell borders (including the
        heavier separators between the Downhill / Flat / Uphill groups). */
-    /* The WRAPPER owns the outer border so it follows the rounded corner.
-       (With the border on the cells instead, the radius clipped it and the
-       curve showed as a blank gap.) Cells therefore carry only their inner
-       right/bottom rules, which also prevents a doubled outer line. */
-    .gwrap {
-      overflow:hidden; -webkit-overflow-scrolling:touch;
-      border-radius:10px; border:1px solid #cfd6dd; background:#fff;
-    }
-    .pgrid { border-collapse:separate; border-spacing:0; font-size:10px; width:100%; table-layout:fixed; }
-    .pgrid th, .pgrid td {
-      border:0; border-right:1px solid #dfe3e8; border-bottom:1px solid #dfe3e8;
-    }
-    .pgrid tr > *:last-child        { border-right:0; }   /* wrapper supplies the edge */
-    .pgrid tbody tr:last-child > *  { border-bottom:0; }
-
-    .pgrid th {
-      padding:3px 1px; text-align:center; font-weight:700; color:#6b7280;
-      background:#f0fdfa; font-size:9px; white-space:nowrap; overflow:hidden;
-    }
-    .pgrid td.row-head {
-      padding:3px 5px; text-align:center; font-size:10px; font-weight:600; color:#374151;
-      background:#f9fafb; white-space:nowrap;
-    }
-    .pgrid td.gcell {
-      height:28px; text-align:center; cursor:pointer; background:#fff;
-      transition:background .08s; -webkit-tap-highlight-color:transparent;
-    }
-    .pgrid td.gcell:active { background:#ccfbf1; }
-    .pgrid td.gcell.on { background:#0f766e; }
-    .pgrid td.gcell.on::after { content:'✓'; font-size:11px; color:#fff; font-weight:800; line-height:1; }
-    .pgrid td.gcell.disabled { background:#f3f4f6; cursor:default; pointer-events:none; }
-    /* a run of dead cells reads as one block: drop the rule to the next dead cell */
-    .pgrid td.gcell.disabled.merge-r { border-right-color:transparent; }
-
-    /* Slope group headers — taller than the cells, and butted straight
-       together since their colours already separate the groups */
-    .pgrid th.slope-h {
-      color:#fff; padding:11px 1px; font-size:12px; font-weight:800;
-      letter-spacing:.3px; border:0;
-    }
-
-    /* ── v2: slope × break selector — the arrow row is the tap target ── */
-    .pgrid td.dcell {
-      height:42px; padding:4px 1px; text-align:center;
-      font-size:20px; font-weight:700; color:#4b5563;
-      background:#f9fafb;
-      cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent;
-      -webkit-user-select:none; user-select:none;
-      transition:background .1s, color .1s;
-    }
-    .pgrid td.dcell:active { background:#ccfbf1; }
-    .pgrid td.dcell.on { background:#0f766e; color:#fff; }
-
     /* ── v2: horizontal distance drum ──────────────────────────────────────
        One drum per hole (not per cell): tap a slope×break cell above, then
        scroll this to the putt distance in feet. */
     .hd-outer {
-      background:#fff; border:1.5px solid #d1d5db; border-radius:10px;
-      padding:6px 0 5px; margin-top:7px;
-      transition:border-color .12s, box-shadow .12s;
+      background:transparent; border:1px solid #dfe5ed; border-radius:4px;
+      padding:3px 0; margin-top:4px;
     }
-    .hd-outer.set { border-color:#99f6e4; }
-    .hd-cap {
-      display:flex; align-items:center; justify-content:center; gap:6px;
-      font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
-      color:#9ca3af; margin-bottom:4px;
-    }
-    .hd-cap b { font-size:15px; font-weight:800; color:#0f766e; letter-spacing:0; }
-
-    .hd-wrap { position:relative; height:46px; overflow:hidden; }
+    .hd-wrap { position:relative; height:30px; overflow:hidden; }
     .hd-scroller {
       position:relative; z-index:3;
       display:flex; height:100%; align-items:center;
@@ -434,28 +378,31 @@
     }
     .hd-scroller::-webkit-scrollbar { display:none; }
     .hd-item {
-      flex:0 0 48px; height:38px;
+      flex:0 0 48px; height:26px;
       display:flex; align-items:center; justify-content:center;
       /* NOT scroll-snap-stop:always — that forces the scroll to halt at every
          single value, so a fast flick moved one foot instead of twenty. With
          it off, momentum carries across many values and still snaps on rest. */
       scroll-snap-align:center;
-      font-size:12px; font-weight:600; color:#b6bcc6; line-height:1;
+      font-size:12px; font-weight:600; color:#aab4c2; line-height:1;
       transition:color .1s, font-size .1s;
     }
     /* the value sitting in the centre band */
-    .hd-item.hd-sel { font-size:18px; font-weight:800; color:#134e4a; }
+    .hd-item.hd-sel { font-size:19px; font-weight:800; color:#fff; }
 
     /* centre band: bordered highlight marking the selected value */
+    /* the selected value is a filled blue chip, like every other selection */
     .hd-band {
-      position:absolute; z-index:1; top:4px; bottom:4px; left:50%; width:48px;
+      position:absolute; z-index:1; top:2px; bottom:2px; left:50%; width:44px;
       transform:translateX(-50%);
-      background:#eef4fb; border:1.5px solid #c7d7e8; border-radius:8px;
+      background:#2563eb; border:none; border-radius:4px;
       pointer-events:none;
     }
-    .hd-outer.set .hd-band { background:#ccfbf1; border-color:#0f766e; }
+    /* nothing chosen yet (resting on 0') — no chip at all */
+    .hd-outer.unset .hd-band { background:transparent; }
+    .hd-outer.unset .hd-item.hd-sel { color:#94a3b8; font-size:14px; }
     /* fade the values either side so the centre reads as selected */
-    .hd-fade-l, .hd-fade-r { position:absolute; z-index:4; top:0; bottom:0; width:56px; pointer-events:none; }
+    .hd-fade-l, .hd-fade-r { position:absolute; z-index:4; top:0; bottom:0; width:40px; pointer-events:none; }
     .hd-fade-l { left:0;  background:linear-gradient(to right,#fff 12%,rgba(255,255,255,0)); }
     .hd-fade-r { right:0; background:linear-gradient(to left, #fff 12%,rgba(255,255,255,0)); }
 
@@ -468,7 +415,7 @@
     }
     .toast {
       pointer-events: auto; cursor: pointer;
-      background: #fff; border: 1.5px solid #dde3ea; border-radius: 18px;
+      background: #fff; border: 1.5px solid #dde3ea; border-radius:6px;
       padding: 18px 20px; display: flex; align-items: center; gap: 14px; max-width: 330px;
       box-shadow: 0 18px 50px rgba(15,23,42,.28), 0 2px 8px rgba(15,23,42,.1);
       animation: toast-in .28s cubic-bezier(.2,.9,.3,1.3);
@@ -481,13 +428,13 @@
       background: #f1f5f9;
     }
     .toast-msg { font-size: 14.5px; font-weight: 700; line-height: 1.4; color: #0f172a; }
-    .toast-good { border-color: #5eead4; } .toast-good .toast-emoji { background: #ccfbf1; }
+    .toast-good { border-color: #93c5fd; } .toast-good .toast-emoji { background: #dbeafe; }
     .toast-bad  { border-color: #fda4af; } .toast-bad  .toast-emoji { background: #ffe4e6; }
     .toast-info { border-color: #cbd5e1; }
     .toast-act {
       margin-left: auto; flex-shrink: 0; border: none; cursor: pointer;
-      background: #0f766e; color: #fff;
-      border-radius: 9px; padding: 8px 12px; font-size: 12px; font-weight: 800;
+      background: #2563eb; color: #fff;
+      border-radius:4px; padding: 8px 12px; font-size: 12px; font-weight: 800;
     }
     @keyframes toast-in { from { opacity:0; transform: scale(.9) translateY(10px); } }
 
@@ -496,7 +443,7 @@
        stretched it to full height. Column + centre fixes both. */
     #step-setup { flex-direction:column; align-items:center; }
     .setup-card {
-      background:#fff; border-radius:16px; padding:18px;
+      background:#fff; border-radius:6px; padding:18px;
       box-shadow:0 1px 3px rgba(0,0,0,.07);
       width:100%; max-width:440px; flex:0 0 auto;   /* height follows content */
     }
@@ -509,12 +456,12 @@
        formatted text — tapping anywhere still opens the system picker. */
     .date-box {
       position:relative; width:100%;
-      border:1.5px solid #e5e7eb; border-radius:10px;
+      border:1.5px solid #e5e7eb; border-radius:4px;
       padding:10px 12px; background:#fff;
       display:flex; align-items:center; justify-content:center;
       min-height:44px;
     }
-    .date-box:focus-within { border-color:#0f766e; }
+    .date-box:focus-within { border-color:#2563eb; }
     .date-box #date-text { font-size:15px; font-weight:600; color:#1f2937; }
     .date-box input[type="date"] {
       position:absolute; inset:0; width:100%; height:100%;
@@ -523,63 +470,112 @@
       font-size:16px;   /* keeps iOS from zooming when the picker opens */
     }
     .inp {
-      width:100%; border:1.5px solid #e5e7eb; border-radius:10px;
+      width:100%; border:1.5px solid #e5e7eb; border-radius:4px;
       padding:10px 12px; font-size:14px; outline:none;
       -webkit-appearance:none;
     }
-    .inp:focus { border-color:#0f766e; }
+    .inp:focus { border-color:#2563eb; }
 
     /* ── v3 scorecard layer ───────────────────────────────────────────── */
-    .holebar{position:relative;display:block;background:#0d9488;min-height:48px;
-             border-radius:9px;margin-bottom:6px}
-    .holebar .who{position:absolute;left:12px;top:50%;transform:translateY(-50%);
-                  font-size:11px;font-weight:800;color:rgba(255,255,255,.88);
-                  text-transform:uppercase;letter-spacing:.04em}
-    .stepwrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
-    .step{display:flex;align-items:center;background:rgba(255,255,255,.17);border-radius:9px;overflow:hidden}
-    .step button{width:34px;height:32px;border:none;background:transparent;color:#fff;
-                 font-size:18px;font-weight:800;display:flex;align-items:center;justify-content:center;
-                 cursor:pointer;-webkit-tap-highlight-color:transparent}
-    .step .val{min-width:34px;height:32px;display:flex;align-items:center;justify-content:center;
-               font-size:19px;font-weight:800;color:#fff}
-    .topar{position:absolute;right:38px;top:50%;transform:translateY(-50%);min-width:44px;height:23px;
-           display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;
-           border-radius:20px;background:#f1f5f9;color:#475569}
-    .topar.bird{background:#ccfbf1;color:#134e4a}
-    .topar.bog {background:#fef3c7;color:#92400e}
-    .topar.dbl {background:#fee2e2;color:#991b1b}
-    .holebar .fl-i{position:absolute;right:10px;top:50%;transform:translateY(-50%)}
-
-    .sc{border:1.5px solid #dde3ea;border-radius:11px;overflow:hidden;background:#fff}
-    .sc-row{display:flex;align-items:center;gap:7px;padding:7px 10px;border-bottom:1px solid #eef2f6}
-    .sc-row:last-child{border-bottom:0}
-    .sc-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
-            color:#94a3b8;flex-shrink:0;width:30px}
-    .seg{display:flex;gap:5px;flex:1}
-    .sbtn{flex:1;height:34px;border:1.5px solid #e2e8f0;background:#fff;border-radius:9px;
-          font-size:12px;font-weight:700;color:#475569;cursor:pointer;
-          display:flex;align-items:center;justify-content:center;gap:5px;
-          -webkit-tap-highlight-color:transparent}
-    .sbtn.on{background:#ccfbf1;border-color:#0d9488;color:#134e4a}
-    .sbtn.warn.on{background:#fef3c7;border-color:#d97706;color:#92400e}
-    .radio{width:11px;height:11px;border-radius:50%;border:1.5px solid currentColor;flex-shrink:0;
-           display:flex;align-items:center;justify-content:center}
-    .radio::after{content:'';width:5px;height:5px;border-radius:50%;background:transparent}
-    .sbtn.on .radio::after{background:#0f766e}
-
-    .divider{display:flex;align-items:center;gap:11px;margin:15px 2px 11px}
-    .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e2e8f0}
-    .divider span{font-size:9.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:#b8c2cf}
-
     /* ── par setup ── */
     .prow{display:flex;align-items:center;gap:6px;margin-bottom:5px}
     .pn{width:17px;text-align:right;font-size:11px;font-weight:700;color:#94a3b8;flex-shrink:0}
-    .pstep{display:flex;align-items:center;flex:1;border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden}
+    .pstep{display:flex;align-items:center;flex:1;border:1.5px solid #e2e8f0;border-radius:4px;overflow:hidden}
     .pstep button{flex:1;height:32px;border:none;background:#f8fafc;font-size:16px;font-weight:800;
                   color:#475569;cursor:pointer}
     .pv{min-width:30px;height:32px;display:flex;align-items:center;justify-content:center;
         font-size:15px;font-weight:800;color:#0f172a;background:#fff}
     .pv.p3{color:#1d4ed8;background:#eff6ff} .pv.p5{color:#9a3412;background:#fff7ed}
+
+    /* ══════════════════════════════════════════════════════════════════
+       HOLE SCREEN — rebuilt. Three rules hold the whole thing together:
+       · one radius (4px) on everything, 6px only on the two containers;
+       · colour means one thing each — yellow ONLY as a dashed outline for
+         an unconfirmed score, orange ONLY for a stroke dropped, blue for
+         anything selected;
+       · an input is a 1px border, never a fill. A fill means chosen.
+       ══════════════════════════════════════════════════════════════════ */
+
+    /* ── the slate scoring card ── */
+    .scard{background:#1e293b;border-radius:4px;padding:8px 11px;margin-bottom:8px}
+    .scard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .scard-h{font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;text-transform:uppercase}
+    .scard-h.warnd{color:#facc15}
+    /* bare glyphs: the 48px target stays, only the box goes */
+    .hero3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:5px}
+    .hbtn{height:48px;border:none;background:transparent;color:#94a3b8;
+          font-size:30px;font-weight:300;line-height:1;cursor:pointer;
+          -webkit-tap-highlight-color:transparent}
+    .hbtn:active{color:#e2e8f0}
+    .sbox{border-radius:4px;padding:4px 6px 6px;text-align:center;cursor:pointer;
+          -webkit-tap-highlight-color:transparent}
+    .sbox-n{font-size:33px;font-weight:800;line-height:1}
+    .sbox-s{font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
+    /* unconfirmed — the only hollow state, and the only yellow one */
+    .sbox.open{border:2px dashed #facc15;background:rgba(250,204,21,.1)}
+    .sbox.open .sbox-n,.sbox.open .sbox-s{color:#facc15}
+    /* confirmed — always filled; the colour is the result */
+    .sbox.fill{border:2px solid rgba(255,255,255,.35)}
+    .sbox.fill .sbox-n{color:#fff}
+    .sbox.fill .sbox-s{color:rgba(255,255,255,.85)}
+    .sbox.r-bird{background:#16a34a} .sbox.r-par{background:#2563eb}
+    .sbox.r-bog {background:#d97706} .sbox.r-dbl{background:#dc2626}
+
+    .fw3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+    .fwb{text-align:center;font-size:11.5px;font-weight:700;padding:7px 0;border-radius:4px;
+         background:#334155;color:#cbd5e1;border:none;cursor:pointer;
+         -webkit-tap-highlight-color:transparent}
+    .fwb.on{background:#2563eb;color:#fff}
+    /* GIR | Sand | Penalty — three separate questions, ruled apart */
+    .trip{display:grid;grid-template-columns:1fr 1px 64px 1px 1fr;gap:8px;align-items:center;
+          margin-top:7px;padding-top:7px;border-top:1px solid #334155}
+    .trip .rule{background:#475569;height:32px;align-self:center}
+    .grp{text-align:center}
+    .grp-l{font-size:8px;font-weight:800;color:#94a3b8;letter-spacing:.09em;
+           margin-bottom:3px;text-transform:uppercase}
+    .grp-b{display:flex;gap:4px;justify-content:center}
+    .gbtn{flex:1;max-width:58px;text-align:center;font-size:11px;font-weight:700;padding:5px 0;
+          border-radius:4px;background:#334155;color:#cbd5e1;border:none;cursor:pointer;
+          -webkit-tap-highlight-color:transparent}
+    .gbtn.on{background:#2563eb;color:#fff}
+    .gbtn.warn.on{background:#ea580c;color:#fff}
+
+    /* ── section headings: tinted rows, no border, centred ── */
+    .sect-h{text-align:center;margin:2px 0 2px;background:#e4eaf2;border-radius:4px;padding:3px 0;
+            font-size:10px;font-weight:800;letter-spacing:.15em;color:#1d4ed8;text-transform:uppercase}
+    .sub-h{font-size:9px;font-weight:800;color:#1d4ed8;letter-spacing:.09em;
+           margin:7px 0 4px;text-transform:uppercase;text-align:center;
+           background:#f1f4f8;border-radius:4px;padding:5px 0;position:relative}
+    .sub-h .fl-i{border-color:#b9c4d4;color:#64748b}
+    .sub-h .fl-i:active{background:rgba(29,78,216,.1)}
+
+    /* ── tiles: a bordered cell is tappable, no cell at all is impossible ── */
+    .tgrid{display:grid;gap:3px}
+    .tile{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:23px;
+          display:flex;align-items:center;justify-content:center;
+          font-size:12px;color:#475569;font-weight:600;cursor:pointer;
+          -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+    .tile:active{background:#dbeafe}
+    .tile.on{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:800}
+    .tile.off{background:transparent;border-color:transparent;color:transparent;
+              cursor:default;pointer-events:none}
+    .tile.arrow{font-size:15px}
+    .t-h{font-size:8px;font-weight:800;color:#94a3b8;text-align:center;padding:1px 0;
+         letter-spacing:-.02em}
+    .t-rl{font-size:9.5px;font-weight:800;color:#475569;height:23px;
+          display:flex;align-items:center;justify-content:center}
+    .band{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:3px}
+    .band i{grid-column:span 3;text-align:center;font-size:8px;font-weight:800;letter-spacing:.07em;
+            color:#fff;padding:3px 0;border-radius:4px;font-style:normal}
+    .missrow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+    .missb{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:23px;
+           display:flex;align-items:center;justify-content:center;
+           font-size:9.5px;font-weight:700;color:#475569;cursor:pointer;
+           -webkit-tap-highlight-color:transparent}
+    .missb:active{background:#dbeafe}
+    .missb.on{background:#2563eb;border-color:#2563eb;color:#fff}
+    .missb.off{background:transparent;border-color:transparent;color:#cbd2db;
+               cursor:default;pointer-events:none}
   </style>
 </head>
 <body>
@@ -611,7 +607,7 @@
       <div style="font-size:52px">⛳</div>
       <p style="font-weight:600;color:#374151;margin:8px 0 4px">No rounds yet</p>
       <p style="font-size:13px;color:#9ca3af;margin-bottom:16px">Start a round to see your stats</p>
-      <button onclick="showMain('round')" style="background:#0f766e;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
+      <button onclick="showMain('round')" style="background:#2563eb;color:#fff;border:none;border-radius:4px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
     </div>
     <div id="backup-banner" style="display:none"></div>
     <div id="db-content" style="display:none">
@@ -626,7 +622,7 @@
 
       <!-- ══ TRENDS ══ -->
       <div id="dtab-trends">
-        <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+        <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
           <div class="stab-row" style="margin-bottom:10px">
             <button class="stab on" onclick="setTrendMetric(this,'score')">Scoring</button>
             <button class="stab"    onclick="setTrendMetric(this,'gir')">GIR</button>
@@ -661,7 +657,7 @@
       <!-- ══ PUTTING ══ -->
       <div id="dtab-putting" style="display:none">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-          <div class="kpi"><div class="kpi-v" id="kpi-ppr" style="color:#0f766e">—</div><div class="kpi-l">Putts / 18 Holes</div></div>
+          <div class="kpi"><div class="kpi-v" id="kpi-ppr" style="color:#2563eb">—</div><div class="kpi-l">Putts / 18 Holes</div></div>
           <div class="kpi"><div class="kpi-v" id="kpi-3p" style="color:#f59e0b">—</div><div class="kpi-l">3-Putt %</div></div>
           <div class="kpi"><div class="kpi-v" id="kpi-gir" style="color:#3b82f6">—</div><div class="kpi-l">Putts/GIR</div></div>
         </div>
@@ -671,7 +667,7 @@
             <div class="kpi-l">SG Putting / 18</div>
             <div style="font-size:9px;color:#9ca3af;margin-top:1px" id="kpi-sgp-base">—</div>
           </div>
-          <div class="kpi"><div class="kpi-v" id="kpi-feet" style="color:#0d9488;font-size:22px">—</div><div class="kpi-l">Feet Made / 18</div></div>
+          <div class="kpi"><div class="kpi-v" id="kpi-feet" style="color:#1d4ed8;font-size:22px">—</div><div class="kpi-l">Feet Made / 18</div></div>
           <div class="kpi"><div class="kpi-v" id="kpi-longest" style="color:#9a3412;font-size:22px">—</div><div class="kpi-l">Longest Made</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
@@ -680,7 +676,7 @@
           <div class="kpi"><div style="font-size:18px;font-weight:800;color:#1f2937" id="kpi-rounds">—</div><div class="kpi-l">Rounds / Holes</div></div>
         </div>
 
-        <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+        <div style="background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
           <div class="stab-row" style="padding:10px 12px;border-bottom:1px solid #f3f4f6">
             <button class="stab on" onclick="setStab(this,'dist')">Distance</button>
             <button class="stab"    onclick="setStab(this,'slope')">Slope</button>
@@ -717,24 +713,24 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div style="font-size:15px;font-weight:700;color:#1f2937">Round History</div>
       <button onclick="exportCSV()"
-        style="background:#f0fdfa;color:#134e4a;border:1.5px solid #0f766e;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">
+        style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #2563eb;border-radius:4px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">
         ↓ Export CSV
       </button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <button onclick="backupData()" id="hist-backup-btn"
-        style="flex:1;background:#f0fdfa;color:#0d9488;border:1.5px solid #16a34a;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
+        style="flex:1;background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd;border-radius:4px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
         💾 Backup Data
       </button>
       <button onclick="triggerRestore()"
-        style="flex:1;background:#fff7ed;color:#c2410c;border:1.5px solid #ea580c;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
+        style="flex:1;background:#fff7ed;color:#c2410c;border:1.5px solid #ea580c;border-radius:4px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
         📥 Restore Backup
       </button>
       <input type="file" id="restore-input" accept=".json" style="display:none" onchange="restoreData(event)">
     </div>
     <div id="import-v2" style="display:none;margin-bottom:12px">
-      <button onclick="importFromV2()" style="width:100%;background:#f0fdfa;color:#0f766e;
-        border:1.5px solid #5eead4;border-radius:10px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">
+      <button onclick="importFromV2()" style="width:100%;background:#eff6ff;color:#2563eb;
+        border:1.5px solid #93c5fd;border-radius:4px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">
         📥 Import rounds from Putting Tracker
       </button>
     </div>
@@ -773,7 +769,7 @@
       <div>
         <div class="setup-lbl" style="margin-bottom:8px">Holes</div>
         <div style="display:flex;align-items:center;gap:10px;justify-content:center">
-          <div style="display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;height:38px">
+          <div style="display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:4px;overflow:hidden;height:38px">
             <button onclick="adjustSetupHoles(-1)" style="width:38px;height:38px;border:none;background:#f9fafb;font-size:18px;font-weight:700;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
             <span id="setup-hole-count" style="min-width:36px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
             <button onclick="adjustSetupHoles(1)"  style="width:38px;height:38px;border:none;background:#f9fafb;font-size:18px;font-weight:700;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
@@ -783,7 +779,7 @@
         </div>
       </div>
       <button onclick="onStartPressed()"
-        style="background:#0f766e;color:#fff;border:none;border-radius:10px;height:48px;font-size:15px;font-weight:700;cursor:pointer;width:100%">
+        style="background:#2563eb;color:#fff;border:none;border-radius:4px;height:48px;font-size:15px;font-weight:700;cursor:pointer;width:100%">
         Start Entering Putts →
       </button>
     </div>
@@ -806,9 +802,9 @@
           <button onclick="fillPars('all4')" class="ch" style="padding:6px 13px">All 4s</button>
         </div>
         <div id="par-cols" style="display:flex;gap:10px"></div>
-        <div id="par-total" style="text-align:center;margin-top:11px;font-size:13px;font-weight:800;color:#0f766e"></div>
+        <div id="par-total" style="text-align:center;margin-top:11px;font-size:13px;font-weight:800;color:#2563eb"></div>
       </div>
-      <button onclick="confirmPars()" style="background:#0f766e;color:#fff;border:none;border-radius:10px;
+      <button onclick="confirmPars()" style="background:#2563eb;color:#fff;border:none;border-radius:4px;
         height:48px;font-size:15px;font-weight:700;cursor:pointer;width:100%">Save course &amp; start →</button>
     </div>
   </div>
@@ -828,7 +824,7 @@
       <button id="react-btn" onclick="toggleReactions()" title="Reactions to your holes"
         style="flex-shrink:0;border:none;background:none;font-size:15px;cursor:pointer;padding:2px 3px;line-height:1">💬</button>
       <span id="ri-holecount" onclick="showHoleAdj()"
-        style="flex-shrink:0;font-size:11px;font-weight:700;color:#0f766e;background:#ccfbf1;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 8px">
+        style="flex-shrink:0;font-size:11px;font-weight:700;color:#2563eb;background:#dbeafe;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 8px">
         18H ✎
       </span>
       <div class="vtoggle" style="flex-shrink:0">
@@ -838,13 +834,13 @@
     </div>
 
     <!-- Inline hole-count adjuster (hidden by default) -->
-    <div id="hole-adj-bar" style="display:none;flex-shrink:0;background:#f0fdfa;border-bottom:1px solid #e5e7eb;padding:8px 14px;align-items:center;justify-content:center;gap:10px">
+    <div id="hole-adj-bar" style="display:none;flex-shrink:0;background:#eff6ff;border-bottom:1px solid #e5e7eb;padding:8px 14px;align-items:center;justify-content:center;gap:10px">
       <span style="font-size:12px;font-weight:600;color:#374151">Holes:</span>
-      <button onclick="stepHoleAdj(-1)" style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">−</button>
+      <button onclick="stepHoleAdj(-1)" style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:4px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">−</button>
       <span id="hole-adj-val" style="min-width:28px;text-align:center;font-size:16px;font-weight:700;color:#1f2937">18</span>
-      <button onclick="stepHoleAdj(1)"  style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">+</button>
-      <button onclick="applyHoleAdj()"  style="height:32px;padding:0 14px;border:none;border-radius:8px;background:#0f766e;color:#fff;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">Done</button>
-      <button onclick="hideHoleAdj()"   style="height:32px;padding:0 10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;color:#6b7280;font-size:12px;font-weight:600;cursor:pointer">Cancel</button>
+      <button onclick="stepHoleAdj(1)"  style="width:32px;height:32px;border:1.5px solid #d1d5db;border-radius:4px;background:#fff;font-size:16px;font-weight:700;color:#374151;cursor:pointer">+</button>
+      <button onclick="applyHoleAdj()"  style="height:32px;padding:0 14px;border:none;border-radius:4px;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px">Done</button>
+      <button onclick="hideHoleAdj()"   style="height:32px;padding:0 10px;border:1.5px solid #d1d5db;border-radius:4px;background:#fff;color:#6b7280;font-size:12px;font-weight:600;cursor:pointer">Cancel</button>
     </div>
 
     <!-- Hole pill strip -->
@@ -890,9 +886,9 @@
     <button class="ins-ftab"   onclick="setInsightFilter(10)">Last 10</button>
     <button class="ins-ftab"   onclick="setInsightFilter(5)">Last 5</button>
     <select id="sg-base-sel" onchange="setSGBase(this.value)" title="Strokes gained benchmark"
-      style="margin-left:auto;flex-shrink:0;padding:5px 8px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;color:#0f766e;background:#ccfbf1;border:none;outline:none">
+      style="margin-left:auto;flex-shrink:0;padding:5px 8px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;color:#2563eb;background:#dbeafe;border:none;outline:none">
     </select>
-    <button onclick="printInsights()" style="flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#0f766e;background:#ccfbf1;border:none;outline:none;white-space:nowrap">⬇ PDF</button>
+    <button onclick="printInsights()" style="flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#2563eb;background:#dbeafe;border:none;outline:none;white-space:nowrap">⬇ PDF</button>
   </div>
   <div id="insights-content" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
 </div>
@@ -920,7 +916,7 @@
     </div>
     <div id="modal-body"></div>
     <button onclick="confirmDelete()"
-      style="margin-top:16px;width:100%;border:1.5px solid #fca5a5;color:#dc2626;border-radius:10px;padding:10px;font-size:13px;font-weight:600;background:#fff;cursor:pointer">
+      style="margin-top:16px;width:100%;border:1.5px solid #fca5a5;color:#dc2626;border-radius:4px;padding:10px;font-size:13px;font-weight:600;background:#fff;cursor:pointer">
       Delete this round
     </button>
   </div>
@@ -1062,7 +1058,7 @@ function fmtToPar(v) {
 // Over par is the norm off a 9 handicap, so it stays neutral — red on every
 // round says nothing. Level or better is what gets picked out.
 function toParColor(v) {
-  return v <= 0 ? '#0f766e' : '#9ca3af';
+  return v <= 0 ? '#2563eb' : '#9ca3af';
 }
 
 const VAR_OPTS    = ['<-6','-5','-3','-1','+1','+3','+5','>+6'];
@@ -1125,7 +1121,11 @@ function blankHole(n, par) {
   // distance = exact feet from ball to hole (integer, null until set)
   // score/fairway/penalty are the v3 scorecard layer; par is snapshotted onto
   // the hole so correcting a course later never re-scores an old round.
-  return { n, par: par || 4, score:null, fairway:null, penalty:0,
+  // scoreSet distinguishes "I entered a 4" from "it defaulted to par and I
+  // never looked". Rounds logged before this existed have it undefined, which
+  // reads as confirmed — they are not retrospectively doubted.
+  return { n, par: par || 4, score:null, scoreSet:false, fairway:null, penalty:0,
+           sand:false,
            distance:null, slope:null, direction:null, numPutts:null,
            variance:null, missDirection:null, gir:null };
 }
@@ -1139,6 +1139,27 @@ function isDoublePlus(h){ const t = toPar(h); return t !== null && t >= 2; }
 function isBirdieBetter(h){ const t = toPar(h); return t !== null && t <= -1; }
 // fairway only applies where there is a tee shot to hit one with
 function fairwayApplies(h) { return (h.par || 4) >= 4; }
+// A score left on the assumed par. Only ever true for holes logged since the
+// confirm step existed, so old rounds are never flagged.
+function scoreAssumed(h) { return !!h && h.scoreSet === false; }
+// Sand save: in a greenside bunker and still got up and down.
+function isSandSave(h)   { return !!h && h.sand === true && toPar(h) !== null && toPar(h) <= 0; }
+// What a confirmed score should be coloured: birdie, par, bogey, double+.
+function resultClass(h) {
+  const t = toPar(h);
+  if (t === null) return 'r-par';
+  return t <= -1 ? 'r-bird' : t === 0 ? 'r-par' : t === 1 ? 'r-bog' : 'r-dbl';
+}
+function resultWord(h) {
+  const t = toPar(h);
+  if (t === null) return '';
+  if (t <= -2) return 'eagle';
+  if (t === -1) return 'birdie';
+  if (t === 0)  return 'par';
+  if (t === 1)  return 'bogey';
+  if (t === 2)  return 'double';
+  return '+' + t;
+}
 
 function isHoleDone(h) {
   // scorecard layer
@@ -1232,7 +1253,7 @@ function initSetup() {
   const wrap = document.getElementById('course-chips');
   if (wrap) wrap.innerHTML = chips.map(c =>
     `<button onclick="pickCourse(this.dataset.c)" data-c="${c.replace(/"/g,'&quot;')}"
-      style="border:1.5px solid #99f6e4;background:#f0fdfa;color:#0f766e;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${c}</button>`
+      style="border:1.5px solid #bfdbfe;background:#eff6ff;color:#2563eb;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${c}</button>`
   ).join('');
 }
 
@@ -1402,7 +1423,8 @@ function setRoundView(v) {
 function renderPills() {
   const strip = document.getElementById('hole-pills');
   strip.innerHTML = AR.holes.map((h,i) => {
-    const cls = i===AH ? 'hp cur' : isHoleDone(h) ? 'hp done' : 'hp';
+    let cls = i===AH ? 'hp cur' : isHoleDone(h) ? 'hp done' : 'hp';
+    if (isHoleDone(h) && scoreAssumed(h)) cls += ' unsure';
     return `<div class="${cls}" onclick="jumpHole(${i})" id="pill-${i}">${h.n}</div>`;
   }).join('');
   // scroll active pill into view
@@ -1472,6 +1494,12 @@ function flLabel(emoji, text, infoId) {
   return `<div class="fl-label"><span>${emoji} ${text} ${emoji}</span>` +
          `<button class="fl-i" onclick="toggleInfo('${infoId}')" aria-label="What goes here?">i</button></div>`;
 }
+// Centred, tinted section heading. Replaces the full-width coloured banner:
+// three of those down one screen was most of why everything looked the same.
+function subHead(text, infoId) {
+  return `<div class="sub-h">${text}` +
+         `<button class="fl-i" onclick="toggleInfo('${infoId}')" aria-label="What goes here?">i</button></div>`;
+}
 function flInfo(infoId, text) {
   return `<div class="fl-info" id="${infoId}" style="display:none">${text}</div>`;
 }
@@ -1490,7 +1518,7 @@ function infoDot(id) {
 }
 function infoPanel(id, html) {
   return `<div id="${id}" style="display:none;font-size:11px;font-style:italic;color:#4b5563;line-height:1.5;
-    background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;margin:8px 0 2px">${html}</div>`;
+    background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:9px 11px;margin:8px 0 2px">${html}</div>`;
 }
 
 // The miss-side row, derived entirely from the hole as it stands right now.
@@ -1501,124 +1529,112 @@ function infoPanel(id, html) {
 function missRowHTML(h, i) {
   const isPuttHoled   = h.numPutts === '1';
   const isPacePerfect = h.variance === '0' && !isPuttHoled; // pin-high: L/R only
-  return `<tr>${MISS_OPTS.map(m => {
+  return MISS_OPTS.map(m => {
     const isMade   = m.v === 'made';
     const disabled = isMade
       ? (h.numPutts != null && !isPuttHoled)
       : (isPuttHoled || (isPacePerfect && (m.v === 'short' || m.v === 'long')));
     const sel = !disabled && h.missDirection === m.v;
-    return `<td class="gcell${sel?' on':''}${disabled?' disabled':''}" id="gc3-${i}-${m.v}"` +
-           `${disabled ? '' : ` onclick="onGrid3(${i},'${m.v}')"`}></td>`;
-  }).join('')}</tr>`;
+    return `<div class="missb${sel?' on':''}${disabled?' off':''}" id="gc3-${i}-${m.v}"` +
+           `${disabled ? '' : ` onclick="onGrid3(${i},'${m.v}')"`}>${m.l}</div>`;
+  }).join('');
 }
 
 function refreshMissRow(i) {
-  const tb = document.querySelector(`#grid3-${i} tbody`);
-  if (tb) tb.innerHTML = missRowHTML(AR.holes[i], i);
+  const row = document.getElementById(`grid3-${i}`);
+  if (row) row.innerHTML = missRowHTML(AR.holes[i], i);
 }
 
 function buildHoleFormHTML(h, i) {
   // ── Scorecard layer ──────────────────────────────────────────────────────
   // Defaults mean a routine par costs no taps: score starts at par, fairway
-  // hit, GIR yes, no penalty. You only touch it when something went wrong.
-  const par   = h.par || 4;
-  const score = h.score == null ? par : h.score;
-  const tp    = score - par;
-  const tpTxt = tp === 0 ? 'PAR' : tp > 0 ? '+' + tp : String(tp);
-  const tpCls = tp <= -1 ? 'bird' : tp === 0 ? 'par' : tp === 1 ? 'bog' : 'dbl';
-  const fw    = h.fairway || 'hit';
-  const gir   = h.gir || 'yes';
-  const pen   = h.penalty || 0;
-  const segBtn = (on, label, click, warn) =>
-    `<button class="sbtn${on?' on':''}${warn?' warn':''}" onclick="${click}">${label}</button>`;
-  const radioBtn = (on, label, click) =>
-    `<button class="sbtn${on?' on':''}" onclick="${click}"><span class="radio"></span>${label}</button>`;
+  // hit, GIR yes, no penalty. The score is only ASSUMED until touched, and
+  // says so — a wrong score entered silently is the one error worth shouting
+  // about, because every scoring stat is built on it.
+  const par     = h.par || 4;
+  const score   = h.score == null ? par : h.score;
+  const assumed = scoreAssumed(h);
+  const fw      = h.fairway || 'hit';
+  const gir     = h.gir || 'yes';
+  const pen     = h.penalty || 0;
 
   const scorecard = `
-  <div class="fl">
-    <div class="holebar">
-      <span class="who">H${h.n} · Par ${par}</span>
-      <span class="stepwrap">
-        <span class="step">
-          <button onclick="bumpScore(${i},-1)">−</button>
-          <span class="val" id="sc-val-${i}">${score}</span>
-          <button onclick="bumpScore(${i},1)">+</button>
-        </span>
-      </span>
-      <span class="topar ${tpCls}" id="sc-tp-${i}">${tpTxt}</span>
-      <button class="fl-i" onclick="toggleInfo('i0-${i}')" aria-label="What goes here?">i</button>
+  <div class="scard">
+    <div class="scard-top">
+      <span class="scard-h">Hole ${h.n} · Par ${par}</span>
+      <span class="scard-h warnd" id="sflag-${i}"
+            style="visibility:${assumed ? 'visible' : 'hidden'}">● score assumed</span>
     </div>
-    ${flInfo(`i0-${i}`, 'Score starts at par — tap +/− only if you did not make it. Fairway is your tee shot (par 4s and 5s). GIR means you reached the green in regulation: par 4 in 2, par 5 in 3. A putt played from the fringe is NOT a green hit, and is not counted as a putt either.')}
-    <div class="sc" id="sc-${i}">
-      <div class="sc-row">
-        ${fairwayApplies(h) ? `
-          <div class="sc-lbl">FW</div>
-          <div class="seg">
-            ${segBtn(fw==='left', '◀', `setFairway(${i},'left')`)}
-            ${segBtn(fw==='hit',  '✓', `setFairway(${i},'hit')`)}
-            ${segBtn(fw==='right','▶', `setFairway(${i},'right')`)}
-          </div>` : `<div class="sc-lbl" style="opacity:.55">PAR 3</div><div class="seg" style="visibility:hidden"><button class="sbtn"></button></div>`}
-        <div class="sc-lbl" style="text-align:right">PEN</div>
-        <div class="seg">
-          ${segBtn(pen===0,'0',  `setPenalty(${i},0)`)}
-          ${segBtn(pen===1,'+1', `setPenalty(${i},1)`, true)}
-          ${segBtn(pen>=2, '+2', `setPenalty(${i},2)`, true)}
+    <div class="hero3">
+      <button class="hbtn" onclick="bumpScore(${i},-1)" aria-label="One less">−</button>
+      <div class="sbox ${assumed ? 'open' : 'fill ' + resultClass(h)}" id="sbox-${i}"
+           onclick="confirmScore(${i})">
+        <div class="sbox-n">${score}</div>
+        <div class="sbox-s">${assumed ? 'tap to confirm' : resultWord(h)}</div>
+      </div>
+      <button class="hbtn" onclick="bumpScore(${i},1)" aria-label="One more">+</button>
+    </div>
+    ${fairwayApplies(h) ? `
+    <div class="fw3" id="fw-${i}">
+      <button class="fwb${fw==='left' ?' on':''}" onclick="setFairway(${i},'left')">◀ Left</button>
+      <button class="fwb${fw==='hit'  ?' on':''}" onclick="setFairway(${i},'hit')">Fairway</button>
+      <button class="fwb${fw==='right'?' on':''}" onclick="setFairway(${i},'right')">Right ▶</button>
+    </div>` : ''}
+    <div class="trip">
+      <div class="grp">
+        <div class="grp-l">GIR</div>
+        <div class="grp-b" id="gir-${i}">
+          <button class="gbtn${gir==='yes'?' on':''}" onclick="setGir(${i},'yes')">Yes</button>
+          <button class="gbtn${gir==='no' ?' on':''}" onclick="setGir(${i},'no')">No</button>
         </div>
       </div>
-      <div class="sc-row">
-        <div class="sc-lbl">GIR</div>
-        <div class="seg">
-          ${radioBtn(gir==='yes','Yes',`setGir(${i},'yes')`)}
-          ${radioBtn(gir==='no', 'No', `setGir(${i},'no')`)}
+      <div class="rule"></div>
+      <div class="grp">
+        <div class="grp-l">Sand</div>
+        <div class="grp-b" id="sand-${i}">
+          <button class="gbtn warn${h.sand?' on':''}" onclick="setSand(${i})"
+                  aria-label="Greenside bunker">⛳</button>
+        </div>
+      </div>
+      <div class="rule"></div>
+      <div class="grp">
+        <div class="grp-l">Penalty</div>
+        <div class="grp-b" id="pen-${i}">
+          <button class="gbtn warn${pen===1?' on':''}" onclick="setPenalty(${i},1)">1</button>
+          <button class="gbtn warn${pen>=2 ?' on':''}" onclick="setPenalty(${i},2)">2</button>
         </div>
       </div>
     </div>
   </div>`;
 
-  // ── Table 1: Putt Characteristics (distance × slope+direction) ──────────
-  // 9 columns: [Down L→R, Down Str, Down R→L, Flat L→R, Flat Str, Flat R→L, Up L→R, Up Str, Up R→L]
+  // ── Slope + break + distance ────────────────────────────────────────────
+  // 9 columns: [Down L→R, Down Str, Down R→L, Flat …, Up …]. The arrows ARE
+  // the tap targets; the coloured band above groups them by slope.
   const COLS1 = [
     {slope:'down',dir:'l-to-r'},{slope:'down',dir:'straight'},{slope:'down',dir:'r-to-l'},
     {slope:'flat',dir:'l-to-r'},{slope:'flat',dir:'straight'},{slope:'flat',dir:'r-to-l'},
     {slope:'up',  dir:'l-to-r'},{slope:'up',  dir:'straight'},{slope:'up',  dir:'r-to-l'},
   ];
-  // One drum per slope × break cell. Scrolling a drum sets all three inputs at
-  // once: the column gives slope, the row-header gives break, the value gives feet.
-  // Slope groups are separated by their header colour, so no divider rules.
-  // Break is shown as the arrow alone — the "L-R"/"Str"/"R-L" text crowded the
-  // row, and the arrows carry the same meaning (the info button spells it out).
   const grid1 = `
-  <div class="fl">
-    ${flLabel('🎯', 'Putt Distance + Slope + Break', `i1-${i}`)}
-    ${flInfo(`i1-${i}`, 'Tap the arrow under the slope that matches your putt — ↗ breaks left-to-right, ↑ straight, ↖ right-to-left. Then scroll the drum to the distance from ball to hole, in feet.')}
-    <div class="gwrap">
-      <table class="pgrid" id="grid1-${i}">
-        <thead>
-          <tr>
-            <th colspan="3" class="slope-h" style="background:#166534">⬇ Downhill</th>
-            <th colspan="3" class="slope-h" style="background:#374151">— Flat</th>
-            <th colspan="3" class="slope-h" style="background:#7c3010">⬆ Uphill</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- the break arrows ARE the tap targets — no separate blank row -->
-          <tr>
-            ${COLS1.map(c => {
-              const sel = h.slope===c.slope && h.direction===c.dir;
-              // Slanting arrows for the break: ↗ left-to-right, ↖ right-to-left.
-              const lbl = c.dir==='l-to-r' ? '↗' : c.dir==='straight' ? '↑' : '↖';
-              return `<td class="dcell${sel?' on':''}" id="gc1-${i}-${c.slope}-${c.dir}"
-                          onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</td>`;
-            }).join('')}
-          </tr>
-        </tbody>
-      </table>
+  <div>
+    ${subHead('Slope + Break + Distance', `i1-${i}`)}
+    ${flInfo(`i1-${i}`, 'Tap the arrow under the slope that matches your putt — ↗ breaks left-to-right, ↑ straight, ↖ right-to-left. Then scroll the drum to the distance from ball to hole, in feet. It rests on 0\u2032 until you set it.')}
+    <div class="band">
+      <i style="background:#15803d">⬇ DOWNHILL</i>
+      <i style="background:#475569">— FLAT</i>
+      <i style="background:#9a3412">⬆ UPHILL</i>
+    </div>
+    <div class="tgrid" id="grid1-${i}" style="grid-template-columns:repeat(9,1fr)">
+      ${COLS1.map(c => {
+        const sel = h.slope===c.slope && h.direction===c.dir;
+        const lbl = c.dir==='l-to-r' ? '↗' : c.dir==='straight' ? '↑' : '↖';
+        return `<div class="tile arrow${sel?' on':''}" id="gc1-${i}-${c.slope}-${c.dir}"
+                     onclick="onGrid1(${i},'${c.slope}','${c.dir}')">${lbl}</div>`;
+      }).join('')}
     </div>
 
     <!-- Distance drum: one per hole, populated when the hole opens -->
-    <div class="hd-outer${h.distance>0?' set':''}" id="hdo-${i}">
-      <!-- no value echoed here — the drum below already shows it large -->
-      <div class="hd-cap" id="hdc-${i}">Putt distance</div>
+    <div class="hd-outer${h.distance>0?'':' unset'}" id="hdo-${i}">
       <div class="hd-wrap">
         <div class="hd-band"></div>
         <div class="hd-fade-l"></div>
@@ -1629,72 +1645,45 @@ function buildHoleFormHTML(h, i) {
     </div>
   </div>`;
 
-  // ── Table 2: # Putts × 1st-putt variance ────────────────────────────────
-  // '0' (middle col): valid for row '1' (holed) AND rows 2+ (pin-high miss, L/R only).
-  // Non-zero cols disabled for row '1' (can't miss distance if you holed it).
-  const PUTTS_ROWS = ['1','2','3','4+'];
+  // ── # Putts × 1st-putt pace ─────────────────────────────────────────────
+  // '0' is valid on every row: for a 1-putt it means holed, for 2+ it means a
+  // pin-high miss. Every other column is impossible on a 1-putt, and an
+  // impossible cell is drawn as nothing at all rather than as a dead box.
+  // The last row stores '4+' but reads "4" — the info text says "or more".
+  const PUTTS_ROWS = [['1','1'],['2','2'],['3','3'],['4+','4']];
   const VAR_COLS   = ['>-7','-5','-3','-1','0','+1','+3','+5','>+7'];
+  const varHead    = v => v === '0' ? '0' : v.replace('>','>').replace('-','−') + "′";
   const grid2 = `
-  <div class="fl">
-    ${flLabel('🏌️', '# Putts × 1st-Putt Variance', `i2-${i}`)}
-    ${flInfo(`i2-${i}`, 'Pick the row for how many putts you took, and the column for where the FIRST putt finished — negative feet if it stopped short, positive if it ran past, 0 if it finished level with the hole.')}
-    <div class="gwrap">
-      <table class="pgrid" id="grid2-${i}">
-        <thead>
-          <tr>
-            <th style="min-width:30px">Putts</th>
-            ${VAR_COLS.map((v,vi) => {
-              const isZero = v === '0';
-              const bg  = isZero ? 'background:#f0fdfa;color:#134e4a;' : '';
-              const label = isZero ? '0' : v + "'";
-              return `<th style="${bg}">${label}</th>`;
-            }).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${PUTTS_ROWS.map(pts => {
-            const safePts = pts.replace(/\+/g,'_');
-            return `<tr>
-            <td class="row-head">${pts}</td>
-            ${VAR_COLS.map((v,vi) => {
-              const isZero = v === '0';
-              // 1-putt row: only '0' valid (holed). Multi-putt rows: all cols valid including '0' (pin-high miss).
-              const disabled = pts==='1' && !isZero;
-              const sel = h.numPutts===pts && h.variance===v;
-              const safeV = v.replace(/[<>+]/g,'_');
-              if (disabled) {
-                // Merge the run of dead cells either side of '0' into one flat
-                // block — internal grid lines there suggest something tappable.
-                // Each cell owns its RIGHT rule, so drop it when the next cell
-                // is dead too (the last of a run keeps its rule).
-                const nextDead = vi < VAR_COLS.length-1 && VAR_COLS[vi+1] !== '0';
-                return `<td class="gcell disabled${nextDead?' merge-r':''}"></td>`;
-              }
-              return `<td class="gcell${sel?' on':''}" id="gc2-${i}-${safePts}-${safeV}"
-                          onclick="onGrid2(${i},'${pts}','${v}')"></td>`;
-            }).join('')}
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
+  <div>
+    ${subHead('Putts & 1st-Putt Pace', `i2-${i}`)}
+    ${flInfo(`i2-${i}`, 'Pick the row for how many putts you took — the last row is 4 or more — and the column for where the FIRST putt finished: negative feet if it stopped short, positive if it ran past, 0 if it finished level with the hole.')}
+    <div class="tgrid" id="grid2-${i}" style="grid-template-columns:22px repeat(9,1fr)">
+      <div class="t-h"></div>
+      ${VAR_COLS.map(v => `<div class="t-h">${varHead(v)}</div>`).join('')}
+      ${PUTTS_ROWS.map(([pts,label]) => {
+        const safePts = pts.replace(/\+/g,'_');
+        return `<div class="t-rl">${label}</div>` + VAR_COLS.map(v => {
+          const disabled = pts === '1' && v !== '0';
+          if (disabled) return `<div class="tile off"></div>`;
+          const sel   = h.numPutts===pts && h.variance===v;
+          const safeV = v.replace(/[<>+]/g,'_');
+          return `<div class="tile${sel?' on':''}" id="gc2-${i}-${safePts}-${safeV}"
+                       onclick="onGrid2(${i},'${pts}','${v}')">${sel?'✓':''}</div>`;
+        }).join('');
+      }).join('')}
     </div>
   </div>`;
 
-  // ── Table 3: miss side ──────────────────────────────────────────────────
-  // GIR has moved to the scorecard, so this is a single row of miss sides.
+  // ── Miss side ───────────────────────────────────────────────────────────
+  // Five labelled pills; no header row, because the labels are the header.
   const grid3 = `
-  <div class="fl" style="margin-bottom:4px">
-    ${flLabel('📍', 'Putt Miss Side', `i3-${i}`)}
-    ${flInfo(`i3-${i}`, 'Which side the ball finished on. Use Made when you holed it. Short and long are unavailable on a pin-high miss, where only line was wrong.')}
-    <div class="gwrap">
-      <table class="pgrid" id="grid3-${i}">
-        <thead><tr>${MISS_OPTS.map(m => `<th>${m.l}</th>`).join('')}</tr></thead>
-        <tbody>${missRowHTML(h, i)}</tbody>
-      </table>
-    </div>
+  <div style="margin-bottom:4px">
+    ${subHead('Miss Side', `i3-${i}`)}
+    ${flInfo(`i3-${i}`, 'Which side the ball finished on. Use Made when you holed it. Short and long do not apply on a pin-high miss, where only the line was wrong.')}
+    <div class="missrow" id="grid3-${i}">${missRowHTML(h, i)}</div>
   </div>`;
 
-  return scorecard + `<div class="divider"><span>Putting</span></div>` + grid1 + grid2 + grid3;
+  return scorecard + `<div class="sect-h">Putting</div>` + grid1 + grid2 + grid3;
 }
 
 // Refresh one row in the list below the form (no full re-render)
@@ -1758,7 +1747,7 @@ function onGrid1(hi, slope, dir) {
   h.slope = slope; h.direction = dir;
   const tbl = document.getElementById(`grid1-${hi}`);
   if (tbl) {
-    tbl.querySelectorAll('.dcell.on').forEach(c => c.classList.remove('on'));
+    tbl.querySelectorAll('.tile.on').forEach(c => c.classList.remove('on'));
     const cell = document.getElementById(`gc1-${hi}-${slope}-${dir}`);
     if (cell) cell.classList.add('on');
   }
@@ -1770,9 +1759,11 @@ function onGrid1(hi, slope, dir) {
   saveDraft();
 }
 
+// Index 0 is 0 feet — i.e. nothing chosen. Showing "0'" rather than a dash
+// makes an untouched hole read as untouched instead of as a tap-length putt.
 function drumItemsHTML(sel) {
-  let s = `<div class="hd-item${sel===0?' hd-sel':''}">—</div>`;
-  for (let n = 1; n <= MAX_DIST; n++) {
+  let s = '';
+  for (let n = 0; n <= MAX_DIST; n++) {
     s += `<div class="hd-item${sel===n?' hd-sel':''}">${n}'</div>`;
   }
   return s;
@@ -1861,6 +1852,8 @@ function onDistScroll(hi, scroller) {
   const live = drumIdx(scroller);
   if (DRUM_LAST[hi] !== live) { DRUM_LAST[hi] = live; drumTick(); }
   paintDrum(scroller, live);
+  const outerLive = document.getElementById(`hdo-${hi}`);
+  if (outerLive) outerLive.classList.toggle('unset', live === 0);
   // …but only commit once scrolling settles.
   clearTimeout(DRUM_T[hi]);
   DRUM_T[hi] = setTimeout(() => {
@@ -1908,7 +1901,7 @@ function commitDist(hi, feet) {
   h.distance = feet > 0 ? feet : null;
 
   const outer = document.getElementById(`hdo-${hi}`);
-  if (outer) outer.classList.toggle('set', feet > 0);
+  if (outer) outer.classList.toggle('unset', !(feet > 0));
 
   // Advance only when the hole GOES from incomplete to complete. Firing on
   // any edit meant returning to a finished hole bounced you forward again
@@ -1958,11 +1951,11 @@ function onGrid2(hi, numPutts, variance) {
 
   const tbl = document.getElementById(`grid2-${hi}`);
   if (tbl) {
-    tbl.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+    tbl.querySelectorAll('.tile.on').forEach(c => { c.classList.remove('on'); c.textContent = ''; });
     const safePts = numPutts.replace(/\+/g,'_');
     const safeVar = variance.replace(/[<>+]/g,'_');
     const cell = document.getElementById(`gc2-${hi}-${safePts}-${safeVar}`);
-    if (cell) cell.classList.add('on');
+    if (cell) { cell.classList.add('on'); cell.textContent = '✓'; }
   }
   if (!wasDone && isHoleDone(h)) onHoleDone(hi);
   else refreshHoleSummary(hi);
@@ -1979,9 +1972,9 @@ function onGrid3(hi, missDir) {
     h.numPutts = '1'; h.variance = '0';
     const tbl2 = document.getElementById(`grid2-${hi}`);
     if (tbl2) {
-      tbl2.querySelectorAll('.gcell.on').forEach(c => c.classList.remove('on'));
+      tbl2.querySelectorAll('.tile.on').forEach(c => { c.classList.remove('on'); c.textContent = ''; });
       const c2 = document.getElementById(`gc2-${hi}-1-0`);
-      if (c2) c2.classList.add('on');
+      if (c2) { c2.classList.add('on'); c2.textContent = '✓'; }
     }
   }
   const isPuttHoled   = h.numPutts === '1';
@@ -2015,45 +2008,77 @@ function afterScoreEdit(hi, wasDone) {
   saveDraft();
 }
 
+// Redraw the score box and the hole's marker from the hole's own state —
+// cheaper than a full re-render and it keeps the two in step.
+function refreshScoreBox(hi) {
+  const h = AR.holes[hi];
+  const box = document.getElementById(`sbox-${hi}`);
+  if (box) {
+    const assumed = scoreAssumed(h);
+    box.className = 'sbox ' + (assumed ? 'open' : 'fill ' + resultClass(h));
+    box.innerHTML = `<div class="sbox-n">${h.score == null ? (h.par||4) : h.score}</div>` +
+                    `<div class="sbox-s">${assumed ? 'tap to confirm' : resultWord(h)}</div>`;
+  }
+  const flag = document.getElementById(`sflag-${hi}`);
+  if (flag) flag.style.visibility = scoreAssumed(h) ? 'visible' : 'hidden';
+  const pill = document.getElementById(`pill-${hi}`);
+  if (pill) pill.classList.toggle('unsure', isHoleDone(h) && scoreAssumed(h));
+}
+
 function bumpScore(hi, d) {
   const h = AR.holes[hi];
   const wasDone = isHoleDone(h);
   const cur = h.score == null ? (h.par || 4) : h.score;
-  h.score = Math.max(1, Math.min(15, cur + d));
-  const v = document.getElementById(`sc-val-${hi}`);
-  if (v) v.textContent = h.score;
-  const tpEl = document.getElementById(`sc-tp-${hi}`);
-  if (tpEl) {
-    const tp = h.score - (h.par || 4);
-    tpEl.textContent = tp === 0 ? 'PAR' : tp > 0 ? '+' + tp : String(tp);
-    tpEl.className = 'topar ' + (tp <= -1 ? 'bird' : tp === 0 ? 'par' : tp === 1 ? 'bog' : 'dbl');
-  }
+  h.score   = Math.max(1, Math.min(15, cur + d));
+  h.scoreSet = true;           // touching it is confirming it
+  refreshScoreBox(hi);
   afterScoreEdit(hi, wasDone);
 }
 
-function pickSeg(hi, rowSel, btnIdx) {
-  const rows = document.querySelectorAll(`#sc-${hi} .seg`);
-  const row = rows[rowSel];
+// Tapping the number itself accepts the assumed par without stepping off it
+// and back — otherwise a real par would cost two taps to confirm.
+function confirmScore(hi) {
+  const h = AR.holes[hi];
+  if (h.scoreSet) return;
+  const wasDone = isHoleDone(h);
+  if (h.score == null) h.score = h.par || 4;
+  h.scoreSet = true;
+  refreshScoreBox(hi);
+  afterScoreEdit(hi, wasDone);
+}
+
+function paintGroup(sel, onIdx) {
+  const row = document.querySelector(sel);
   if (!row) return;
-  [...row.children].forEach((b, n) => b.classList.toggle('on', n === btnIdx));
+  [...row.children].forEach((b, n) => b.classList.toggle('on', n === onIdx));
 }
 
 function setFairway(hi, v) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
   h.fairway = v;
-  pickSeg(hi, 0, {left:0, hit:1, right:2}[v]);
+  paintGroup(`#fw-${hi}`, {left:0, hit:1, right:2}[v]);
   afterScoreEdit(hi, wasDone);
 }
+// Penalty has no zero button: nothing selected IS zero, and tapping the
+// selected one clears it back.
 function setPenalty(hi, n) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
-  h.penalty = n;
-  pickSeg(hi, 1, n);
+  h.penalty = (h.penalty === n) ? 0 : n;
+  paintGroup(`#pen-${hi}`, h.penalty === 0 ? -1 : h.penalty - 1);
+  afterScoreEdit(hi, wasDone);
+}
+// Greenside bunker. A toggle, off by default — it only costs a tap on the
+// holes you were actually in one.
+function setSand(hi) {
+  const h = AR.holes[hi]; const wasDone = isHoleDone(h);
+  h.sand = !h.sand;
+  paintGroup(`#sand-${hi}`, h.sand ? 0 : -1);
   afterScoreEdit(hi, wasDone);
 }
 function setGir(hi, v) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
   h.gir = v;
-  pickSeg(hi, 2, v === 'yes' ? 0 : 1);
+  paintGroup(`#gir-${hi}`, v === 'yes' ? 0 : 1);
   afterScoreEdit(hi, wasDone);
 }
 
@@ -2269,6 +2294,20 @@ function saveRound() {
   flushDrum(AH);        // capture a distance still inside its debounce window
   const done = AR.holes.filter(isHoleDone);
   if (!done.length) { alert('Fill in at least one hole before saving.'); return; }
+
+  // Last line of defence on the assumed par. Everything scoring-related is
+  // built on h.score, so a round saved with holes nobody looked at quietly
+  // poisons the averages — better to ask once than to find out in a trend.
+  const unsure = done.filter(scoreAssumed);
+  if (unsure.length) {
+    const list = unsure.map(h => h.n).join(', ');
+    const ok = confirm(
+      `${unsure.length} hole${unsure.length!==1?'s':''} still on the default par.\n\n` +
+      `Hole${unsure.length!==1?'s':''} ${list} — the score was never confirmed, so ` +
+      `${unsure.length!==1?'they':'it'} will be saved as par.\n\n` +
+      `OK to save, or Cancel to go back and check.`);
+    if (!ok) { jumpHole(AR.holes.indexOf(unsure[0])); return; }
+  }
   const round = { ...AR, holes: done };
   const rounds = loadRounds();
   rounds.unshift(round);
@@ -2292,7 +2331,7 @@ function saveRound() {
 function pct(n,d)  { return d ? Math.round(n/d*100) : null; }
 function colorForPct(p) {
   if (p===null) return '#d1d5db';
-  return p>=70?'#0f766e':p>=40?'#f59e0b':'#ef4444';
+  return p>=70?'#2563eb':p>=40?'#f59e0b':'#ef4444';
 }
 
 function computeStats(holes) {
@@ -2332,6 +2371,12 @@ function computeStats(holes) {
     fwN:        fwElig.length,
     scramblePct: girMiss.length ? pct(girMiss.filter(isScramble).length, girMiss.length) : null,
     scrambleN:  girMiss.length,
+    // Sand saves split scrambling into two quite different problems: missing
+    // a green into grass and missing it into a bunker.
+    sandN:      scored.filter(h => h.sand === true).length,
+    sandPct:    scored.filter(h => h.sand === true).length
+                  ? pct(scored.filter(isSandSave).length,
+                        scored.filter(h => h.sand === true).length) : null,
     dblPct:     pct(scored.filter(isDoublePlus).length, scN),
     birdiePct:  pct(scored.filter(isBirdieBetter).length, scN),
     penPerRound: +((scored.reduce((a,h) => a + (h.penalty||0), 0) / scN) * 18).toFixed(2),
@@ -2500,7 +2545,7 @@ function renderBackupBanner() {
   const when = info ? new Date(info.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : null;
   el.style.display = 'block';
   el.innerHTML = `
-    <div style="background:#fff7ed;border:1.5px solid #fdba74;border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:11px">
+    <div style="background:#fff7ed;border:1.5px solid #fdba74;border-radius:6px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:11px">
       <span style="font-size:20px;line-height:1">⚠️</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700;color:#9a3412">
@@ -2510,7 +2555,7 @@ function renderBackupBanner() {
           ${when ? `Last backup ${when}. ` : 'Never backed up. '}Phone storage can be cleared without warning.
         </div>
       </div>
-      <button onclick="backupData()" style="flex-shrink:0;border:none;background:#ea580c;color:#fff;border-radius:9px;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer">Back up</button>
+      <button onclick="backupData()" style="flex-shrink:0;border:none;background:#ea580c;color:#fff;border-radius:4px;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer">Back up</button>
     </div>`;
 }
 
@@ -2566,7 +2611,7 @@ function roundSeries() {
 }
 
 const TREND_SPECS = {
-  score: { lbl:'Score to par / 18', col:'#0f766e', fmt:v => (v>0?'+':'') + v,
+  score: { lbl:'Score to par / 18', col:'#2563eb', fmt:v => (v>0?'+':'') + v,
            cap:'Strokes over or under par per 18 holes. Lower is better.' },
   gir:   { lbl:'GIR %',    col:'#15803d', fmt:v => v + '%', higher:true,
            cap:'Greens in regulation. The stat most tied to scoring at your level — higher is better.' },
@@ -2574,7 +2619,7 @@ const TREND_SPECS = {
            cap:'Tee shots finding the fairway, on par 4s and 5s. Higher is better.' },
   putts: { lbl:'Putts / 18', col:'#7c3aed', fmt:v => String(v),
            cap:'Putts per 18 holes, counting only strokes played on the green. Lower is better.' },
-  sg:    { lbl:'SG Putting / 18', col:'#0d9488', fmt:v => (v>0?'+':'') + v, higher:true,
+  sg:    { lbl:'SG Putting / 18', col:'#1d4ed8', fmt:v => (v>0?'+':'') + v, higher:true,
            cap:'Strokes gained putting against the benchmark chosen in Insights. Higher is better.' },
   dbl:   { lbl:'Double+ %', col:'#dc2626', fmt:v => v + '%',
            cap:'Holes taking two or more over par. Eliminating these is the fastest route down a handicap.' },
@@ -2651,7 +2696,7 @@ function renderTrendSummary(S) {
       <td style="padding:7px 6px;text-align:right;font-size:12px;font-weight:800;color:${col}">${dir||'·'}</td></tr>`;
   }).filter(Boolean).join('');
   el.innerHTML = !rows ? '' : `
-    <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+    <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">Last 5 rounds vs before</div>
       <table style="width:100%;border-collapse:collapse">
         <thead><tr style="color:#cbd5e1;font-size:9.5px;text-transform:uppercase">
@@ -2670,7 +2715,7 @@ function renderScoringTab(s, roundsCount) {
   const sc = s.scoring;
   if (!el) return;
   if (!sc) {
-    el.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;text-align:center;
+    el.innerHTML = `<div style="background:#fff;border-radius:6px;padding:22px;text-align:center;
       box-shadow:0 1px 3px rgba(0,0,0,.07)">
       <div style="font-size:34px;margin-bottom:8px">📋</div>
       <p style="font-weight:700;color:#374151;margin:0 0 6px">No scored rounds yet</p>
@@ -2688,17 +2733,19 @@ function renderScoringTab(s, roundsCount) {
       ${sub ? `<div style="font-size:9px;color:#9ca3af;margin-top:1px">${sub}</div>` : ''}</div>`;
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-      ${card(tpT, 'Score to par / 18', tp <= 0 ? '#16a34a' : '#0f766e')}
+      ${card(tpT, 'Score to par / 18', tp <= 0 ? '#16a34a' : '#2563eb')}
       ${card(sc.girPct + '%', 'Greens in reg', '#15803d')}
       ${card(sc.fwPct === null ? '—' : sc.fwPct + '%', 'Fairways', '#2563eb', sc.fwN ? sc.fwN + ' tee shots' : '')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-      ${card(sc.scramblePct === null ? '—' : sc.scramblePct + '%', 'Scrambling', '#0d9488',
+      ${card(sc.scramblePct === null ? '—' : sc.scramblePct + '%', 'Scrambling', '#1d4ed8',
              sc.scrambleN ? sc.scrambleN + ' missed greens' : '')}
       ${card(sc.dblPct + '%', 'Double or worse', '#dc2626')}
       ${card(sc.birdiePct + '%', 'Birdie or better', '#16a34a')}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      ${card(sc.sandPct === null ? '—' : sc.sandPct + '%', 'Sand saves', '#b45309',
+             sc.sandN ? sc.sandN + ' bunkers' : 'no bunkers logged')}
       ${card(sc.penPerRound, 'Penalties / 18', '#b45309')}
       ${card(`${roundsCount} / ${sc.n}`, 'Rounds / scored holes', '#1f2937')}
     </div>
@@ -2722,7 +2769,7 @@ function costOfMissHTML(sc) {
   const gap = (a,b) => (rows[a][1] !== null && rows[b][1] !== null)
       ? ` <span style="color:#dc2626;font-weight:800">${(rows[b][1]-rows[a][1]).toFixed(2)} shots</span>` : '';
   return `
-  <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+  <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">What a miss costs</div>
     <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:9px">
       Your average score to par in each case — measured on your own rounds, not a model.
@@ -2749,7 +2796,7 @@ function renderByParTab(s) {
   if (!rows.length) { el.innerHTML = ''; return; }
   const worst = rows.reduce((a,b) => (b.toPar > a.toPar ? b : a), rows[0]);
   el.innerHTML = `
-  <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+  <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:9px">Scoring by hole type</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="color:#cbd5e1;font-size:9.5px;text-transform:uppercase">
@@ -2912,15 +2959,15 @@ function renderDashboard() {
   const paceBar = (label, n, p, col) => !n ? '' : `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
       <div style="min-width:64px;font-size:11px;color:#374151;font-weight:600">${label}</div>
-      <div style="flex:1;height:9px;background:#f3f4f6;border-radius:5px;overflow:hidden">
-        <div style="height:100%;width:${p}%;background:${col};border-radius:5px"></div>
+      <div style="flex:1;height:9px;background:#f3f4f6;border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${p}%;background:${col};border-radius:4px"></div>
       </div>
       <div style="width:34px;text-align:right;font-size:12px;font-weight:800;color:${col}">${p}%</div>
       <div style="width:26px;text-align:right;font-size:10px;color:#cbd5e1">${n}</div>
     </div>`;
 
   const paceVsLineHTML = !pv.n ? '' : `
-    <div style="background:#f8fafc;border:1.5px solid #dde3ea;border-radius:12px;padding:12px;margin-bottom:14px">
+    <div style="background:#f8fafc;border:1.5px solid #dde3ea;border-radius:4px;padding:12px;margin-bottom:14px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#334155;margin-bottom:3px">Pace vs Line</div>
       <div style="font-size:10px;color:#94a3b8;line-height:1.45;margin-bottom:9px">
         Where your first putt finished on every miss (${pv.n}). Taken from 1st-putt
@@ -2928,7 +2975,7 @@ function renderDashboard() {
         only captures line.
       </div>
       ${paceBar('Short',    pv.short, pv.shortPct, '#2563eb')}
-      ${paceBar('Pin-high', pv.pin,   pv.pinPct,   '#0f766e')}
+      ${paceBar('Pin-high', pv.pin,   pv.pinPct,   '#2563eb')}
       ${paceBar('Long',     pv.long,  pv.longPct,  '#ea580c')}
       <div style="border-top:1px solid #e2e8f0;margin-top:9px;padding-top:9px;font-size:11.5px;color:#334155;line-height:1.5">
         <b>${pv.offPct}% of misses were short or long.</b>
@@ -2948,7 +2995,7 @@ function renderDashboard() {
     // Empty segments are dropped so a 0% slice cannot leave a stray divider
     const segs = [
       { p:o.shortPct, c:'#2563eb', t:'short' },
-      { p:o.pinPct,   c:'#0f766e', t:'pin'   },
+      { p:o.pinPct,   c:'#2563eb', t:'pin'   },
       { p:o.longPct,  c:'#ea580c', t:'long'  },
     ].filter(x => x.p > 0);
     // The word only fits on a wide enough slice; narrow ones keep just the %
@@ -2959,7 +3006,7 @@ function renderDashboard() {
         <span style="font-weight:700;color:#374151">${label}</span>
         <span style="font-size:9.5px;color:#cbd5e1">${o.n} miss${o.n!==1?'es':''}</span>
       </div>
-      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f3f4f6">
+      <div style="display:flex;height:12px;border-radius:4px;overflow:hidden;background:#f3f4f6">
         ${segs.map((x,i) => `<div style="width:${x.p}%;background:${x.c};box-sizing:border-box${
           i < segs.length-1 ? ';border-right:1.5px solid #fff' : ''}"></div>`).join('')}
       </div>
@@ -2977,7 +3024,7 @@ function renderDashboard() {
   };
 
   const paceByCondHTML = !pv.n ? '' : `
-    <div style="background:#fff;border:1.5px solid #dde3ea;border-radius:12px;padding:12px;margin-bottom:14px">
+    <div style="background:#fff;border:1.5px solid #dde3ea;border-radius:4px;padding:12px;margin-bottom:14px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#334155;margin-bottom:3px">Pace by condition</div>
       <div style="font-size:10px;color:#94a3b8;line-height:1.45;margin-bottom:10px">
         The same short / pin-high / long split, by where the putt was from.
@@ -3011,7 +3058,7 @@ function renderDashboard() {
   charts.var = new Chart(document.getElementById('chart-var').getContext('2d'),{
     type:'bar',
     data:{labels:av.map(v=>v.v),
-      datasets:[{data:av.map(v=>v.n),backgroundColor:'#5eead4',borderRadius:4}]},
+      datasets:[{data:av.map(v=>v.n),backgroundColor:'#93c5fd',borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
@@ -3030,7 +3077,7 @@ function renderDashboard() {
       <tbody>
         ${s.byVar.filter(v=>v.n>0).map(v=>{
           const isZero = v.v==='0';
-          const col = isZero ? '#0f766e' : v.v.startsWith('+') || v.v==='>+7' ? '#ea580c' : '#2563eb';
+          const col = isZero ? '#2563eb' : v.v.startsWith('+') || v.v==='>+7' ? '#ea580c' : '#2563eb';
           return `
           <tr style="border-top:1px solid #f3f4f6">
             <td style="padding:4px 2px;font-weight:700;color:${col}">${isZero?'0 (pin-high)':v.v+"'"}</td>
@@ -3045,9 +3092,9 @@ function renderDashboard() {
         }).join('')}
       </tbody>
     </table>
-    <div style="margin-top:14px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:11px;color:#64748b;line-height:1.5">
+    <div style="margin-top:14px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;font-size:11px;color:#64748b;line-height:1.5">
       Pace split by distance, slope and break now lives under
-      <b style="color:#0f766e">Miss → Pace by condition</b>, where it also shows
+      <b style="color:#2563eb">Miss → Pace by condition</b>, where it also shows
       pin-high rather than only short vs long.
     </div>`;
 
@@ -3805,13 +3852,13 @@ function drawTrendChart(tab) {
   if (trendCharts[tab]) { trendCharts[tab].destroy(); delete trendCharts[tab]; }
 
   const SPECS = {
-    sg:    [{ k:'sg',    lbl:'SG / 18',  col:'#0f766e' }],
-    make:  [{ k:'make',  lbl:'Make %',   col:'#0f766e' }],
+    sg:    [{ k:'sg',    lbl:'SG / 18',  col:'#2563eb' }],
+    make:  [{ k:'make',  lbl:'Make %',   col:'#2563eb' }],
     '3putt':[{ k:'tp',   lbl:'3-putt %', col:'#dc2626' }],
     pace:  [{ k:'short', lbl:'% short',  col:'#2563eb' },
             { k:'long',  lbl:'% long',   col:'#ea580c' }],
     miss:  [{ k:'mLeft', lbl:'% left',   col:'#7c3aed' },
-            { k:'mRight',lbl:'% right',  col:'#0d9488' }],
+            { k:'mRight',lbl:'% right',  col:'#1d4ed8' }],
   };
   const spec = SPECS[tab];
   if (!spec) return;
@@ -3902,7 +3949,7 @@ function shotsLostHTML(rounds) {
   const rows = shotsLostBreakdown(rounds);
   if (!rows || !rows.length) {
     const scored = rounds.flatMap(r => r.holes || []).filter(h => h.score != null).length;
-    return `<div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;
+    return `<div style="background:#fff;border-radius:6px;padding:18px;margin-bottom:14px;
       box-shadow:0 1px 3px rgba(0,0,0,.07);text-align:center">
       <div style="font-size:30px;margin-bottom:7px">📋</div>
       <p style="font-weight:700;color:#374151;margin:0 0 5px">What improvement is worth</p>
@@ -3913,7 +3960,7 @@ function shotsLostHTML(rounds) {
   const max = rows[0].value;
   const COL = { gir:'#dc2626', fw:'#2563eb', pen:'#b45309', tp:'#7c3aed' };
   return `
-  <div style="background:#fff;border-radius:16px;padding:15px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+  <div style="background:#fff;border-radius:6px;padding:15px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">What improvement is worth</div>
     <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:12px">
       Shots saved per single improvement, measured on your own rounds. Ranked by
@@ -3925,8 +3972,8 @@ function shotsLostHTML(rounds) {
           <span style="font-size:13px;font-weight:800;color:#1f2937">${r.label}</span>
           <span style="font-size:14px;font-weight:800;color:${COL[r.key]}">−${r.value} <span style="font-size:10px;font-weight:600;color:#94a3b8">shots</span></span>
         </div>
-        <div style="height:9px;background:#f3f4f6;border-radius:5px;overflow:hidden">
-          <div style="height:100%;width:${Math.round(r.value/max*100)}%;background:${COL[r.key]};border-radius:5px"></div>
+        <div style="height:9px;background:#f3f4f6;border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${Math.round(r.value/max*100)}%;background:${COL[r.key]};border-radius:4px"></div>
         </div>
         <div style="font-size:10px;color:#94a3b8;margin-top:3px">
           ${r.perRound} ${r.unit} a round, so there is room
@@ -3969,7 +4016,7 @@ function renderInsights() {
       <div style="font-size:52px">💡</div>
       <p style="font-weight:600;color:#374151;margin:8px 0 4px">No data yet</p>
       <p style="font-size:13px">Complete a round to start getting insights</p>
-      <button onclick="showMain('round')" style="margin-top:16px;background:#0f766e;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
+      <button onclick="showMain('round')" style="margin-top:16px;background:#2563eb;color:#fff;border:none;border-radius:4px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer">Start a Round</button>
     </div>`;
     return;
   }
@@ -3978,7 +4025,7 @@ function renderInsights() {
 
   if (data.insufficient) {
     container.innerHTML = `<div style="padding:16px">
-      <div style="background:#fff;border-radius:16px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+      <div style="background:#fff;border-radius:6px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
         <div style="font-size:40px;margin-bottom:10px">📊</div>
         <p style="font-weight:700;color:#374151;margin-bottom:6px">Building your profile…</p>
         <p style="font-size:13px;color:#9ca3af;line-height:1.5">${data.N} putts tracked across ${data.R} round${data.R!==1?'s':''}.<br>Need 15+ putts for meaningful patterns.</p>
@@ -4004,7 +4051,7 @@ function renderInsights() {
       const n = sub.filter(testFn).length;
       const r = n / sub.length;
       const col = r > allRate + 0.06 ? '#dc2626' : r < allRate - 0.06 ? '#16a34a' : '#374151';
-      return `<div style="flex:1;background:rgba(255,255,255,.55);border-radius:5px;padding:3px;text-align:center;min-width:0">
+      return `<div style="flex:1;background:rgba(255,255,255,.55);border-radius:4px;padding:3px;text-align:center;min-width:0">
         <div style="font-size:8px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sub._label||''}</div>
         <div style="font-size:11px;font-weight:800;color:${col}">${Math.round(r*100)}%</div>
         <div style="font-size:8px;color:#9ca3af">${n}/${sub.length}</div></div>`;
@@ -4049,7 +4096,7 @@ function renderInsights() {
           const same   = fv(v) === fv(ref);
           const better = !same && (higherIsBetter ? v > ref : v < ref);
           const worse  = !same && (higherIsBetter ? v < ref : v > ref);
-          if (better) { bg='#f0fdfa'; color='#16a34a'; }
+          if (better) { bg='#eff6ff'; color='#16a34a'; }
           else if (worse) { bg='#fef2f2'; color='#dc2626'; }
         }
         return `<td style="text-align:center;padding:5px 3px;font-weight:${fw};color:${color};background:${bg};border-radius:4px">${v!==null?fv(v):'<span style="color:#d1d5db">—</span>'}</td>`;
@@ -4068,19 +4115,19 @@ function renderInsights() {
   // v2 headline strip: strokes gained per 18 holes + feet holed per round
   const sgHTML = `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-    <div style="background:${summary.sg===null?'#f9fafb':summary.sg>=0?'#f0fdfa':'#fef2f2'};border-radius:10px;padding:10px;text-align:center">
+    <div style="background:${summary.sg===null?'#f9fafb':summary.sg>=0?'#eff6ff':'#fef2f2'};border-radius:4px;padding:10px;text-align:center">
       <div style="font-size:20px;font-weight:800;color:${summary.sg===null?'#d1d5db':summary.sg>=0?'#16a34a':'#dc2626'}">${summary.sg===null?'—':fmtSG(summary.sg,1)}</div>
       <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">SG Putting / 18 holes</div>
       <div style="font-size:9px;color:#6b7280;margin-top:1px">vs ${sgBaseLabel()}</div>
       ${summary.sg5!==null&&summary.sg!==null?`<div style="font-size:9px;color:#6b7280;margin-top:2px">Last 5: ${fmtSG(summary.sg5,1)}${summary.sg5>summary.sg?' <span style="color:#16a34a">▲</span>':summary.sg5<summary.sg?' <span style="color:#dc2626">▼</span>':''}</div>`:''}
     </div>
-    <div style="background:#f0fdfa;border-radius:10px;padding:10px;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#0d9488">${summary.feetPerRd!==null?summary.feetPerRd+"'":'—'}</div>
+    <div style="background:#eff6ff;border-radius:4px;padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#1d4ed8">${summary.feetPerRd!==null?summary.feetPerRd+"'":'—'}</div>
       <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">Feet holed / 18 holes</div>
     </div>
   </div>`;
   const summaryHTML = `
-  <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+  <div style="background:#fff;border-radius:6px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:12px">
       Performance · ${data.N} putts · ${data.R} round${data.R!==1?'s':''}${INSIGHT_FILTER!=='all'?` · last ${INSIGHT_FILTER} rounds`:''}
     </div>
@@ -4094,7 +4141,7 @@ function renderInsights() {
           const worse  = k.better==='higher' ? v5n < vn : v5n > vn;
           arrowEl = better ? ' <span style="color:#16a34a">▲</span>' : worse ? ' <span style="color:#dc2626">▼</span>' : '';
         }
-        return `<div style="background:#f9fafb;border-radius:10px;padding:10px;text-align:center">
+        return `<div style="background:#f9fafb;border-radius:4px;padding:10px;text-align:center">
           <div style="font-size:18px;font-weight:800;color:#1f2937">${k.v}</div>
           <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:2px">${k.label}</div>
           ${k.v5!==null?`<div style="font-size:9px;color:#6b7280;margin-top:2px">Last 5: ${k.v5}${arrowEl}</div>`:''}
@@ -4135,27 +4182,27 @@ function renderInsights() {
     const skipV  = fa.type.startsWith('pace_');
     const bd     = bdGrid(fa.pool, fa.testFn, skipV);
     return `
-    <div style="background:${st.bg};border-radius:16px;padding:16px;margin-bottom:12px;border:1.5px solid ${st.border};box-shadow:0 1px 4px rgba(0,0,0,.06)">
+    <div style="background:${st.bg};border-radius:6px;padding:16px;margin-bottom:12px;border:1.5px solid ${st.border};box-shadow:0 1px 4px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <div style="background:${st.badgeBg};color:#fff;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:800;letter-spacing:.05em">${st.label}</div>
+        <div style="background:${st.badgeBg};color:#fff;border-radius:4px;padding:3px 9px;font-size:10px;font-weight:800;letter-spacing:.05em">${st.label}</div>
         <div style="font-size:10px;color:#9ca3af">#${i+1} of ${focusAreas.length}</div>
         <div style="margin-left:auto;font-size:10px;font-weight:700;color:${st.badgeBg}">${impTxt}</div>
       </div>
       <div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:8px;line-height:1.3">${fa.emoji} ${fa.title}</div>
-      <div style="background:rgba(255,255,255,.7);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="background:rgba(255,255,255,.7);border-radius:4px;padding:10px 12px;margin-bottom:10px">
         <div style="font-size:12px;color:#374151;line-height:1.5">${sr}% in this condition (${n}/${fa.pool.length}) vs your overall ${br}%</div>
       </div>
       <div style="font-size:12px;color:#1f2937;line-height:1.6;margin-bottom:10px">
-        <span style="font-weight:800;color:#134e4a">💡 Fix: </span>${fa.rec}
+        <span style="font-weight:800;color:#1d4ed8">💡 Fix: </span>${fa.rec}
       </div>
       ${bd ? `<button onclick="(function(b,el){el.style.display=el.style.display==='none'?'block':'none';b.textContent=b.textContent.includes('▼')?'Hide details ▲':'Details by condition ▼';})(this,document.getElementById('${bdId}'))"
-        style="border:none;background:rgba(0,0,0,.06);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;color:#374151;cursor:pointer;width:100%;text-align:center;margin-bottom:2px">
+        style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:5px 12px;font-size:11px;font-weight:600;color:#374151;cursor:pointer;width:100%;text-align:center;margin-bottom:2px">
         Details by condition ▼
       </button>
       <div id="${bdId}" style="display:none;margin-top:8px">${bd}</div>` : ''}
     </div>`;
   }).join('')}` : `
-  <div style="background:#fff;border-radius:16px;padding:20px;text-align:center;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+  <div style="background:#fff;border-radius:6px;padding:20px;text-align:center;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
     <div style="font-size:40px;margin-bottom:10px">✅</div>
     <p style="font-weight:700;color:#374151;margin-bottom:6px">No significant patterns found</p>
     <p style="font-size:13px;color:#9ca3af;line-height:1.5">Your putting is consistent across all conditions. Keep adding rounds for more granular analysis.</p>
@@ -4167,7 +4214,7 @@ function renderInsights() {
 
   const trendsHTML = `
   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:10px">Trends over time</div>
-  <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+  <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)">
     <div style="display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">
       ${tTabDefs.map(t=>`<button class="tr-tab${t.k===TREND_TAB?' on':''}" data-tab="${t.k}" onclick="setTrendTab('${t.k}')">${t.l}</button>`).join('')}
     </div>
@@ -4232,7 +4279,7 @@ function printInsights() {
   const when = new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
   document.getElementById('print-content').innerHTML = `
-    <h1 style="font-size:21px;font-weight:800;color:#134e4a;margin:0 0 4px">&#9971; Putting Insights</h1>
+    <h1 style="font-size:21px;font-weight:800;color:#1d4ed8;margin:0 0 4px">&#9971; Putting Insights</h1>
     <div style="font-size:12px;color:#9ca3af;margin-bottom:18px;border-bottom:1px solid #e5e7eb;padding-bottom:12px">
       ${filterLabel} &middot; vs ${sgBaseLabel()} &middot; ${when}
     </div>
@@ -4473,9 +4520,9 @@ function renderHistory() {
     const behind = roundsSinceBackup();
     btn.textContent = behind > 0 && rounds.length
       ? `💾 Back up (${behind} new)` : '💾 Backup Data';
-    btn.style.background   = behind >= 3 ? '#fff7ed' : '#f0fdfa';
-    btn.style.color        = behind >= 3 ? '#c2410c' : '#0d9488';
-    btn.style.borderColor  = behind >= 3 ? '#ea580c' : '#16a34a';
+    btn.style.background   = behind >= 3 ? '#fff7ed' : '#eff6ff';
+    btn.style.color        = behind >= 3 ? '#c2410c' : '#1d4ed8';
+    btn.style.borderColor  = behind >= 3 ? '#ea580c' : '#93c5fd';
   }
   document.getElementById('hist-empty').style.display = rounds.length ? 'none' : 'block';
   document.getElementById('hist-list').innerHTML = rounds.map(r=>{
@@ -4494,7 +4541,7 @@ function renderHistory() {
           ${sc
             ? `<div style="font-size:22px;font-weight:800;color:#1f2937">${sc.strokes}</div>
                <div style="font-size:10px;font-weight:700;color:${toParColor(sc.toPar)}">${fmtToPar(sc.toPar)}</div>`
-            : `<div style="font-size:22px;font-weight:800;color:#0f766e">${s.makesPct}%</div>
+            : `<div style="font-size:22px;font-weight:800;color:#2563eb">${s.makesPct}%</div>
                <div style="font-size:10px;color:#9ca3af">make rate</div>`}
         </div>
       </div>
@@ -4503,13 +4550,14 @@ function renderHistory() {
         <span>🎯 GIR ${sc.girPct}%</span>
         ${sc.fwPct!=null?`<span>⛳ FW ${sc.fwPct}%</span>`:''}
         ${sc.scramblePct!=null?`<span>🛟 Scr ${sc.scramblePct}%</span>`:''}
+        ${sc.sandN?`<span>⛳ Sand ${sc.sandPct}%</span>`:''}
         ${sc.penalties?`<span style="color:#dc2626">⚠ ${sc.penalties} pen</span>`:''}
       </div>` : ''}
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:12px;color:#6b7280">
         <span>🏌️ ${s.totalPutts} putts</span>
         <span style="color:${parseInt(s.threePct)>15?'#f59e0b':'#6b7280'}">⚠ 3-putt ${s.threePct}%</span>
         ${s.sgN>=5?`<span style="font-weight:700;color:${s.sgTotal>=0?'#16a34a':'#dc2626'}">SG ${fmtSG(s.sgTotal,1)}</span>`:''}
-        <span style="color:#0d9488">📏 ${s.feetMade}' made</span>
+        <span style="color:#1d4ed8">📏 ${s.feetMade}' made</span>
       </div>
     </div>`;
   }).join('');
@@ -4537,11 +4585,11 @@ function openModal(id) {
         <div class="mkpi-l">To Par</div>
       </div>
       <div class="mkpi">
-        <div class="mkpi-v" style="color:#0f766e">${sc.girPct}%</div>
+        <div class="mkpi-v" style="color:#2563eb">${sc.girPct}%</div>
         <div class="mkpi-l">GIR</div>
       </div>
       <div class="mkpi">
-        <div class="mkpi-v" style="color:#0d9488">${sc.fwPct??'—'}${sc.fwPct!=null?'%':''}</div>
+        <div class="mkpi-v" style="color:#1d4ed8">${sc.fwPct??'—'}${sc.fwPct!=null?'%':''}</div>
         <div class="mkpi-l">Fairways</div>
       </div>
     </div>
@@ -4563,6 +4611,13 @@ function openModal(id) {
         <div class="mkpi-l">Penalties</div>
       </div>
     </div>
+    ${sc.sandN ? `
+    <div style="display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:10px">
+      <div class="mkpi">
+        <div class="mkpi-v" style="color:#b45309">${sc.sandPct}%</div>
+        <div class="mkpi-l">Sand saves · ${sc.sandN} greenside bunker${sc.sandN!==1?'s':''}</div>
+      </div>
+    </div>` : ''}
     <table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:16px">
       <thead><tr style="color:#9ca3af">
         <th style="text-align:left;padding:4px 2px">By par</th>
@@ -4578,13 +4633,13 @@ function openModal(id) {
             <td style="padding:5px 2px;text-align:center;color:#9ca3af">${p.n}</td>
             <td style="padding:5px 2px;text-align:center;font-weight:700;color:#374151">${p.avg.toFixed(2)}</td>
             <td style="padding:5px 2px;text-align:center;font-weight:700;color:${toParColor(p.toPar)}">${p.toPar>0?'+':''}${p.toPar.toFixed(2)}</td>
-            <td style="padding:5px 2px;text-align:right;color:#0f766e">${p.girPct}%</td>
+            <td style="padding:5px 2px;text-align:right;color:#2563eb">${p.girPct}%</td>
           </tr>`).join('')}
       </tbody>
     </table>
     <div class="msec-h">Putting</div>`
-  : `<div style="margin-bottom:12px;padding:8px 10px;background:#f0fdfa;border:1px solid #ccfbf1;
-         border-radius:8px;font-size:11px;color:#0f766e;font-style:italic">
+  : `<div style="margin-bottom:12px;padding:8px 10px;background:#eff6ff;border:1px solid #dbeafe;
+         border-radius:4px;font-size:11px;color:#2563eb;font-style:italic">
        Imported from Putting Tracker — putting data only, no scorecard.
      </div>`;
 
@@ -4597,7 +4652,7 @@ function openModal(id) {
         <div class="mkpi-l">Putts</div>
       </div>
       <div class="mkpi">
-        <div class="mkpi-v" style="color:#0f766e">${s.makesPct}%</div>
+        <div class="mkpi-v" style="color:#2563eb">${s.makesPct}%</div>
         <div class="mkpi-l">Make</div>
       </div>
       <div class="mkpi">
@@ -4621,7 +4676,7 @@ function openModal(id) {
         <div class="mkpi-l">SG Putting</div>
       </div>
       <div class="mkpi feet">
-        <div class="mkpi-v" style="color:#0d9488">${s.feetMade}'</div>
+        <div class="mkpi-v" style="color:#1d4ed8">${s.feetMade}'</div>
         <div class="mkpi-l">Feet Made</div>
       </div>
       <div class="mkpi long">
@@ -4631,7 +4686,7 @@ function openModal(id) {
     </div>
 
     <!-- Breakdown tabs -->
-    <div style="background:#fff;border:1.5px solid #dde3ea;border-radius:12px;overflow:hidden;margin-bottom:16px">
+    <div style="background:#fff;border:1.5px solid #dde3ea;border-radius:4px;overflow:hidden;margin-bottom:16px">
       <div class="stab-row" style="padding:8px 10px;border-bottom:1px solid #f3f4f6">
         <button class="stab on" onclick="setModalStab(this,'dist')">Distance</button>
         <button class="stab"    onclick="setModalStab(this,'slope')">Slope</button>
@@ -4692,7 +4747,7 @@ function openModal(id) {
                 const mx = Math.max(1, ...s.byVar.map(v=>v.n));
                 return s.byVar.filter(v=>v.n>0).map(v => {
                   const isZero = v.v === '0';
-                  const col = isZero ? '#0f766e' : (v.v.startsWith('+') || v.v === '>+7') ? '#ea580c' : '#2563eb';
+                  const col = isZero ? '#2563eb' : (v.v.startsWith('+') || v.v === '>+7') ? '#ea580c' : '#2563eb';
                   return `
                   <tr style="border-top:1px solid #f3f4f6">
                     <td style="padding:4px 2px;font-weight:700;color:${col}">${isZero?'0 (pin-high)':v.v+"'"}</td>
