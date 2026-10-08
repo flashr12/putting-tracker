@@ -1683,7 +1683,7 @@ function buildHoleFormHTML(h, i) {
   const varHead    = v => v === '0' ? '0' : v.replace('>','>').replace('-','−') + "′";
   const grid2 = `
   <div>
-    ${subHead('Putts & 1st-Putt Pace', `i2-${i}`)}
+    ${subHead('Total Putts + 1st Putt Pace', `i2-${i}`)}
     ${flInfo(`i2-${i}`, 'Pick the row for how many putts you took — the last row is 4 or more — and the column for where the FIRST putt finished: negative feet if it stopped short, positive if it ran past, 0 if it finished level with the hole.')}
     <div class="tgrid" id="grid2-${i}" style="grid-template-columns:22px repeat(9,1fr)">
       <div class="t-h"></div>
