@@ -1071,7 +1071,10 @@ const LONG_VAR    = ['+1','+3','+5','>+6','>+7'];   // ran past hole
 const SLOPE_OPTS  = [{v:'flat',l:'— Flat'},{v:'up',l:'⬆ Up'},{v:'down',l:'⬇ Down'}];
 const DIR_OPTS    = [{v:'straight',l:'↑ Str'},{v:'l-to-r',l:'↗ L→R'},{v:'r-to-l',l:'↖ R→L'}];
 const NUM_OPTS    = ['1','2','3','4+'];
-const MISS_OPTS   = [{v:'left',l:'◀ Left'},{v:'right',l:'▶ Right'},{v:'short',l:'▼ Short'},{v:'long',l:'▲ Long'},{v:'made',l:'✓ Made'}];
+// Laid out around the hole rather than grouped by axis: Made sits in the
+// middle and every miss reads outwards from it — short and long either side,
+// left and right at the ends. Order here IS the on-screen order.
+const MISS_OPTS   = [{v:'left',l:'◀ Left'},{v:'short',l:'▼ Short'},{v:'made',l:'✓ Made'},{v:'long',l:'▲ Long'},{v:'right',l:'▶ Right'}];
 const GIR_OPTS    = [{v:'yes',l:'✓ Yes'},{v:'no',l:'✗ No'}];
 const STORAGE_KEY = 'scratch_v1';   // v3 has its own store; v1/v2 are untouched
 
