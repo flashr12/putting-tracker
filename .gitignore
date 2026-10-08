@@ -3,6 +3,9 @@ backup.json
 *-backup-*.json
 putts-*.csv
 
+# Scratch mockups and working copies — anything prefixed with _
+_*
+
 # Local tooling / OS
 .claude/
 .DS_Store
