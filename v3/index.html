@@ -177,8 +177,14 @@
     #round-bottom-nav {
       flex-shrink: 0;
       padding: 8px 14px;
-      padding-bottom: calc(8px + env(safe-area-inset-bottom));
-      background: #fff; border-top: 1px solid #e5e7eb;
+      /* the home-indicator strip is reserved by iOS and cannot be used, so
+         the buttons sit directly on top of it rather than 8px above it —
+         any extra here just reads as a gap under the bar */
+      padding-bottom: calc(2px + env(safe-area-inset-bottom));
+      /* tinted, not white: iOS reserves the home-indicator strip and no app
+         can use it, but on a white page a white bar makes that strip look
+         like empty page rather than the base of the bar */
+      background: #f1f4f8; border-top: 1px solid #dfe5ed;
       display: flex; gap: 8px;
     }
     .rnav-btn {
@@ -474,11 +480,11 @@
        ══════════════════════════════════════════════════════════════════ */
 
     /* ── the slate scoring card ── */
-    .scard{background:#1e293b;border-radius:4px;padding:6px 11px;margin-bottom:7px}
+    .scard{background:#1e293b;border-radius:4px;padding:12px 11px;margin-bottom:7px}
     .scard{position:relative}
     /* par sits in the corner of the card, on the score's own row — the hole
        number is already the highlighted marker directly above */
-    .scard-h{position:absolute;top:7px;left:11px;
+    .scard-h{position:absolute;top:6px;left:11px;
              font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;
              text-transform:uppercase}
     /* bare glyphs: the 48px target stays, only the box goes */
@@ -526,7 +532,10 @@
 
     /* ── section headings: tinted rows, no border, centred ── */
     .sect-h{text-align:center;margin:1px 0 2px;background:#e4eaf2;border-radius:4px;padding:2px 0;
-            font-size:10px;font-weight:800;letter-spacing:.15em;color:#1d4ed8;text-transform:uppercase}
+            font-size:10px;font-weight:800;color:#1d4ed8;text-transform:uppercase;
+            /* spaced out letters; the padding offsets the trailing space so
+               the word stays optically centred */
+            letter-spacing:.45em;padding-left:.45em}
     .sub-h{font-size:9px;font-weight:800;color:#1d4ed8;letter-spacing:.09em;
            margin:6px 0 4px;text-transform:uppercase;text-align:center;
            background:#f1f4f8;border-radius:4px;padding:5px 0;position:relative}
@@ -535,7 +544,7 @@
 
     /* ── tiles: a bordered cell is tappable, no cell at all is impossible ── */
     .tgrid{display:grid;gap:3px}
-    .tile{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:23px;
+    .tile{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:27px;
           display:flex;align-items:center;justify-content:center;
           font-size:12px;color:#475569;font-weight:600;cursor:pointer;
           -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
@@ -546,14 +555,19 @@
     .tile.arrow{font-size:15px}
     .t-h{font-size:8.5px;font-weight:800;color:#475569;text-align:center;padding:1px 0;
          letter-spacing:-.02em}
-    .t-rl{font-size:9.5px;font-weight:800;color:#475569;height:23px;
+    .t-rl{font-size:9.5px;font-weight:800;color:#475569;height:27px;
           display:flex;align-items:center;justify-content:center}
     .band{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:3px}
     .band i{grid-column:span 3;text-align:center;font-size:8px;font-weight:800;letter-spacing:.07em;
             color:#fff;padding:3px 0;border-radius:4px;font-style:normal}
     .missrow{display:grid;grid-template-columns:repeat(3,1fr);
-             grid-template-rows:repeat(2,21px);gap:3px}
-    .missb{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:21px;
+             grid-template-rows:repeat(2,26px);gap:3px}
+    /* Left and Right span both rows but are shorter than the pair and
+       vertically centred, so each edge lands at the middle of the box it
+       sits against. A literal edge-to-edge reading would make them 13px,
+       which is not a tappable target. */
+    .missb.lat{height:29px;align-self:center}
+    .missb{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:26px;
            display:flex;align-items:center;justify-content:center;
            font-size:9.5px;font-weight:700;color:#475569;cursor:pointer;
            -webkit-tap-highlight-color:transparent}
@@ -561,6 +575,17 @@
     .missb.on{background:#2563eb;border-color:#2563eb;color:#fff}
     .missb.off{background:transparent;border-color:transparent;color:#cbd2db;
                cursor:default;pointer-events:none}
+
+    /* The taller boxes fit a 956pt screen with room to spare, but push a
+       whole hole off a 812pt one. Step back down there rather than make
+       every phone scroll. */
+    @media (max-height: 880px) {
+      .tile, .t-rl   { height: 23px; }
+      .missb         { height: 22px; }
+      .missb.lat     { height: 25px; }
+      .scard         { padding: 8px 11px; }
+      .hero3         { margin-bottom: 11px; }
+    }
   </style>
 </head>
 <body>
@@ -1064,10 +1089,10 @@ const NUM_OPTS    = ['1','2','3','4+'];
 // already records it, so the whole pad simply closes on a 1-putt.
 // `at` is grid-area: row-start / col-start / row-end / col-end.
 const MISS_OPTS   = [
-  {v:'left', l:'◀ Left',  at:'1/1/3/2'},
+  {v:'left', l:'◀ Left',  at:'1/1/3/2', lat:1},
   {v:'long', l:'▲ Long',  at:'1/2/2/3'},
   {v:'short',l:'▼ Short', at:'2/2/3/3'},
-  {v:'right',l:'Right ▶', at:'1/3/3/4'},
+  {v:'right',l:'Right ▶', at:'1/3/3/4', lat:1},
 ];
 const GIR_OPTS    = [{v:'yes',l:'✓ Yes'},{v:'no',l:'✗ No'}];
 const STORAGE_KEY = 'scratch_v1';   // v3 has its own store; v1/v2 are untouched
@@ -1542,7 +1567,7 @@ function missRowHTML(h, i) {
   return MISS_OPTS.map(m => {
     const disabled = !missAllowed(h, m.v);
     const sel = !disabled && h.missDirection === m.v;
-    return `<div class="missb${sel?' on':''}${disabled?' off':''}" id="gc3-${i}-${m.v}"` +
+    return `<div class="missb${m.lat?' lat':''}${sel?' on':''}${disabled?' off':''}" id="gc3-${i}-${m.v}"` +
            ` style="grid-area:${m.at}"` +
            `${disabled ? '' : ` onclick="onGrid3(${i},'${m.v}')"`}>${m.l}</div>`;
   }).join('');
