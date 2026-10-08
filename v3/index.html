@@ -48,8 +48,9 @@
     }
     .ntab {
       flex: 1; display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 500; color: #6b7280;
+      font-size: 12px; font-weight: 500; color: #6b7280;
       border-bottom: 2px solid transparent; cursor: pointer;
+      white-space: nowrap; padding: 0 2px;
     }
     .ntab.on { color: #2563eb; border-bottom-color: #2563eb; font-weight: 700; }
 
@@ -601,12 +602,16 @@
   <div class="ntab"    id="tab-round"     onclick="showMain('round')">New Round</div>
   <div class="ntab"    id="tab-history"   onclick="showMain('history')">History</div>
   <div class="ntab"    id="tab-insights"  onclick="showMain('insights')">💡 Insights</div>
+  <div class="ntab"    id="tab-training"  onclick="showMain('training')">Practice</div>
 </div>
 
 <!-- ════════════════════════════════════
      DASHBOARD + HISTORY  (scrollable)
 ════════════════════════════════════ -->
 <div id="scroll-main" style="display:none">
+
+  <!-- PRACTICE -->
+  <div id="view-training" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))"></div>
 
   <!-- DASHBOARD -->
   <div id="view-dashboard" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))">
@@ -1222,18 +1227,20 @@ function missIcon(v) {
 //  MAIN VIEW ROUTING
 // ═══════════════════════════════════════
 function showMain(name) {
-  const scrollViews = ['dashboard','history'];
+  const scrollViews = ['dashboard','history','training'];
   document.getElementById('scroll-main').style.display  = scrollViews.includes(name) ? 'block' : 'none';
   document.getElementById('round-shell').style.display  = (name==='round') ? 'flex' : 'none';
   document.getElementById('view-dashboard').style.display = (name==='dashboard') ? 'block' : 'none';
   document.getElementById('view-history').style.display   = (name==='history') ? 'block' : 'none';
   document.getElementById('view-insights').style.display  = (name==='insights') ? 'flex' : 'none';
-  ['dashboard','round','history','insights'].forEach(v => {
+  document.getElementById('view-training').style.display  = (name==='training') ? 'block' : 'none';
+  ['dashboard','round','history','insights','training'].forEach(v => {
     document.getElementById('tab-'+v).classList.toggle('on', v===name);
   });
   if (name==='dashboard') renderDashboard();
   if (name==='history')   renderHistory();
   if (name==='insights')  renderInsights();
+  if (name==='training')  renderTraining();
   if (name==='round' && !AR) {
     const draft = loadDraft();
     if (draft?.AR) {
@@ -4522,6 +4529,248 @@ function importFromV2() {
   const added = mergeRounds(src.map(normalizeV2Round));
   renderHistory(); renderDashboard();
   showToast('📥', `${added} rounds imported from Putting Tracker.`, 'good', { ms: 5000 });
+}
+
+
+// ═══════════════════════════════════════
+//  PRACTICE
+// ═══════════════════════════════════════
+// Eight drills, plus a counter for the ones that only work under a
+// consecutive-makes target. Which drills are pushed to the top is decided by
+// the rounds already logged, so the tab answers "what should I practise
+// today" rather than being a list to scroll past.
+
+const DRILLS = [
+  { id:'gate', name:'The Gate Drill, with a twist', trains:'Start line',
+    kit:'2 tees', mins:'10 min',
+    how:[
+      'Push two tees into the green a putter-head width apart — but place the gate <b>6 inches in front of the ball</b>, not at the ball.',
+      'Putt through the gate from 4–6 feet.',
+      'Narrow the gate as you start hitting it cleanly.' ],
+    why:'A gate at the ball only tests the face at impact. Six inches out tests where the ball is actually <i>going</i> through the initial roll, which is what decides whether it holes. It shows up pushes and pulls you would otherwise never see.' },
+
+  { id:'coin', name:'Coin on the Putter Face', trains:'Stroke stability',
+    kit:'A coin', mins:'5 min',
+    how:[
+      'Balance a coin on the top edge of the putter face.',
+      'Make your stroke without it falling off.',
+      'Start at 3 feet and work outwards.' ],
+    why:'Any twisting, flipping or hand manipulation drops the coin instantly. It forces a quiet face through the whole stroke, and you get the feedback before the ball has even moved.' },
+
+  { id:'onehand', name:'One-Handed Putting', trains:'Face control',
+    kit:'Nothing', mins:'5 min',
+    how:[
+      'Putt 6–10 footers with your <b>lead hand only</b> — left hand for a right-hander.',
+      'Five minutes, then go back to your normal grip.' ],
+    why:'If your trail hand has been taking over and steering the face, this exposes it within three putts. Doing it before normal practice resets the feel for the rest of the session.' },
+
+  { id:'clock', name:'The Clock Drill, under pressure', trains:'Short putts',
+    kit:'Nothing', mins:'15 min', target:18, targetLabel:'from 3 feet',
+    how:[
+      'Place balls around the hole at 3 feet.',
+      'Make <b>18 in a row</b> before you are allowed to stop. Or 12 in a row from 6 feet.',
+      'Miss at 16 and you start again at zero.' ],
+    why:'Going round the clock without a target is just repetition. The consecutive requirement manufactures the one thing a practice green cannot otherwise give you — consequence. Missing at 16 and restarting is the closest thing to a 4-footer to save par.' },
+
+  { id:'ladder', name:'Ladder Drill', trains:'Distance control',
+    kit:'5 balls', mins:'10 min',
+    how:[
+      'Pick a clear stretch of green. No hole involved.',
+      'Putt 5 balls, each one stopping <b>further than the last</b> — roughly 10, 15, 20, 25, 30 feet — without passing the previous ball.',
+      'Then work back down the ladder.' ],
+    why:'Most three-putts come from poor lag distance, not a bad line. Taking the hole out of it stops you aiming and makes you feel pace alone.' },
+
+  { id:'eyes', name:'Eyes Closed Putting', trains:'Feel and trust',
+    kit:'Nothing', mins:'5 min',
+    how:[
+      'Set up to a 5-footer, close your eyes, and stroke it.',
+      'Start at 3 feet and build out to 8.' ],
+    why:'You cannot steer what you cannot see. Most players hole more with their eyes shut once they stop trying to guide it, which tells you something uncomfortable and useful about the stroke you make with them open.' },
+
+  { id:'teegate', name:'Tee Gate at the Hole', trains:'Honest feedback',
+    kit:'2 tees', mins:'10 min',
+    how:[
+      'Push two tees in just inside the cup, one each side, leaving exactly a putter-head width.',
+      'Putt from 4–6 feet. Anything that catches a tee did not deserve to drop.' ],
+    why:'A lip-out feels like bad luck and is usually a putt that was slightly offline. This stops you filing near-misses under luck — particularly in the 4–6 foot range, where the stroke feels fine and the result says otherwise.' },
+
+  { id:'feet', name:'Feet Together', trains:'Body stillness',
+    kit:'Nothing', mins:'5 min',
+    how:[
+      'Stand with your feet touching.',
+      'Putt a range of lengths, paying attention to distance control rather than holing out.' ],
+    why:'With no base you cannot sway, so the stroke has to come from the shoulders. If your distance control <i>improves</i> like this, your body is moving too much when you stand normally.' },
+];
+
+// ── what to practise, from the rounds already logged ──────────────────────
+// Only speaks when there is enough data to mean it, and always says which
+// number it is reacting to — a recommendation with no reason is just noise.
+function practicePlan() {
+  const holes = loadRounds().flatMap(r => r.holes || []).filter(h => h.numPutts);
+  if (holes.length < 30) return { enough:false, n:holes.length, recs:[] };
+  const s = computeStats(holes);
+  const recs = [];
+
+  const scoring = s.byDist.find(d => d.b === "4–8'");
+  if (scoring && scoring.n >= 10 && scoring.mp !== null && scoring.mp < 45) {
+    recs.push({ ids:['teegate','gate'],
+      because:`You are holing ${scoring.mp}% from 4–8 feet across ${scoring.n} putts. That band is where strokes hide.` });
+  }
+  if (s.threePct !== null && s.threePct > 8) {
+    recs.push({ ids:['ladder','feet'],
+      because:`Three-putts on ${s.threePct}% of holes. Almost all of those are pace, not line.` });
+  }
+  // a settled left/right bias is a start-line problem, not a reading problem
+  const lat = s.mL + s.mR;
+  if (lat >= 12) {
+    const side = s.mL > s.mR ? 'left' : 'right';
+    const share = Math.round(Math.max(s.mL, s.mR) / lat * 100);
+    if (share >= 62) recs.push({ ids:['gate','onehand'],
+      because:`${share}% of your line misses go ${side}, over ${lat} putts. That is a start-line pattern, not bad greens.` });
+  }
+  const paced = s.mS + s.mLo;
+  if (paced >= 12) {
+    const shortSide = s.mS > s.mLo;
+    const share = Math.round(Math.max(s.mS, s.mLo) / paced * 100);
+    if (share >= 62) recs.push({ ids: shortSide ? ['ladder','eyes'] : ['ladder','coin'],
+      because:`${share}% of your pace misses finish ${shortSide ? 'short' : 'past'}, over ${paced} putts.` });
+  }
+  return { enough:true, n:holes.length, recs:recs.slice(0, 3) };
+}
+
+const TRAIN_KEY = 'scratch_streak';
+function loadStreak() {
+  try { return JSON.parse(localStorage.getItem(TRAIN_KEY)) || { cur:0, best:0, target:18 }; }
+  catch { return { cur:0, best:0, target:18 }; }
+}
+function saveStreak(v) { localStorage.setItem(TRAIN_KEY, JSON.stringify(v)); }
+function streakHit()  { const v = loadStreak(); v.cur++; if (v.cur > v.best) v.best = v.cur; saveStreak(v); renderStreak(); }
+function streakMiss() { const v = loadStreak(); v.cur = 0; saveStreak(v); renderStreak(); }
+function streakReset(){ const v = loadStreak(); v.cur = 0; v.best = 0; saveStreak(v); renderStreak(); }
+function streakTarget(d) {
+  const v = loadStreak();
+  v.target = Math.max(3, Math.min(50, (v.target || 18) + d));
+  saveStreak(v); renderStreak();
+}
+function renderStreak() {
+  const el = document.getElementById('streak-box'); if (!el) return;
+  const v = loadStreak();
+  const done = v.cur >= v.target;
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+      <span style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;text-transform:uppercase">Consecutive makes</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#94a3b8">
+        TARGET
+        <button onclick="streakTarget(-1)" style="width:20px;height:20px;border:1px solid #dfe5ed;background:#fff;border-radius:4px;font-weight:800;color:#475569;cursor:pointer">−</button>
+        <b style="min-width:18px;text-align:center;color:#1f2937;font-size:12px">${v.target}</b>
+        <button onclick="streakTarget(1)" style="width:20px;height:20px;border:1px solid #dfe5ed;background:#fff;border-radius:4px;font-weight:800;color:#475569;cursor:pointer">+</button>
+      </span>
+    </div>
+    <div style="text-align:center;margin-bottom:9px">
+      <div style="font-size:44px;font-weight:800;line-height:1;color:${done ? '#16a34a' : '#2563eb'}">${v.cur}</div>
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;margin-top:3px;text-transform:uppercase;letter-spacing:.05em">
+        ${done ? 'target reached — well done! 🎯' : `best today ${v.best}`}
+      </div>
+    </div>
+    <div style="display:flex;gap:7px">
+      <button onclick="streakHit()" style="flex:2;height:42px;border:none;border-radius:4px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Holed</button>
+      <button onclick="streakMiss()" style="flex:2;height:42px;border:none;border-radius:4px;background:#ea580c;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Missed</button>
+      <button onclick="streakReset()" style="flex:1;height:42px;border:1px solid #dfe5ed;border-radius:4px;background:#fff;color:#64748b;font-size:12px;font-weight:600;cursor:pointer">Reset</button>
+    </div>`;
+}
+
+let OPEN_DRILL = null;
+function toggleDrill(id) {
+  OPEN_DRILL = (OPEN_DRILL === id) ? null : id;
+  renderTraining();
+  if (OPEN_DRILL) {
+    const el = document.getElementById('drill-' + OPEN_DRILL);
+    if (el) el.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  }
+}
+
+function drillCardHTML(d, flagged) {
+  const open = OPEN_DRILL === d.id;
+  return `
+  <div id="drill-${d.id}" style="background:#fff;border:1px solid ${open ? '#93c5fd' : '#e3e9f0'};
+       border-radius:4px;margin-bottom:8px;overflow:hidden">
+    <div onclick="toggleDrill('${d.id}')" style="padding:11px 12px;cursor:pointer;display:flex;
+         align-items:center;gap:9px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700;color:#1f2937">${d.name}</div>
+        <div style="font-size:10.5px;color:#94a3b8;margin-top:2px">
+          ${d.trains} · ${d.mins} · ${d.kit}
+          ${flagged ? ` · <b style="color:#ea580c">for you</b>` : ''}
+        </div>
+      </div>
+      <span style="color:#94a3b8;font-size:13px;flex-shrink:0">${open ? '▲' : '▼'}</span>
+    </div>
+    ${open ? `
+    <div style="padding:0 12px 12px">
+      <ol style="margin:0 0 10px;padding-left:19px;list-style:decimal;
+                 font-size:12.5px;line-height:1.55;color:#374151">
+        ${d.how.map(x => `<li style="margin-bottom:5px">${x}</li>`).join('')}
+      </ol>
+      <div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 4px 4px 0;
+           padding:9px 11px;font-size:11.5px;line-height:1.5;color:#334155">
+        <b style="color:#1d4ed8">Why it works.</b> ${d.why}
+      </div>
+      ${d.target ? `
+      <div style="margin-top:9px;font-size:11px;color:#64748b;font-style:italic">
+        Use the counter at the top of this tab — target ${d.target} ${d.targetLabel}.
+      </div>` : ''}
+    </div>` : ''}
+  </div>`;
+}
+
+function renderTraining() {
+  const el = document.getElementById('view-training');
+  const plan = practicePlan();
+  const flagged = new Set(plan.recs.flatMap(r => r.ids));
+  const byId = Object.fromEntries(DRILLS.map(d => [d.id, d]));
+
+  el.innerHTML = `
+    <h2 style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px">Practice</h2>
+    <p style="font-size:11.5px;color:#94a3b8;margin-bottom:12px">
+      Eight putting drills, and a counter for the ones that need one.</p>
+
+    <div id="streak-box" style="background:#f7f9fc;border:1px solid #e3e9f0;border-radius:4px;
+         padding:11px 12px;margin-bottom:14px"></div>
+
+    <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
+         text-transform:uppercase;margin-bottom:7px">What your rounds say</div>
+    ${plan.enough
+      ? (plan.recs.length
+        ? plan.recs.map(r => `
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;
+               padding:10px 12px;margin-bottom:8px">
+            <div style="font-size:12px;color:#7c2d12;line-height:1.5">${r.because}</div>
+            <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap">
+              ${r.ids.map(id => `<button onclick="toggleDrill('${id}')"
+                  style="border:1px solid #ea580c;background:#fff;color:#c2410c;border-radius:4px;
+                         padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">
+                  ${byId[id].name}</button>`).join('')}
+            </div>
+          </div>`).join('')
+        : `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:10px 12px;
+                font-size:12px;color:#1e40af;line-height:1.5;margin-bottom:8px">
+             Nothing is standing out as a weakness across your ${plan.n} logged putts — no single
+             band or miss pattern is bad enough to single out. Rotate through the drills below.
+           </div>`)
+      : `<div style="background:#f7f9fc;border:1px solid #e3e9f0;border-radius:4px;padding:10px 12px;
+              font-size:12px;color:#64748b;line-height:1.5;margin-bottom:8px">
+           ${plan.n} putts logged. From about 30 there is enough to point you at the right drill
+           rather than guess.
+         </div>`}
+
+    <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
+         text-transform:uppercase;margin:16px 0 7px">All drills</div>
+    ${DRILLS.map(d => drillCardHTML(d, flagged.has(d.id))).join('')}
+
+    <p style="font-size:10.5px;color:#b0b8c4;line-height:1.5;margin-top:14px;font-style:italic">
+      The counter is yours to use however you like — it is not saved into a round and does not
+      affect any statistic.</p>`;
+  renderStreak();
 }
 
 function renderHistory() {
