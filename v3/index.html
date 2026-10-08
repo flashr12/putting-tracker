@@ -14,10 +14,11 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html { height: 100%; height: 100dvh; }
+    html { height: 100%; }
     body {
-      height: 100%;          /* fallback for anything without dvh */
-      height: 100dvh;        /* follows the viewport as browser chrome moves */
+      /* pinned to the real viewport edges, which viewport units on iOS do
+         not reliably give you — see the note above about the white band */
+      position: fixed; inset: 0;
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #fff;
@@ -474,9 +475,12 @@
 
     /* ── the slate scoring card ── */
     .scard{background:#1e293b;border-radius:4px;padding:6px 11px;margin-bottom:7px}
-    .scard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
-    .scard-h{font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;text-transform:uppercase}
-    .scard-h.warnd{color:#facc15}
+    .scard{position:relative}
+    /* par sits in the corner of the card, on the score's own row — the hole
+       number is already the highlighted marker directly above */
+    .scard-h{position:absolute;top:7px;left:11px;
+             font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;
+             text-transform:uppercase}
     /* bare glyphs: the 48px target stays, only the box goes */
     .hero3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:13px}
     .hbtn{height:48px;border:none;background:transparent;color:#94a3b8;
@@ -548,11 +552,7 @@
     .band i{grid-column:span 3;text-align:center;font-size:8px;font-weight:800;letter-spacing:.07em;
             color:#fff;padding:3px 0;border-radius:4px;font-style:normal}
     .missrow{display:grid;grid-template-columns:repeat(3,1fr);
-             grid-template-rows:repeat(3,21px);gap:3px;margin-top:3px}
-    .missrow .pad-l{grid-area:1/1;display:flex;align-items:center;
-                    font-size:8.5px;font-weight:800;color:#1d4ed8;letter-spacing:.09em}
-    .missrow .pad-i{grid-area:1/3;display:flex;align-items:center;justify-content:flex-end}
-    .missrow .pad-i .fl-i{position:static;transform:none;border-color:#b9c4d4;color:#64748b}
+             grid-template-rows:repeat(2,21px);gap:3px}
     .missb{background:transparent;border:1px solid #dfe5ed;border-radius:4px;height:21px;
            display:flex;align-items:center;justify-content:center;
            font-size:9.5px;font-weight:700;color:#475569;cursor:pointer;
@@ -1058,12 +1058,16 @@ const NUM_OPTS    = ['1','2','3','4+'];
 // Laid out as a pad around the hole, seen looking down the line: past the
 // hole is beyond you (top), short is nearer you (bottom), the hole itself in
 // the middle. `at` is the grid cell — row / column.
+// A pad seen looking down the line: past the hole is beyond you, short is
+// nearer you, and the two lateral misses are full-height columns either
+// side. There is no "Made" — a holed putt has no miss side, and numPutts
+// already records it, so the whole pad simply closes on a 1-putt.
+// `at` is grid-area: row-start / col-start / row-end / col-end.
 const MISS_OPTS   = [
-  {v:'left', l:'◀ Left',  at:'2/1'},
-  {v:'short',l:'▼ Short', at:'3/2'},
-  {v:'made', l:'✓ Made',  at:'2/2'},
-  {v:'long', l:'▲ Long',  at:'1/2'},
-  {v:'right',l:'Right ▶', at:'2/3'},
+  {v:'left', l:'◀ Left',  at:'1/1/3/2'},
+  {v:'long', l:'▲ Long',  at:'1/2/2/3'},
+  {v:'short',l:'▼ Short', at:'2/2/3/3'},
+  {v:'right',l:'Right ▶', at:'1/3/3/4'},
 ];
 const GIR_OPTS    = [{v:'yes',l:'✓ Yes'},{v:'no',l:'✗ No'}];
 const STORAGE_KEY = 'scratch_v1';   // v3 has its own store; v1/v2 are untouched
@@ -1526,9 +1530,7 @@ function varianceSign(v) {
 // contradict each other: a first putt that finished short was not also long.
 // Pin-high already ruled both out; this is that rule generalised.
 function missAllowed(h, v) {
-  const isPuttHoled = h.numPutts === '1';
-  if (v === 'made')  return h.numPutts == null || isPuttHoled;
-  if (isPuttHoled)   return false;              // holed it: no side to miss on
+  if (h.numPutts === '1') return false;         // holed it: no side to miss on
   const sign = varianceSign(h.variance);
   if (sign === null) return true;               // no pace set yet, allow all
   if (v === 'short') return sign < 0;
@@ -1546,13 +1548,9 @@ function missRowHTML(h, i) {
   }).join('');
 }
 
-// Only the five buttons are rebuilt — the label and the info button share
-// the same grid and have to survive.
 function refreshMissRow(i) {
   const row = document.getElementById(`grid3-${i}`);
-  if (!row) return;
-  row.querySelectorAll('.missb').forEach(b => b.remove());
-  row.insertAdjacentHTML('beforeend', missRowHTML(AR.holes[i], i));
+  if (row) row.innerHTML = missRowHTML(AR.holes[i], i);
 }
 
 function buildHoleFormHTML(h, i) {
@@ -1572,9 +1570,7 @@ function buildHoleFormHTML(h, i) {
 
   const scorecard = `
   <div class="scard">
-    <div class="scard-top">
-      <span class="scard-h">Hole ${h.n} · Par ${par}</span>
-    </div>
+    <span class="scard-h">Par ${par}</span>
     <div class="hero3">
       <button class="hbtn" onclick="bumpScore(${i},-1)" aria-label="One less">−</button>
       <div class="sbox ${assumed ? 'open' : 'fill ' + resultClass(h)}" id="sbox-${i}"
@@ -1688,13 +1684,9 @@ function buildHoleFormHTML(h, i) {
   // Five labelled pills; no header row, because the labels are the header.
   const grid3 = `
   <div>
-    <div class="missrow" id="grid3-${i}">
-      <span class="pad-l">MISS SIDE</span>
-      <span class="pad-i"><button class="fl-i" onclick="toggleInfo('i3-${i}')"
-            aria-label="What goes here?">i</button></span>
-      ${missRowHTML(h, i)}
-    </div>
-    ${flInfo(`i3-${i}`, 'Where the first putt finished, laid out as you saw it: long is past the hole, short is nearer you. Use Made when you holed it. Only the sides that agree with the pace above are offered — a putt left short cannot also be long, and on a pin-high miss only the line was wrong.')}
+    ${subHead('Miss Side', `i3-${i}`)}
+    ${flInfo(`i3-${i}`, 'Where the first putt finished, laid out as you saw it: long is past the hole, short is nearer you, left and right either side. A holed putt has no miss side, so the pad closes on a 1-putt. Only the sides that agree with the pace above are offered — a putt left short cannot also be long, and on a pin-high miss only the line was wrong.')}
+    <div class="missrow" id="grid3-${i}">${missRowHTML(h, i)}</div>
   </div>`;
 
   return scorecard + `<div class="sect-h">Putting</div>` + grid1 + grid2 + grid3;
@@ -1966,16 +1958,6 @@ function onGrid3(hi, missDir) {
   ensureScorecardDefaults(hi);
   const h = AR.holes[hi];
   const wasDone = isHoleDone(h);
-  // Auto-fill 1-putt + variance=0 if 'made' tapped before Grid 2 is set
-  if (missDir === 'made' && !h.numPutts) {
-    h.numPutts = '1'; h.variance = '0';
-    const tbl2 = document.getElementById(`grid2-${hi}`);
-    if (tbl2) {
-      tbl2.querySelectorAll('.tile.on').forEach(c => { c.classList.remove('on'); c.textContent = ''; });
-      const c2 = document.getElementById(`gc2-${hi}-1-0`);
-      if (c2) { c2.classList.add('on'); c2.textContent = '✓'; }
-    }
-  }
   if (!missAllowed(h, missDir)) return;
   h.missDirection = missDir;
   refreshMissRow(hi);   // tapping Made sets a 1-putt, which re-gates the sides
