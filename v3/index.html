@@ -388,19 +388,19 @@
       transition:color .1s, font-size .1s;
     }
     /* the value sitting in the centre band */
-    .hd-item.hd-sel { font-size:19px; font-weight:800; color:#fff; }
+    .hd-item.hd-sel { font-size:14px; font-weight:800; color:#fff; }
 
     /* centre band: bordered highlight marking the selected value */
     /* the selected value is a filled blue chip, like every other selection */
     .hd-band {
       position:absolute; z-index:1; top:2px; bottom:2px; left:50%; width:44px;
       transform:translateX(-50%);
-      background:#2563eb; border:none; border-radius:4px;
+      background:#2563eb; border:none; border-radius:4px; width:40px;
       pointer-events:none;
     }
     /* nothing chosen yet (resting on 0') — no chip at all */
     .hd-outer.unset .hd-band { background:transparent; }
-    .hd-outer.unset .hd-item.hd-sel { color:#94a3b8; font-size:14px; }
+    .hd-outer.unset .hd-item.hd-sel { color:#94a3b8; font-size:13px; }
     /* fade the values either side so the centre reads as selected */
     .hd-fade-l, .hd-fade-r { position:absolute; z-index:4; top:0; bottom:0; width:40px; pointer-events:none; }
     .hd-fade-l { left:0;  background:linear-gradient(to right,#fff 12%,rgba(255,255,255,0)); }
@@ -497,12 +497,12 @@
        ══════════════════════════════════════════════════════════════════ */
 
     /* ── the slate scoring card ── */
-    .scard{background:#1e293b;border-radius:4px;padding:8px 11px;margin-bottom:8px}
-    .scard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .scard{background:#1e293b;border-radius:4px;padding:7px 11px;margin-bottom:8px}
+    .scard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
     .scard-h{font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;text-transform:uppercase}
     .scard-h.warnd{color:#facc15}
     /* bare glyphs: the 48px target stays, only the box goes */
-    .hero3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:5px}
+    .hero3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:13px}
     .hbtn{height:48px;border:none;background:transparent;color:#94a3b8;
           font-size:30px;font-weight:300;line-height:1;cursor:pointer;
           -webkit-tap-highlight-color:transparent}
@@ -526,9 +526,13 @@
          background:#334155;color:#cbd5e1;border:none;cursor:pointer;
          -webkit-tap-highlight-color:transparent}
     .fwb.on{background:#2563eb;color:#fff}
+    /* Fairway and GIR are not guessed. Until answered the whole group is
+       hollow and dashed — the same language the score box uses. */
+    .fwb.unset,.gbtn.unset{background:transparent;border:1px dashed rgba(255,255,255,.5);
+                           color:#cbd5e1}
     /* GIR | Sand | Penalty — three separate questions, ruled apart */
     .trip{display:grid;grid-template-columns:1fr 1px 64px 1px 1fr;gap:8px;align-items:center;
-          margin-top:7px;padding-top:7px;border-top:1px solid #334155}
+          margin-top:6px;padding-top:6px;border-top:1px solid #334155}
     .trip .rule{background:#475569;height:32px;align-self:center}
     .grp{text-align:center}
     .grp-l{font-size:8px;font-weight:800;color:#94a3b8;letter-spacing:.09em;
@@ -544,7 +548,7 @@
     .sect-h{text-align:center;margin:2px 0 2px;background:#e4eaf2;border-radius:4px;padding:3px 0;
             font-size:10px;font-weight:800;letter-spacing:.15em;color:#1d4ed8;text-transform:uppercase}
     .sub-h{font-size:9px;font-weight:800;color:#1d4ed8;letter-spacing:.09em;
-           margin:7px 0 4px;text-transform:uppercase;text-align:center;
+           margin:6px 0 4px;text-transform:uppercase;text-align:center;
            background:#f1f4f8;border-radius:4px;padding:5px 0;position:relative}
     .sub-h .fl-i{border-color:#b9c4d4;color:#64748b}
     .sub-h .fl-i:active{background:rgba(29,78,216,.1)}
@@ -1161,7 +1165,8 @@ function resultWord(h) {
   return '+' + t;
 }
 
-function isHoleDone(h) {
+// Every field answered. Says nothing about whether the score was confirmed.
+function isHoleLogged(h) {
   // scorecard layer
   if (h.score == null || !h.gir) return false;
   if (fairwayApplies(h) && !h.fairway) return false;
@@ -1170,6 +1175,18 @@ function isHoleDone(h) {
   if (!h.slope || !h.direction || !h.numPutts) return false;
   if (h.numPutts === '1') return true;   // holed: variance/miss not applicable
   return !!(h.variance && h.missDirection);
+}
+// Finished. Confirming the score is part of finishing, so a hole left on the
+// assumed par never counts as done and never auto-advances — which is the
+// whole point: the app should not move on from a number nobody looked at.
+function isHoleDone(h) {
+  return isHoleLogged(h) && !scoreAssumed(h);
+}
+// Anything entered at all — used at save time to spot a half-filled hole
+// before it is silently dropped.
+function holeTouched(h) {
+  return !!(h && (h.scoreSet || h.gir || h.fairway || h.distance ||
+                  h.slope || h.numPutts || h.sand || h.penalty));
 }
 
 function varDisplay(v, missDirection) {
@@ -1201,7 +1218,7 @@ function showMain(name) {
   if (name==='round' && !AR) {
     const draft = loadDraft();
     if (draft?.AR) {
-      const saved = draft.AR.holes.filter(h => isHoleDone(h)).length;
+      const saved = draft.AR.holes.filter(h => isHoleLogged(h)).length;
       if (confirm(`Resume in-progress round?\n${draft.AR.course||'Round'} · ${saved} hole${saved!==1?'s':''} entered`)) {
         AR = draft.AR; AH = draft.AH;
         document.getElementById('step-setup').style.display = 'none';
@@ -1385,7 +1402,7 @@ function applyHoleAdj() {
   if (newCount === AR.holeCount) { hideHoleAdj(); return; }
   if (newCount < AR.holeCount) {
     // Check if any holes beyond newCount have data
-    const dataLost = AR.holes.slice(newCount).some(isHoleDone);
+    const dataLost = AR.holes.slice(newCount).some(holeTouched);
     if (dataLost && !confirm(`Holes ${newCount+1}–${AR.holeCount} have data that will be removed. Continue?`)) return;
     AR.holes = AR.holes.slice(0, newCount);
     if (AH >= newCount) AH = newCount - 1;
@@ -1424,7 +1441,8 @@ function renderPills() {
   const strip = document.getElementById('hole-pills');
   strip.innerHTML = AR.holes.map((h,i) => {
     let cls = i===AH ? 'hp cur' : isHoleDone(h) ? 'hp done' : 'hp';
-    if (isHoleDone(h) && scoreAssumed(h)) cls += ' unsure';
+    // everything filled but the score never confirmed — the one thing left
+    if (isHoleLogged(h) && scoreAssumed(h)) cls += ' unsure';
     return `<div class="${cls}" onclick="jumpHole(${i})" id="pill-${i}">${h.n}</div>`;
   }).join('');
   // scroll active pill into view
@@ -1554,16 +1572,16 @@ function buildHoleFormHTML(h, i) {
   const par     = h.par || 4;
   const score   = h.score == null ? par : h.score;
   const assumed = scoreAssumed(h);
-  const fw      = h.fairway || 'hit';
-  const gir     = h.gir || 'yes';
+  const fw      = h.fairway;          // null until answered — never assumed
+  const gir     = h.gir;
+  const fwU     = fw  ? '' : ' unset';
+  const girU    = gir ? '' : ' unset';
   const pen     = h.penalty || 0;
 
   const scorecard = `
   <div class="scard">
     <div class="scard-top">
       <span class="scard-h">Hole ${h.n} · Par ${par}</span>
-      <span class="scard-h warnd" id="sflag-${i}"
-            style="visibility:${assumed ? 'visible' : 'hidden'}">● score assumed</span>
     </div>
     <div class="hero3">
       <button class="hbtn" onclick="bumpScore(${i},-1)" aria-label="One less">−</button>
@@ -1576,16 +1594,16 @@ function buildHoleFormHTML(h, i) {
     </div>
     ${fairwayApplies(h) ? `
     <div class="fw3" id="fw-${i}">
-      <button class="fwb${fw==='left' ?' on':''}" onclick="setFairway(${i},'left')">◀ Left</button>
-      <button class="fwb${fw==='hit'  ?' on':''}" onclick="setFairway(${i},'hit')">Fairway</button>
-      <button class="fwb${fw==='right'?' on':''}" onclick="setFairway(${i},'right')">Right ▶</button>
+      <button class="fwb${fwU}${fw==='left' ?' on':''}" onclick="setFairway(${i},'left')">◀ Left</button>
+      <button class="fwb${fwU}${fw==='hit'  ?' on':''}" onclick="setFairway(${i},'hit')">Fairway</button>
+      <button class="fwb${fwU}${fw==='right'?' on':''}" onclick="setFairway(${i},'right')">Right ▶</button>
     </div>` : ''}
     <div class="trip">
       <div class="grp">
         <div class="grp-l">GIR</div>
         <div class="grp-b" id="gir-${i}">
-          <button class="gbtn${gir==='yes'?' on':''}" onclick="setGir(${i},'yes')">Yes</button>
-          <button class="gbtn${gir==='no' ?' on':''}" onclick="setGir(${i},'no')">No</button>
+          <button class="gbtn${girU}${gir==='yes'?' on':''}" onclick="setGir(${i},'yes')">Yes</button>
+          <button class="gbtn${girU}${gir==='no' ?' on':''}" onclick="setGir(${i},'no')">No</button>
         </div>
       </div>
       <div class="rule"></div>
@@ -1994,10 +2012,12 @@ function onGrid3(hi, missDir) {
 // taps on this block — you just fill the putting detail and move on.
 function ensureScorecardDefaults(hi) {
   const h = AR.holes[hi]; if (!h) return;
-  if (h.score == null)              h.score = h.par || 4;
-  if (!h.gir)                       h.gir = 'yes';
-  if (!h.fairway && fairwayApplies(h)) h.fairway = 'hit';
-  if (h.penalty == null)            h.penalty = 0;
+  // Only the score is pre-filled, and only as an unconfirmed suggestion.
+  // Fairway and GIR are no longer guessed: every fairway% and GIR% in the
+  // app is built on them, and a default that is right most of the time is
+  // exactly the kind of wrong that never gets noticed.
+  if (h.score == null)   h.score = h.par || 4;
+  if (h.penalty == null) h.penalty = 0;
 }
 
 // ── Scorecard handlers ────────────────────────────────────────────────────
@@ -2019,10 +2039,7 @@ function refreshScoreBox(hi) {
     box.innerHTML = `<div class="sbox-n">${h.score == null ? (h.par||4) : h.score}</div>` +
                     `<div class="sbox-s">${assumed ? 'tap to confirm' : resultWord(h)}</div>`;
   }
-  const flag = document.getElementById(`sflag-${hi}`);
-  if (flag) flag.style.visibility = scoreAssumed(h) ? 'visible' : 'hidden';
-  const pill = document.getElementById(`pill-${hi}`);
-  if (pill) pill.classList.toggle('unsure', isHoleDone(h) && scoreAssumed(h));
+  renderPills();
 }
 
 function bumpScore(hi, d) {
@@ -2047,16 +2064,21 @@ function confirmScore(hi) {
   afterScoreEdit(hi, wasDone);
 }
 
-function paintGroup(sel, onIdx) {
+// Light the chosen button and, for a group that was waiting to be answered,
+// drop the dashed outline off all of them.
+function paintGroup(sel, onIdx, answered) {
   const row = document.querySelector(sel);
   if (!row) return;
-  [...row.children].forEach((b, n) => b.classList.toggle('on', n === onIdx));
+  [...row.children].forEach((b, n) => {
+    b.classList.toggle('on', n === onIdx);
+    if (answered !== undefined) b.classList.toggle('unset', !answered);
+  });
 }
 
 function setFairway(hi, v) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
   h.fairway = v;
-  paintGroup(`#fw-${hi}`, {left:0, hit:1, right:2}[v]);
+  paintGroup(`#fw-${hi}`, {left:0, hit:1, right:2}[v], true);
   afterScoreEdit(hi, wasDone);
 }
 // Penalty has no zero button: nothing selected IS zero, and tapping the
@@ -2078,7 +2100,7 @@ function setSand(hi) {
 function setGir(hi, v) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
   h.gir = v;
-  paintGroup(`#gir-${hi}`, v === 'yes' ? 0 : 1);
+  paintGroup(`#gir-${hi}`, v === 'yes' ? 0 : 1, true);
   afterScoreEdit(hi, wasDone);
 }
 
@@ -2292,23 +2314,39 @@ function renderTable() {
 // ═══════════════════════════════════════
 function saveRound() {
   flushDrum(AH);        // capture a distance still inside its debounce window
-  const done = AR.holes.filter(isHoleDone);
-  if (!done.length) { alert('Fill in at least one hole before saving.'); return; }
+  // A hole is saved once every field is answered. Confirming the score is
+  // not one of those fields — an unconfirmed hole still saves, it just gets
+  // named first, because dropping it would lose real putting data.
+  const logged  = AR.holes.filter(isHoleLogged);
+  if (!logged.length) { alert('Fill in at least one hole before saving.'); return; }
 
-  // Last line of defence on the assumed par. Everything scoring-related is
-  // built on h.score, so a round saved with holes nobody looked at quietly
-  // poisons the averages — better to ask once than to find out in a trend.
-  const unsure = done.filter(scoreAssumed);
-  if (unsure.length) {
-    const list = unsure.map(h => h.n).join(', ');
-    const ok = confirm(
-      `${unsure.length} hole${unsure.length!==1?'s':''} still on the default par.\n\n` +
-      `Hole${unsure.length!==1?'s':''} ${list} — the score was never confirmed, so ` +
-      `${unsure.length!==1?'they':'it'} will be saved as par.\n\n` +
-      `OK to save, or Cancel to go back and check.`);
-    if (!ok) { jumpHole(AR.holes.indexOf(unsure[0])); return; }
+  // Half-filled holes are NOT saved, so say so by number rather than letting
+  // them disappear. With fairway and GIR no longer defaulted this is easy to
+  // do by accident — one missed tap and the hole is incomplete.
+  const partial = AR.holes.filter(h => holeTouched(h) && !isHoleLogged(h));
+  // Everything answered but the score never looked at. It saves as par, and
+  // every scoring average is built on that number, so it is worth one ask.
+  const unsure  = logged.filter(scoreAssumed);
+
+  if (partial.length || unsure.length) {
+    const nums = hs => hs.map(h => h.n).join(', ');
+    let msg = '';
+    if (partial.length) {
+      msg += `${partial.length} hole${partial.length!==1?'s':''} ` +
+             `(${nums(partial)}) ${partial.length!==1?'are':'is'} incomplete and ` +
+             `will NOT be saved.\n\n`;
+    }
+    if (unsure.length) {
+      msg += `${unsure.length} hole${unsure.length!==1?'s':''} ` +
+             `(${nums(unsure)}) still ${unsure.length!==1?'have':'has'} the ` +
+             `assumed par — ${unsure.length!==1?'they':'it'} will be saved as par.\n\n`;
+    }
+    if (!confirm(msg + 'OK to save anyway, or Cancel to go back and fix them.')) {
+      jumpHole(AR.holes.indexOf(partial[0] || unsure[0]));
+      return;
+    }
   }
-  const round = { ...AR, holes: done };
+  const round = { ...AR, holes: logged };
   const rounds = loadRounds();
   rounds.unshift(round);
   saveRounds(rounds);
