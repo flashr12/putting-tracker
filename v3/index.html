@@ -1544,14 +1544,31 @@ function infoPanel(id, html) {
 // both Table 2 and Table 3 rebuild this rather than patching classes — the
 // patching version addressed cells by an id that no longer exists (GIR used
 // to be part of this table), so a cell disabled on one tap stayed dead.
+// Which way the first putt finished, from the variance: -1 short, +1 past,
+// 0 pin-high, null not chosen yet. '>-7' and '>+7' carry their sign too.
+function varianceSign(v) {
+  if (v == null) return null;
+  if (v === '0') return 0;
+  return v.includes('-') ? -1 : 1;
+}
+
+// missDirection describes the SAME putt the variance does, so the two cannot
+// contradict each other: a first putt that finished short was not also long.
+// Pin-high already ruled both out; this is that rule generalised.
+function missAllowed(h, v) {
+  const isPuttHoled = h.numPutts === '1';
+  if (v === 'made')  return h.numPutts == null || isPuttHoled;
+  if (isPuttHoled)   return false;              // holed it: no side to miss on
+  const sign = varianceSign(h.variance);
+  if (sign === null) return true;               // no pace set yet, allow all
+  if (v === 'short') return sign < 0;
+  if (v === 'long')  return sign > 0;
+  return true;                                  // left / right always possible
+}
+
 function missRowHTML(h, i) {
-  const isPuttHoled   = h.numPutts === '1';
-  const isPacePerfect = h.variance === '0' && !isPuttHoled; // pin-high: L/R only
   return MISS_OPTS.map(m => {
-    const isMade   = m.v === 'made';
-    const disabled = isMade
-      ? (h.numPutts != null && !isPuttHoled)
-      : (isPuttHoled || (isPacePerfect && (m.v === 'short' || m.v === 'long')));
+    const disabled = !missAllowed(h, m.v);
     const sel = !disabled && h.missDirection === m.v;
     return `<div class="missb${sel?' on':''}${disabled?' off':''}" id="gc3-${i}-${m.v}"` +
            `${disabled ? '' : ` onclick="onGrid3(${i},'${m.v}')"`}>${m.l}</div>`;
@@ -1697,7 +1714,7 @@ function buildHoleFormHTML(h, i) {
   const grid3 = `
   <div style="margin-bottom:4px">
     ${subHead('Miss Side', `i3-${i}`)}
-    ${flInfo(`i3-${i}`, 'Which side the ball finished on. Use Made when you holed it. Short and long do not apply on a pin-high miss, where only the line was wrong.')}
+    ${flInfo(`i3-${i}`, 'Where the first putt finished. Use Made when you holed it. Only the sides that agree with the pace above are offered — a putt left short cannot also be long, and on a pin-high miss only the line was wrong.')}
     <div class="missrow" id="grid3-${i}">${missRowHTML(h, i)}</div>
   </div>`;
 
@@ -1955,16 +1972,9 @@ function onGrid2(hi, numPutts, variance) {
   const h = AR.holes[hi];
   const wasDone = isHoleDone(h);
   h.numPutts = numPutts; h.variance = variance;
-  const isPuttHoled   = numPutts === '1';
-  const isPacePerfect = variance === '0' && !isPuttHoled; // pin-high miss: L/R only
-  // Drop a miss side the new putt count or variance has made impossible:
-  // 'made' on a multi-putt, a side on a 1-putt, or short/long on a pin-high
-  // miss. Anything still valid is kept.
-  const nowImpossible =
-    (!isPuttHoled && h.missDirection === 'made') ||
-    (isPuttHoled && h.missDirection && h.missDirection !== 'made') ||
-    (isPacePerfect && (h.missDirection === 'short' || h.missDirection === 'long'));
-  if (nowImpossible) { h.missDirection = null; h.gir = null; }
+  // Drop a miss side the new putt count or pace has just contradicted —
+  // changing the pace from short to long must not leave "short" standing.
+  if (h.missDirection && !missAllowed(h, h.missDirection)) h.missDirection = null;
   refreshMissRow(hi);
 
   const tbl = document.getElementById(`grid2-${hi}`);
@@ -1995,11 +2005,7 @@ function onGrid3(hi, missDir) {
       if (c2) { c2.classList.add('on'); c2.textContent = '✓'; }
     }
   }
-  const isPuttHoled   = h.numPutts === '1';
-  const isPacePerfect = h.variance === '0' && !isPuttHoled;
-  if (missDir === 'made' && !isPuttHoled) return;
-  if (missDir !== 'made' && isPuttHoled) return;
-  if ((missDir === 'short' || missDir === 'long') && isPacePerfect) return;
+  if (!missAllowed(h, missDir)) return;
   h.missDirection = missDir;
   refreshMissRow(hi);   // tapping Made sets a 1-putt, which re-gates the sides
   if (!wasDone && isHoleDone(h)) onHoleDone(hi);
