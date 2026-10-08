@@ -181,10 +181,7 @@
          the buttons sit directly on top of it rather than 8px above it —
          any extra here just reads as a gap under the bar */
       padding-bottom: calc(2px + env(safe-area-inset-bottom));
-      /* tinted, not white: iOS reserves the home-indicator strip and no app
-         can use it, but on a white page a white bar makes that strip look
-         like empty page rather than the base of the bar */
-      background: #f1f4f8; border-top: 1px solid #dfe5ed;
+      background: #fff; border-top: 1px solid #e5e7eb;
       display: flex; gap: 8px;
     }
     .rnav-btn {
@@ -2113,7 +2110,7 @@ function showToast(emoji, text, kind, opts = {}) {
   }
   el.onclick = close;
   wrap.appendChild(el);
-  setTimeout(close, opts.ms || 5200);
+  setTimeout(close, opts.ms || 8000);   // a tap dismisses it early
 }
 
 function toggleReactions() {
@@ -2132,17 +2129,18 @@ function syncReactBtn() {
 // Message pools. Picked at random, avoiding an immediate repeat, so the same
 // line does not land twice in a round.
 const REACTIONS = {
-  monster: ['{d} FEET. Absolute filth.', 'From {d} feet?! Frame it.',
-            '{d}-footer drops. Casually devastating.', 'You holed a {d} footer. Tell everyone.'],
-  long:    ['🔥 {d} feet — get in!', '{d}-footer! Somebody is warm.',
-            'Drained it from {d}. Lovely.', '{d} feet, no bother.'],
-  solid:   ['{d} feet, straight in the middle.', 'Nice — {d}-footer converted.',
-            'That is why you practise. {d} feet.'],
-  lag:     ['Two from {d} feet. Lag clinic.', '{d} feet to a tap-in — textbook speed.',
-            'Cosied {d} feet to gimme range. Well judged.'],
-  streak:  ['{n} one-putts on the bounce. Do not look down.',
-            'That is {n} in a row. The putter is hot.',
-            '{n} straight one-putts — someone stop him.'],
+  monster: ['{d} FEET. Absolute filth! 🤯', 'From {d} feet?! Frame it!',
+            '{d}-footer drops. Casually devastating! 😎',
+            'You holed a {d} footer. Tell everyone!'],
+  long:    ['🔥 {d} feet — get in!', '{d}-footer! Somebody is warm 🔥',
+            'Drained it from {d}. Lovely! 👏', '{d} feet, no bother!'],
+  solid:   ['{d} feet, straight in the middle! 🎯', 'Nice — {d}-footer converted! 👍',
+            'That is why you practise. {d} feet!'],
+  lag:     ['Two from {d} feet. Lag clinic! 🎳', '{d} feet to a tap-in — textbook speed! 👌',
+            'Cosied {d} feet to gimme range. Well judged! 😌'],
+  streak:  ['{n} one-putts on the bounce. Do not look down! 😬🔥',
+            'That is {n} in a row. The putter is hot! 🔥',
+            '{n} straight one-putts — someone stop him! 🙌'],
   shortTp: ['Ouch. Three from {d} feet. That one stings.',
             'Three-putt from {d}. We saw nothing.',
             '{d} feet and three putts — shake it off, it is one hole.',
@@ -2184,16 +2182,16 @@ function reactToHole(hi) {
     const streak = oneputtStreak(hi);
     // a streak outranks the individual putt, but only from 3 up
     if (streak >= 3) return showToast('🔥', pickMsg('streak', { n: streak }), 'good');
-    if (d >= 40) return showToast('😱', pickMsg('monster', { d }), 'good', { ms: 4200 });
-    if (d >= 25) return showToast('🔥', pickMsg('long',    { d }), 'good', { ms: 4000 });
+    if (d >= 40) return showToast('😱', pickMsg('monster', { d }), 'good', { ms: 9000 });
+    if (d >= 25) return showToast('🔥', pickMsg('long',    { d }), 'good', { ms: 8500 });
     if (d >= 15) return showToast('🎯', pickMsg('solid',   { d }), 'good');
     return;
   }
 
-  if (putts === '4+') return showToast('💀', pickMsg('four', { d }), 'bad', { ms: 4200 });
+  if (putts === '4+') return showToast('💀', pickMsg('four', { d }), 'bad', { ms: 6500 });
 
   if (putts === '3') {
-    if (d <= 10) return showToast('😬', pickMsg('shortTp', { d }), 'bad', { ms: 4200 });
+    if (d <= 10) return showToast('😬', pickMsg('shortTp', { d }), 'bad', { ms: 6500 });
     if (d <= 25) return showToast('😕', pickMsg('midTp',   { d }), 'bad');
     return;   // a 3-putt from 40ft is unlucky, not worth a poke
   }
@@ -2204,11 +2202,13 @@ function reactToHole(hi) {
 
 // Scoring reactions — fire alongside the putting ones, on the scorecard side.
 const SCORE_REACTIONS = {
-  eagle:   ['An EAGLE. Go and buy a lottery ticket.', 'Eagle. Absolutely no notes.'],
-  birdie:  ['Birdie on {n}. Take it.', 'A birdie! That is how it is done.', 'Birdie — stroke back.'],
-  scramble:['Missed the green and still made par. That is a save.',
-            'Up and down on {n}. Scrambling like that keeps rounds together.',
-            'Par from off the green — those are the ones that lower handicaps.'],
+  eagle:   ['An EAGLE. Go and buy a lottery ticket! 🦅',
+            'Eagle on {n}. Absolutely no notes! 🤩'],
+  birdie:  ['Birdie on {n}. Take it! 🐦', 'A birdie — that is how it is done! 👏',
+            'Birdie on {n} — stroke back! 💪'],
+  scramble:['Missed the green and still made par. That is a save! 🛟',
+            'Up and down on {n}. Scrambling like that keeps rounds together! 👊',
+            'Par from off the green — those are the ones that lower handicaps! 📉'],
   dbl:     ['Double on {n}. Park it — the next tee is a fresh start.',
             'That one got away. One hole, nothing more.'],
 };
@@ -2218,10 +2218,10 @@ function reactToScore(hi) {
   const tp = toPar(h), n = h.n;
   const pick = k => { const p = SCORE_REACTIONS[k];
     return p[Math.floor(Math.random()*p.length)].replace('{n}', n); };
-  if (tp <= -2)      { showToast('🦅', pick('eagle'),   'good', { ms: 5600 }); return true; }
-  if (tp === -1)     { showToast('🐦', pick('birdie'),  'good', { ms: 5200 }); return true; }
-  if (isScramble(h)) { showToast('🛟', pick('scramble'),'good', { ms: 5200 }); return true; }
-  if (tp >= 2)       { showToast('😖', pick('dbl'),     'bad',  { ms: 5200 }); return true; }
+  if (tp <= -2)      { showToast('🦅', pick('eagle'),   'good', { ms: 10000 }); return true; }
+  if (tp === -1)     { showToast('🐦', pick('birdie'),  'good', { ms: 9000 }); return true; }
+  if (isScramble(h)) { showToast('🛟', pick('scramble'),'good', { ms: 9000 }); return true; }
+  if (tp >= 2)       { showToast('😖', pick('dbl'),     'bad',  { ms: 6500 }); return true; }
   return false;
 }
 
