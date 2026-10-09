@@ -535,12 +535,15 @@
               border:1px solid #bfdbfe;background:#fff;color:#1d4ed8;border-radius:4px;
               padding:1px 6px;font-size:8.5px;font-weight:800;letter-spacing:.04em;
               cursor:pointer;text-transform:uppercase}
-    .sect-h.appr{background:#ccfbf1;color:#0f766e}
-    .sub-h.appr{background:#f0fdfa;color:#0f766e}
-    .tile.appr.on{background:#0d9488;border-color:#0d9488}
-    .hd-outer.appr .hd-band{background:#0d9488}
-    .hd-outer.appr.unset .hd-band{background:transparent;border:1px dashed #2dd4bf}
-    .hd-outer.appr.unset .hd-item.hd-sel{color:#0f766e}
+    /* Deeper teal than the first pass — the 50/100 tints were so pale the
+       section barely read as its own. Green is deliberately avoided: it
+       already means under par, and the downhill slope band. */
+    .sect-h.appr{background:#5eead4;color:#134e4a}
+    .sub-h.appr{background:#ccfbf1;color:#115e59}
+    .tile.appr.on{background:#0f766e;border-color:#0f766e}
+    .hd-outer.appr .hd-band{background:#0f766e}
+    .hd-outer.appr.unset .hd-band{background:transparent;border:1px dashed #14b8a6}
+    .hd-outer.appr.unset .hd-item.hd-sel{color:#115e59}
     .sect-h{text-align:center;margin:8px 0 4px;background:#e4eaf2;border-radius:4px;padding:2px 0;
             font-size:10px;font-weight:800;color:#1d4ed8;text-transform:uppercase;
             /* spaced out letters; the padding offsets the trailing space so
