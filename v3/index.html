@@ -1719,7 +1719,7 @@ function buildHoleFormHTML(h, i) {
   <div>
     <div class="sect-h appr">Approach</div>
     ${subHead('Distance to pin · yards', `ia-${i}`, true)}
-    ${flInfo(`ia-${i}`, 'The last full shot you hit AT the green, whichever number it was — the second on most par 4s, the third on most par 5s. Not a greenside chip or pitch. If you were hacking out of trouble and the shot was never really an attempt at the green, leave this blank: it is optional, and a recovery shot logged as an approach makes the distance bands lie. Tap the highlighted value again to clear it.')}
+    ${flInfo(`ia-${i}`, 'Your FIRST real attempt at the green, from more than about 30 yards — normally the second on a par 4 and the third on a par 5. If it misses, the shot you play next is short game, not another approach: log the first one and leave it. A punch-out or a layup is not an attempt at the green, so the approach is the first proper go you have after it. If the hole never gave you one, leave this blank — it is optional. Tap the highlighted value again to clear it.')}
     <div class="hd-outer${h.apprDist>0?'':' unset'} appr" id="hdoA-${i}">
       <div class="hd-wrap">
         <div class="hd-band"></div>
