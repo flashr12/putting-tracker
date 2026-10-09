@@ -546,6 +546,29 @@
        sub-heading tint underneath. Selections stay blue throughout the app —
        one rule for "chosen" rather than one per section. */
     .sub-h.appr{background:#eef1f5;color:#475569}
+    /* Label beside the control instead of a bar above it. The landing grid
+       already had an empty cell in that corner, so FINISH costs nothing. */
+    /* min-width:0 matters: a grid item's automatic minimum is its min-content
+       width, and the drum's track is 2000px+ of values, so without it the
+       column blows out and the drum scrolls inside a box wider than the
+       phone — the parked value ends up off-screen. */
+    .arow{display:grid;align-items:center;gap:4px;margin-bottom:4px}
+    .arow > *{min-width:0}
+    .arow-l{font-size:8.5px;font-weight:800;color:#475569;letter-spacing:.06em;
+            display:flex;align-items:center;white-space:nowrap}
+    .chip{border:1px solid #dfe5ed;border-radius:4px;height:27px;display:flex;
+          align-items:center;justify-content:center;font-size:10.5px;font-weight:700;
+          color:#475569;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .chip:active{background:#dbeafe}
+    .chip.on{background:#2563eb;border-color:#2563eb;color:#fff}
+    /* derived from the fairway you entered — visibly an assumption, not a choice */
+    .chip.derived{background:#eef4ff;border-color:#93c5fd;color:#1d4ed8;border-style:dashed}
+    .chip.fixed{background:#f1f4f8;border-color:#e3e9f0;color:#94a3b8;cursor:default}
+    .sect-i{position:absolute;right:6px;top:50%;transform:translateY(-50%);
+            width:15px;height:15px;border-radius:50%;background:transparent;
+            border:1px solid rgba(255,255,255,.45);color:#fff;font-size:9px;font-weight:800;
+            font-style:italic;line-height:1;cursor:pointer;padding:0;letter-spacing:0;
+            display:flex;align-items:center;justify-content:center}
     .sect-h{text-align:center;margin:8px 0 4px;background:#475569;border-radius:4px;padding:2px 0;
             font-size:10px;font-weight:800;color:#fff;text-transform:uppercase;
             /* spaced out letters; the padding offsets the trailing space so
@@ -1215,7 +1238,7 @@ function blankHole(n, par) {
   // being saved. It is never required for a hole to count as logged.
   return { n, par: par || 4, score:null, scoreSet:false, fairway:null, penalty:0,
            sand:false,
-           apprDist:null, apprDepth:null, apprSide:null,
+           apprDist:null, apprDepth:null, apprSide:null, apprLie:null,
            distance:null, slope:null, direction:null, numPutts:null,
            variance:null, missDirection:null, gir:null };
 }
@@ -1232,6 +1255,20 @@ function fairwayApplies(h) { return (h.par || 4) >= 4; }
 // A score left on the assumed par. Only ever true for holes logged since the
 // confirm step existed, so old rounds are never flagged.
 function scoreAssumed(h) { return !!h && h.scoreSet === false; }
+// The lie the approach was played from. On a par 4 the tee shot is the shot
+// immediately before it, so the fairway field answers this already. On a par 3
+// it is a tee. On a par 5 the approach follows the layup, which nothing in the
+// app records — so there is no honest derivation and the row starts blank.
+function derivedLie(h) {
+  const par = h.par || 4;
+  if (par === 3) return 'tee';
+  if (par === 4) return h.fairway ? (h.fairway === 'hit' ? 'fairway' : 'rough') : null;
+  return null;
+}
+// What the stats should use: an explicit answer if there is one, else the
+// derivation. Only overrides are stored.
+function effectiveLie(h) { return h.apprLie || derivedLie(h); }
+
 // Sand save: in a greenside bunker and still got up and down.
 function isSandSave(h)   { return !!h && h.sand === true && toPar(h) !== null && toPar(h) <= 0; }
 // What a confirmed score should be coloured: birdie, par, bogey, double+.
@@ -1281,7 +1318,7 @@ function isHoleDone(h) {
 function holeTouched(h) {
   return !!(h && (h.scoreSet || h.gir || h.fairway || h.distance ||
                   h.slope || h.numPutts || h.sand || h.penalty ||
-                  h.apprDist || h.apprDepth));
+                  h.apprDist || h.apprDepth || h.apprLie));
 }
 
 function varDisplay(v, missDirection) {
@@ -1697,10 +1734,10 @@ function buildHoleFormHTML(h, i) {
       </div>
       <div class="rule"></div>
       <div class="grp">
-        <div class="grp-l">Sand</div>
+        <div class="grp-l">Greenside</div>
         <div class="grp-b" id="sand-${i}">
           <button class="gbtn warn${h.sand?' on':''}" onclick="setSand(${i})"
-                  aria-label="Greenside bunker">⛳</button>
+                  aria-label="Greenside bunker">🏖</button>
         </div>
       </div>
       <div class="rule"></div>
@@ -1720,24 +1757,47 @@ function buildHoleFormHTML(h, i) {
   // a routine, uphill-putt outcome and the commonest miss in golf.
   const APPR_SIDES  = [['left','◀ LEFT'],['on','ON LINE'],['right','RIGHT ▶']];
   const APPR_DEPTHS = [['long','▲ LONG'],['pin','PIN HIGH'],['short','▼ SHORT']];
+  // Lie: Bunker here means the one you played FROM — a fairway bunker. The
+  // greenside one is the Sand toggle on the scorecard, and both can be true
+  // on the same hole.
+  const LIES = [['fairway','Fairway'],['rough','Rough'],['sand','Bunker']];
+  const lieNow  = h.apprLie;
+  const lieDerv = derivedLie(h);
+  const isPar3  = (h.par || 4) === 3;
+
   const approach = `
   <div>
-    <div class="sect-h appr">Approach</div>
-    ${subHead('Distance to pin · yards', `ia-${i}`, true)}
-    ${flInfo(`ia-${i}`, 'Your FIRST real attempt at the green, from more than about 30 yards — normally the second on a par 4 and the third on a par 5. If it misses, the shot you play next is short game, not another approach: log the first one and leave it. A punch-out or a layup is not an attempt at the green, so the approach is the first proper go you have after it. If the hole never gave you one, leave this blank — it is optional. Tap the highlighted value again to clear it.')}
-    <div class="hd-outer${h.apprDist>0?'':' unset'} appr" id="hdoA-${i}">
-      <div class="hd-wrap">
-        <div class="hd-band"></div>
-        <div class="hd-fade-l"></div>
-        <div class="hd-fade-r"></div>
-        <div class="hd-scroller" id="hdsA-${i}" data-kind="appr"
-             onscroll="onDistScroll(${i},this)" onclick="onDrumTap(${i},event,this)"></div>
+    <div class="sect-h appr">Approach<button class="sect-i"
+         onclick="toggleInfo('ia-${i}')" aria-label="What goes here?">i</button></div>
+    ${flInfo(`ia-${i}`, 'Your FIRST real attempt at the green, from more than about 30 yards — normally the second on a par 4 and the third on a par 5. If it misses, the shot you play next is short game, not another approach: log the first one and leave it. A punch-out or a layup is not an attempt at the green, so the approach is the first proper go you have after it. All of this is optional; tap the highlighted distance again to clear it.<br><br>LIE is where you played it from. Bunker means a fairway bunker — the greenside one is the Sand toggle on the scorecard. On a par 4 it follows the fairway you already entered and is shown outlined; tap to correct it. On a par 5 it starts blank, because nothing in the app knows where your layup finished.<br><br>FINISH is where the ball came to rest relative to the flag, with about 10 feet of tolerance on each axis — so ON LINE is within roughly 10 feet left or right, PIN HIGH within roughly 10 feet nearer or past. The centre cell is not a hole-out; it is any shot close on both. How close is already in the putt distance.')}
+
+    <div class="arow" style="grid-template-columns:52px repeat(3,1fr)">
+      <div class="arow-l">LIE</div>
+      ${isPar3
+        ? `<div class="chip fixed" style="grid-column:span 3">Tee shot</div>`
+        : LIES.map(([v,l]) => {
+            const chosen  = lieNow === v;
+            const assumed = !lieNow && lieDerv === v;
+            return `<div class="chip${chosen?' on':''}${assumed?' derived':''}"
+                         id="gl-${i}-${v}" onclick="onApprLie(${i},'${v}')">${l}</div>`;
+          }).join('')}
+    </div>
+
+    <div class="arow" style="grid-template-columns:52px 1fr">
+      <div class="arow-l">YARDS</div>
+      <div class="hd-outer${h.apprDist>0?'':' unset'} appr" id="hdoA-${i}">
+        <div class="hd-wrap">
+          <div class="hd-band"></div>
+          <div class="hd-fade-l"></div>
+          <div class="hd-fade-r"></div>
+          <div class="hd-scroller" id="hdsA-${i}" data-kind="appr"
+               onscroll="onDistScroll(${i},this)" onclick="onDrumTap(${i},event,this)"></div>
+        </div>
       </div>
     </div>
-    ${subHead('Where it finished', `ib-${i}`, true)}
-    ${flInfo(`ib-${i}`, 'Where the ball came to rest relative to the flag. Each axis has a tolerance of about 10 feet — three paces — so ON LINE means within roughly 10 feet left or right of the flag, and PIN HIGH means within roughly 10 feet nearer or past it. The centre cell is therefore not a hole-out: it is any shot that finished close on both axes. How close is already recorded by the putt distance, so this grid only has to carry the direction of the miss.')}
-    <div class="tgrid" id="grida-${i}" style="grid-template-columns:48px repeat(3,1fr)">
-      <div class="t-h"></div>
+
+    <div class="tgrid" id="grida-${i}" style="grid-template-columns:52px repeat(3,1fr);max-width:330px">
+      <div class="arow-l">FINISH</div>
       ${APPR_SIDES.map(([,l]) => `<div class="t-h">${l}</div>`).join('')}
       ${APPR_DEPTHS.map(([dv,dl]) => `<div class="t-rl wide">${dl}</div>` +
         APPR_SIDES.map(([sv]) => {
@@ -2178,6 +2238,26 @@ function onApproach(hi, depth, side) {
   saveDraft();
 }
 
+// Lie. Tapping the derived answer makes it explicit; tapping an explicit one
+// again drops back to the derivation, so there is always a way out.
+function onApprLie(hi, v) {
+  ensureScorecardDefaults(hi);
+  const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
+  h.apprLie = (h.apprLie === v) ? null : v;
+  const derv = derivedLie(h);
+  LIE_VALUES.forEach(k => {
+    const el = document.getElementById(`gl-${hi}-${k}`);
+    if (!el) return;
+    el.classList.toggle('on', h.apprLie === k);
+    el.classList.toggle('derived', !h.apprLie && derv === k);
+  });
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
+  else refreshHoleSummary(hi);
+  saveDraft();
+}
+const LIE_VALUES = ['fairway','rough','sand'];
+
 // Simple mode: putt count with no pace or miss side to go with it.
 function onSimplePutts(hi, v) {
   ensureScorecardDefaults(hi);
@@ -2280,6 +2360,14 @@ function setFairway(hi, v) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
   h.fairway = v;
   paintGroup(`#fw-${hi}`, {left:0, hit:1, right:2}[v], true);
+  // the lie follows the fairway, so repaint it unless it was answered directly
+  if (!h.apprLie) {
+    const derv = derivedLie(h);
+    LIE_VALUES.forEach(k => {
+      const el = document.getElementById(`gl-${hi}-${k}`);
+      if (el) el.classList.toggle('derived', derv === k);
+    });
+  }
   afterScoreEdit(hi, wasDone);
 }
 // Penalty has no zero button: nothing selected IS zero, and tapping the
@@ -4886,6 +4974,17 @@ function approachStats(holes) {
     }),
     // 3x3 counts, for the pattern grid
     cell: (d,sd) => A.filter(h => h.apprDepth===d && h.apprSide===sd).length,
+    // By the lie it was played from. Par 3s are excluded: a tee is not a lie
+    // you chose, and including them would flatter the "fairway" row with
+    // every perfect tee-peg shot on the course.
+    byLie: ['fairway','rough','sand'].map(k => {
+      const set = A.filter(h => (h.par || 4) !== 3 && effectiveLie(h) === k);
+      const g   = girOf(set);
+      return { k, label: k === 'sand' ? 'Fairway bunker' : k[0].toUpperCase()+k.slice(1),
+               n: set.length, girPct: share(g.length, set),
+               shortPct: share(set.filter(h => h.apprDepth === 'short').length, set),
+               prox: prox(set) };
+    }).filter(x => x.n),
     // Scramble rate by where the approach finished. This is the honest
     // version of "short-siding": the app does not know where the pin sat on
     // the green, so it measures the outcome rather than guessing the cause.
@@ -4985,6 +5084,33 @@ function renderApproachTab() {
              reasonably centred, so the work is in direction rather than club choice.`}
       </div>
     </div>
+
+    ${a.byLie.length > 1 ? `
+    <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">By lie</div>
+      <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:9px">
+        What the lie costs you. Par 3s are left out — a tee peg is not a lie you chose.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="color:#9ca3af">
+          <th style="text-align:left;padding:4px 2px">From</th>
+          <th style="text-align:center;padding:4px 2px">Shots</th>
+          <th style="text-align:center;padding:4px 2px">GIR</th>
+          <th style="text-align:center;padding:4px 2px">Short</th>
+          <th style="text-align:right;padding:4px 2px">Proximity</th>
+        </tr></thead>
+        <tbody>
+          ${a.byLie.map(b => `
+            <tr style="border-top:1px solid #f3f4f6">
+              <td style="padding:6px 2px;font-weight:700;color:#374151">${b.label}</td>
+              <td style="padding:6px 2px;text-align:center;color:#9ca3af">${b.n}</td>
+              <td style="padding:6px 2px;text-align:center;font-weight:700;color:${colorForPct(b.girPct)}">${pc(b.girPct)}</td>
+              <td style="padding:6px 2px;text-align:center;font-weight:700;color:${b.shortPct>45?'#dc2626':'#b45309'}">${pc(b.shortPct)}</td>
+              <td style="padding:6px 2px;text-align:right;font-weight:700;color:#2563eb">${b.prox===null?'—':b.prox+"'"}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
 
     ${a.scrambleBy.length ? `
     <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
