@@ -355,11 +355,11 @@
       scrollbar-width:none; overscroll-behavior-x:contain;
       /* half the track minus half an item, so item 0 can sit dead centre.
          With this, scrollLeft === index * HD_ITEM_W exactly. */
-      padding:0 calc(50% - 24px);
+      padding:0 calc(50% - 18px);
     }
     .hd-scroller::-webkit-scrollbar { display:none; }
     .hd-item {
-      flex:0 0 48px; height:26px;
+      flex:0 0 36px; height:26px;
       display:flex; align-items:center; justify-content:center;
       /* NOT scroll-snap-stop:always — that forces the scroll to halt at every
          single value, so a fast flick moved one foot instead of twenty. With
@@ -374,9 +374,9 @@
     /* centre band: bordered highlight marking the selected value */
     /* the selected value is a filled blue chip, like every other selection */
     .hd-band {
-      position:absolute; z-index:1; top:2px; bottom:2px; left:50%; width:44px;
+      position:absolute; z-index:1; top:2px; bottom:2px; left:50%; width:34px;
       transform:translateX(-50%);
-      background:#2563eb; border:none; border-radius:4px; width:40px;
+      background:#2563eb; border:none; border-radius:4px; width:32px;
       pointer-events:none;
     }
     /* nothing chosen yet (resting on 0') — no chip at all */
@@ -529,6 +529,15 @@
     .gbtn.warn.on{background:#ea580c;color:#fff}
 
     /* ── section headings: tinted rows, no border, centred ── */
+    .sect-h{position:relative}
+    .mode-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);
+              border:1px solid #bfdbfe;background:#fff;color:#1d4ed8;border-radius:4px;
+              padding:1px 6px;font-size:8.5px;font-weight:800;letter-spacing:.04em;
+              cursor:pointer;text-transform:uppercase}
+    .sect-h.appr{background:#ffedd5;color:#c2410c}
+    .sub-h.appr{background:#fff7ed;color:#c2410c}
+    .tile.appr.on{background:#ea580c;border-color:#ea580c}
+    .hd-outer.appr .hd-band{background:#ea580c}
     .sect-h{text-align:center;margin:1px 0 2px;background:#e4eaf2;border-radius:4px;padding:2px 0;
             font-size:10px;font-weight:800;color:#1d4ed8;text-transform:uppercase;
             /* spaced out letters; the padding offsets the trailing space so
@@ -555,6 +564,7 @@
          letter-spacing:-.02em}
     .t-rl{font-size:9.5px;font-weight:800;color:#475569;height:27px;
           display:flex;align-items:center;justify-content:center}
+    .t-rl.wide{font-size:8px;white-space:nowrap;letter-spacing:-.01em}
     .band{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:3px}
     .band i{grid-column:span 3;text-align:center;font-size:8px;font-weight:800;letter-spacing:.07em;
             color:#fff;padding:3px 0;border-radius:4px;font-style:normal}
@@ -629,8 +639,11 @@
         <button class="stab on" onclick="setDashTab(this,'trends')">Trends</button>
         <button class="stab"    onclick="setDashTab(this,'scoring')">Scoring</button>
         <button class="stab"    onclick="setDashTab(this,'bypar')">By Par</button>
+        <button class="stab"    onclick="setDashTab(this,'approach')">Approach</button>
         <button class="stab"    onclick="setDashTab(this,'putting')">Putting</button>
       </div>
+
+      <div id="dtab-approach" style="display:none"></div>
 
       <!-- ══ TRENDS ══ -->
       <div id="dtab-trends">
@@ -836,7 +849,7 @@
       <button id="react-btn" onclick="toggleReactions()" title="Reactions to your holes"
         style="flex-shrink:0;border:none;background:none;font-size:15px;cursor:pointer;padding:2px 3px;line-height:1">💬</button>
       <span id="ri-holecount" onclick="showHoleAdj()"
-        style="flex-shrink:0;font-size:11px;font-weight:700;color:#2563eb;background:#dbeafe;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 8px">
+        style="flex-shrink:0;font-size:11px;font-weight:700;color:#2563eb;background:#dbeafe;border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;margin:0 6px">
         18H ✎
       </span>
       <div class="vtoggle" style="flex-shrink:0">
@@ -939,8 +952,19 @@
 //  CONSTANTS
 // ═══════════════════════════════════════
 // v2: exact distance in feet. Bands below are for reporting only — raw feet is stored.
-const MAX_DIST  = 100;   // drum picker upper bound (feet)
-const HD_ITEM_W = 48;    // px width of one drum value (must match .hd-item CSS)
+const MAX_DIST  = 100;   // putt drum upper bound (feet)
+const HD_ITEM_W = 36;    // px width of one drum value (must match .hd-item CSS)
+// Two drums now: putt distance in feet, approach distance in yards. An index
+// on the track maps to a value through `step`, so the yard drum can move in
+// 5s — 250 yards at 1-yard detents would be an absurd amount of scrolling,
+// and nothing downstream reads approach distance finer than a 25-yard band.
+const DRUMS = {
+  putt: { max: MAX_DIST, step: 1, unit: "'",
+          get: h => h.distance,   set: (h,v) => { h.distance  = v > 0 ? v : null; } },
+  appr: { max: 50,       step: 5, unit: 'y',
+          get: h => h.apprDist,   set: (h,v) => { h.apprDist  = v > 0 ? v : null; } },
+};
+const drumSpec = sc => DRUMS[(sc && sc.dataset.kind) || 'putt'];
 
 // Reporting bands, applied to h.distance (integer feet)
 const DIST_BANDS = [
@@ -1116,6 +1140,23 @@ function loadRounds()   {
 function saveRounds(r)  { localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
 
 // Draft round (auto-saved after every chip tap so Safari crashes don't lose data)
+// Full records slope, break, first-putt pace and miss side. Simple records
+// only how many putts and from how far — which is still everything strokes
+// gained and feet-made need, so the headline putting numbers never break.
+let PUTT_MODE = localStorage.getItem('scratch_puttmode') || 'full';
+function setPuttMode(m) {
+  PUTT_MODE = m;
+  localStorage.setItem('scratch_puttmode', m);
+  syncModeBtn();
+  if (AR) { renderPills(); renderAccordion(); }
+}
+function togglePuttMode() { setPuttMode(PUTT_MODE === 'full' ? 'simple' : 'full'); }
+function syncModeBtn() {
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.textContent = PUTT_MODE === 'full' ? 'Full ✎' : 'Simple ✎';
+  });
+}
+
 const DRAFT_KEY = 'scratch_v1_draft';
 function saveDraft()  { if (AR) localStorage.setItem(DRAFT_KEY, JSON.stringify({AR, AH})); }
 function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
@@ -1152,8 +1193,12 @@ function blankHole(n, par) {
   // scoreSet distinguishes "I entered a 4" from "it defaulted to par and I
   // never looked". Rounds logged before this existed have it undefined, which
   // reads as confirmed — they are not retrospectively doubted.
+  // Approach is optional on purpose: no rangefinder reading, a hole you
+  // hacked out of, a driveable par 4 — none of those should stop the hole
+  // being saved. It is never required for a hole to count as logged.
   return { n, par: par || 4, score:null, scoreSet:false, fairway:null, penalty:0,
            sand:false,
+           apprDist:null, apprDepth:null, apprSide:null,
            distance:null, slope:null, direction:null, numPutts:null,
            variance:null, missDirection:null, gir:null };
 }
@@ -1194,9 +1239,12 @@ function isHoleLogged(h) {
   // scorecard layer
   if (h.score == null || !h.gir) return false;
   if (fairwayApplies(h) && !h.fairway) return false;
-  // putting layer
+  // putting layer. Approach is deliberately absent — it is optional.
   if (!h.distance || h.distance < 1) return false;
-  if (!h.slope || !h.direction || !h.numPutts) return false;
+  if (!h.numPutts) return false;
+  // Simple mode asks for nothing beyond putts and distance.
+  if (PUTT_MODE === 'simple') return true;
+  if (!h.slope || !h.direction) return false;
   if (h.numPutts === '1') return true;   // holed: variance/miss not applicable
   return !!(h.variance && h.missDirection);
 }
@@ -1210,7 +1258,8 @@ function isHoleDone(h) {
 // before it is silently dropped.
 function holeTouched(h) {
   return !!(h && (h.scoreSet || h.gir || h.fairway || h.distance ||
-                  h.slope || h.numPutts || h.sand || h.penalty));
+                  h.slope || h.numPutts || h.sand || h.penalty ||
+                  h.apprDist || h.apprDepth));
 }
 
 function varDisplay(v, missDirection) {
@@ -1252,7 +1301,7 @@ function showMain(name) {
         document.getElementById('ri-course').textContent = AR.course || 'New Round';
         document.getElementById('ri-date').textContent = new Date(AR.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
         document.getElementById('ri-holecount').textContent = (AR.holeCount||18) + 'H ✎';
-        setRoundView('form'); renderPills(); renderAccordion();
+        syncModeBtn(); setRoundView('form'); renderPills(); renderAccordion();
       } else { clearDraft(); initSetup(); }
     } else { initSetup(); }
   }
@@ -1387,6 +1436,7 @@ function startRound() {
   renderAccordion();
   syncSoundBtn();
   syncReactBtn();
+  syncModeBtn();
 }
 
 // Reflect the persisted sound preference on the toggle
@@ -1517,8 +1567,8 @@ function flLabel(emoji, text, infoId) {
 }
 // Centred, tinted section heading. Replaces the full-width coloured banner:
 // three of those down one screen was most of why everything looked the same.
-function subHead(text, infoId) {
-  return `<div class="sub-h">${text}` +
+function subHead(text, infoId, appr) {
+  return `<div class="sub-h${appr?' appr':''}">${text}` +
          `<button class="fl-i" onclick="toggleInfo('${infoId}')" aria-label="What goes here?">i</button></div>`;
 }
 function flInfo(infoId, text) {
@@ -1642,6 +1692,40 @@ function buildHoleFormHTML(h, i) {
     </div>
   </div>`;
 
+  // ── Approach ────────────────────────────────────────────────────────────
+  // Distance in yards, then one tap for where it finished relative to the
+  // flag. The centre column is ON LINE, not holed — "short and on line" is
+  // a routine, uphill-putt outcome and the commonest miss in golf.
+  const APPR_SIDES  = [['left','LEFT'],['on','ON LINE'],['right','RIGHT']];
+  const APPR_DEPTHS = [['long','LONG'],['pin','PIN HIGH'],['short','SHORT']];
+  const approach = `
+  <div>
+    <div class="sect-h appr">Approach</div>
+    ${subHead('Distance to pin · yards', `ia-${i}`, true)}
+    ${flInfo(`ia-${i}`, 'How far you were from the flag for the shot you were trying to hit the green with — the third on most par 5s. In 5-yard steps; nothing reads it finer than a 25-yard band. Leave it at 0 on any hole where there was no real approach.')}
+    <div class="hd-outer${h.apprDist>0?'':' unset'} appr" id="hdoA-${i}">
+      <div class="hd-wrap">
+        <div class="hd-band"></div>
+        <div class="hd-fade-l"></div>
+        <div class="hd-fade-r"></div>
+        <div class="hd-scroller" id="hdsA-${i}" data-kind="appr"
+             onscroll="onDistScroll(${i},this)" onclick="onDrumTap(${i},event,this)"></div>
+      </div>
+    </div>
+    ${subHead('Where it finished', `ib-${i}`, true)}
+    ${flInfo(`ib-${i}`, 'Where the ball came to rest relative to the flag, whether or not you hit the green. ON LINE means neither left nor right of the flag — not holed. Pin high and on line is a good one.')}
+    <div class="tgrid" id="grida-${i}" style="grid-template-columns:48px repeat(3,1fr)">
+      <div class="t-h"></div>
+      ${APPR_SIDES.map(([,l]) => `<div class="t-h">${l}</div>`).join('')}
+      ${APPR_DEPTHS.map(([dv,dl]) => `<div class="t-rl wide">${dl}</div>` +
+        APPR_SIDES.map(([sv]) => {
+          const sel = h.apprDepth===dv && h.apprSide===sv;
+          return `<div class="tile appr${sel?' on':''}" id="ga-${i}-${dv}-${sv}"
+                       onclick="onApproach(${i},'${dv}','${sv}')">${sel?'✓':''}</div>`;
+        }).join('')).join('')}
+    </div>
+  </div>`;
+
   // ── Slope + break + distance ────────────────────────────────────────────
   // 9 columns: [Down L→R, Down Str, Down R→L, Flat …, Up …]. The arrows ARE
   // the tap targets; the coloured band above groups them by slope.
@@ -1718,7 +1802,41 @@ function buildHoleFormHTML(h, i) {
     <div class="missrow" id="grid3-${i}">${missRowHTML(h, i)}</div>
   </div>`;
 
-  return scorecard + `<div class="sect-h">Putting</div>` + grid1 + grid2 + grid3;
+  // Simple mode keeps the distance drum — it is what strokes gained and
+  // feet-made are computed from, so dropping it would break the one putting
+  // number worth carrying forward.
+  const simplePutts = `
+  <div>
+    ${subHead('Putts', `ip-${i}`)}
+    ${flInfo(`ip-${i}`, 'How many putts on the green. Slope, break, pace and miss side are only recorded in Full mode — switch at the top of the round bar.')}
+    <div class="missrow" id="gridp-${i}"
+         style="grid-template-columns:repeat(5,1fr);grid-template-rows:27px">
+      ${['1','2','3','4','4+'].map((v,idx) => {
+        const label = idx === 4 ? '5+' : v;
+        const sel = h.numPutts === v;
+        return `<div class="missb${sel?' on':''}" style="grid-area:auto"
+                     onclick="onSimplePutts(${i},'${v}')">${label}</div>`;
+      }).join('')}
+    </div>
+    ${subHead('Putt Distance · feet', `id-${i}`)}
+    ${flInfo(`id-${i}`, 'How far the first putt was. This is what strokes gained putting and feet-made are built from.')}
+    <div class="hd-outer${h.distance>0?'':' unset'}" id="hdo-${i}">
+      <div class="hd-wrap">
+        <div class="hd-band"></div>
+        <div class="hd-fade-l"></div>
+        <div class="hd-fade-r"></div>
+        <div class="hd-scroller" id="hds-${i}" data-kind="putt"
+             onscroll="onDistScroll(${i},this)" onclick="onDrumTap(${i},event,this)"></div>
+      </div>
+    </div>
+  </div>`;
+
+  // The detail switch sits on the heading of the thing it switches.
+  const puttHead = `<div class="sect-h">Putting<button class="mode-btn"
+      onclick="togglePuttMode()" title="How much putting detail to record"
+      >${PUTT_MODE === 'full' ? 'Full ✎' : 'Simple ✎'}</button></div>`;
+  return scorecard + approach + puttHead +
+    (PUTT_MODE === 'simple' ? simplePutts : grid1 + grid2 + grid3);
 }
 
 // Refresh one row in the list below the form (no full re-render)
@@ -1788,10 +1906,11 @@ function onGrid1(hi, slope, dir) {
 
 // Index 0 is 0 feet — i.e. nothing chosen. Showing "0'" rather than a dash
 // makes an untouched hole read as untouched instead of as a tap-length putt.
-function drumItemsHTML(sel) {
+function drumItemsHTML(sel, kind) {
+  const d = DRUMS[kind] || DRUMS.putt;
   let s = '';
-  for (let n = 0; n <= MAX_DIST; n++) {
-    s += `<div class="hd-item${sel===n?' hd-sel':''}">${n}'</div>`;
+  for (let n = 0; n <= d.max; n++) {
+    s += `<div class="hd-item${sel===n?' hd-sel':''}">${n * d.step}${d.unit}</div>`;
   }
   return s;
 }
@@ -1805,7 +1924,8 @@ function paintDrum(scroller, idx) {
 }
 
 function drumIdx(scroller) {
-  return Math.max(0, Math.min(MAX_DIST, Math.round(scroller.scrollLeft / HD_ITEM_W)));
+  return Math.max(0, Math.min(drumSpec(scroller).max,
+                              Math.round(scroller.scrollLeft / HD_ITEM_W)));
 }
 
 // ── Drum detent click ─────────────────────────────────────────────────────
@@ -1871,37 +1991,45 @@ function toggleSound() {
   });
 }
 
+// Keyed by drum, not by hole — a hole now carries two of them.
 const DRUM_T = {}, DRUM_LAST = {};
+const drumKey = (hi, kind) => kind + ':' + hi;
+
 function onDistScroll(hi, scroller) {
   // Populated lazily — an empty scroller is mid-teardown, not user input.
   if (!scroller.firstElementChild) return;
+  const kind = scroller.dataset.kind || 'putt';
+  const key  = drumKey(hi, kind);
   // Repaint live while the finger is moving, clicking on each value crossed…
   const live = drumIdx(scroller);
-  if (DRUM_LAST[hi] !== live) { DRUM_LAST[hi] = live; drumTick(); }
+  if (DRUM_LAST[key] !== live) { DRUM_LAST[key] = live; drumTick(); }
   paintDrum(scroller, live);
-  const outerLive = document.getElementById(`hdo-${hi}`);
+  const outerLive = document.getElementById(`hdo${kind==='appr'?'A':''}-${hi}`);
   if (outerLive) outerLive.classList.toggle('unset', live === 0);
   // …but only commit once scrolling settles.
-  clearTimeout(DRUM_T[hi]);
-  DRUM_T[hi] = setTimeout(() => {
-    delete DRUM_T[hi];
+  clearTimeout(DRUM_T[key]);
+  DRUM_T[key] = setTimeout(() => {
+    delete DRUM_T[key];
     // If the hole was switched inside the debounce window the drum is already
     // detached, and a detached element reports scrollLeft 0 — committing that
     // would silently wipe the distance the user just dialled in.
     if (!scroller.isConnected || !scroller.firstElementChild) return;
     const idx = drumIdx(scroller);
     paintDrum(scroller, idx);
-    commitDist(hi, idx);
+    commitDist(hi, idx, kind);
   }, 140);
 }
 
 // Commit a pending drum value immediately, before its element goes away.
 function flushDrum(hi) {
-  if (DRUM_T[hi] === undefined) return;
-  clearTimeout(DRUM_T[hi]);
-  delete DRUM_T[hi];
-  const sc = document.getElementById(`hds-${hi}`);
-  if (sc && sc.isConnected && sc.firstElementChild) commitDist(hi, drumIdx(sc));
+  ['putt','appr'].forEach(kind => {
+    const key = drumKey(hi, kind);
+    if (DRUM_T[key] === undefined) return;
+    clearTimeout(DRUM_T[key]);
+    delete DRUM_T[key];
+    const sc = document.getElementById(`hds${kind==='appr'?'A':''}-${hi}`);
+    if (sc && sc.isConnected && sc.firstElementChild) commitDist(hi, drumIdx(sc), kind);
+  });
 }
 
 // Tap any visible value to jump straight to it, rather than only scrolling.
@@ -1910,25 +2038,28 @@ function onDrumTap(hi, ev, scroller) {
   if (!item || !scroller.firstElementChild) return;
   const idx = Array.prototype.indexOf.call(scroller.children, item);
   if (idx < 0) return;
+  const kind = scroller.dataset.kind || 'putt';
   // Direct assignment, not scrollTo({behavior:'smooth'}) — mandatory scroll-snap
   // fights the smooth animation and the scroll never lands.
   scroller.scrollLeft = idx * HD_ITEM_W;
   // A programmatic scroll does not reliably raise a scroll event, so commit
   // here rather than waiting on the debounced handler.
-  clearTimeout(DRUM_T[hi]); delete DRUM_T[hi];
-  DRUM_LAST[hi] = idx;
+  const key = drumKey(hi, kind);
+  clearTimeout(DRUM_T[key]); delete DRUM_T[key];
+  DRUM_LAST[key] = idx;
   paintDrum(scroller, idx);
-  commitDist(hi, idx);
+  commitDist(hi, idx, kind);
 }
 
-function commitDist(hi, feet) {
+function commitDist(hi, idx, kind = 'putt') {
   ensureScorecardDefaults(hi);
   const h = AR.holes[hi];
   const wasDone = isHoleDone(h);
-  h.distance = feet > 0 ? feet : null;
+  const d = DRUMS[kind];
+  d.set(h, idx * d.step);
 
-  const outer = document.getElementById(`hdo-${hi}`);
-  if (outer) outer.classList.toggle('unset', !(feet > 0));
+  const outer = document.getElementById(`hdo${kind==='appr'?'A':''}-${hi}`);
+  if (outer) outer.classList.toggle('unset', !(idx > 0));
 
   // Advance only when the hole GOES from incomplete to complete. Firing on
   // any edit meant returning to a finished hole bounced you forward again
@@ -1938,16 +2069,19 @@ function commitDist(hi, feet) {
   saveDraft();
 }
 
-// Populate + position the drum for one hole (only the open hole carries rows)
+// Populate + position both drums for one hole (only the open hole carries rows)
 function initDrums(hi) {
   const h = AR.holes[hi];
   if (!h) return;
-  const sc = document.getElementById(`hds-${hi}`);
-  if (!sc) return;
-  const val = h.distance > 0 ? h.distance : 0;
-  if (!sc.firstElementChild) sc.innerHTML = drumItemsHTML(val);
-  if (drumIdx(sc) !== val) sc.scrollLeft = val * HD_ITEM_W;
-  paintDrum(sc, val);
+  ['putt','appr'].forEach(kind => {
+    const sc = document.getElementById(`hds${kind==='appr'?'A':''}-${hi}`);
+    if (!sc) return;
+    const d   = DRUMS[kind];
+    const val = Math.round((d.get(h) > 0 ? d.get(h) : 0) / d.step);
+    if (!sc.firstElementChild) sc.innerHTML = drumItemsHTML(val, kind);
+    if (drumIdx(sc) !== val) sc.scrollLeft = val * HD_ITEM_W;
+    paintDrum(sc, val);
+  });
 }
 
 // Drop the rows of every hole except `keep` — keeps the DOM small on phones
@@ -1977,6 +2111,43 @@ function onGrid2(hi, numPutts, variance) {
     const cell = document.getElementById(`gc2-${hi}-${safePts}-${safeVar}`);
     if (cell) { cell.classList.add('on'); cell.textContent = '✓'; }
   }
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
+  else refreshHoleSummary(hi);
+  saveDraft();
+}
+
+// Approach: one tap sets depth and side together. Tapping the selected cell
+// clears it, because approach is optional and there has to be a way back out.
+function onApproach(hi, depth, side) {
+  ensureScorecardDefaults(hi);
+  const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
+  const same = h.apprDepth === depth && h.apprSide === side;
+  h.apprDepth = same ? null : depth;
+  h.apprSide  = same ? null : side;
+  const g = document.getElementById(`grida-${hi}`);
+  if (g) g.querySelectorAll('.tile.on').forEach(c => { c.classList.remove('on'); c.textContent=''; });
+  if (!same) {
+    const cell = document.getElementById(`ga-${hi}-${depth}-${side}`);
+    if (cell) { cell.classList.add('on'); cell.textContent = '✓'; }
+  }
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
+  else refreshHoleSummary(hi);
+  saveDraft();
+}
+
+// Simple mode: putt count with no pace or miss side to go with it.
+function onSimplePutts(hi, v) {
+  ensureScorecardDefaults(hi);
+  const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
+  h.numPutts = v;
+  // nothing recorded in Simple mode can describe a first putt, so make sure
+  // no stale Full-mode value is left hanging off the hole
+  h.variance = null; h.missDirection = null;
+  const g = document.getElementById(`gridp-${hi}`);
+  if (g) [...g.children].forEach(c => c.classList.toggle('on',
+    c.getAttribute('onclick').includes(`'${v}'`)));
   if (!wasDone && isHoleDone(h)) onHoleDone(hi);
   else refreshHoleSummary(hi);
   saveDraft();
@@ -2600,12 +2771,13 @@ function setDashTab(btn, name) {
   DASH_TAB = name;
   const row = btn.parentElement;
   [...row.children].forEach(b => b.classList.toggle('on', b === btn));
-  ['trends','scoring','bypar','putting'].forEach(t => {
+  ['trends','scoring','bypar','putting','approach'].forEach(t => {
     const el = document.getElementById('dtab-' + t);
     if (el) el.style.display = t === name ? 'block' : 'none';
   });
   // a canvas inside a hidden box lays out at zero, so draw on reveal
-  if (name === 'trends') drawDashTrend();
+  if (name === 'trends')   drawDashTrend();
+  if (name === 'approach') renderApproachTab();
 }
 
 function setTrendMetric(btn, m) {
@@ -4335,12 +4507,23 @@ let modalRoundId = null;
 function exportCSV() {
   const rounds = loadRounds();
   if (!rounds.length) { alert('No rounds to export yet.'); return; }
-  const headers = ['Date','Course','Hole','Feet','Slope','Direction','Putts','Variance','Miss','GIR','ExpPutts','StrokesGained'];
+  // Everything the app records, not just the putting half — an export that
+  // silently drops score, fairways and approach would misrepresent the round
+  // to anything reading it.
+  const headers = ['Date','Course','Hole','Par','Score','ToPar','ScoreConfirmed',
+                   'Fairway','GIR','Sand','Penalty',
+                   'ApproachYards','ApproachDepth','ApproachSide',
+                   'PuttFeet','Slope','Direction','Putts','Variance','Miss',
+                   'ExpPutts','StrokesGained'];
   const rows = rounds.flatMap(r => r.holes.map(h => {
-    const sg = holeSGP(h);
+    const sg = holeSGP(h), tp = toPar(h);
     return [
-      r.date, r.course||'', h.n, h.distance||'', h.slope||'', h.direction||'',
-      h.numPutts||'', varDisplay(h.variance, h.missDirection)||h.variance||'', h.missDirection||'', h.gir||'',
+      r.date, r.course||'', h.n, h.par||'', h.score??'', tp===null?'':tp,
+      h.score==null ? '' : (h.scoreSet === false ? 'assumed' : 'yes'),
+      h.fairway||'', h.gir||'', h.sand ? 'yes' : '', h.penalty||0,
+      h.apprDist||'', h.apprDepth||'', h.apprSide||'',
+      h.distance||'', h.slope||'', h.direction||'',
+      h.numPutts||'', varDisplay(h.variance, h.missDirection)||h.variance||'', h.missDirection||'',
       h.distance ? sgpExpected(h.distance).toFixed(3) : '', sg!==null ? sg.toFixed(3) : ''
     ];
   }));
@@ -4531,6 +4714,171 @@ function importFromV2() {
   showToast('📥', `${added} rounds imported from Putting Tracker.`, 'good', { ms: 5000 });
 }
 
+
+
+// ═══════════════════════════════════════
+//  APPROACH
+// ═══════════════════════════════════════
+// Only holes with an approach distance count — it is an optional field, so a
+// round logged before it existed, or a hole where there was no real approach,
+// simply sits this out rather than counting as a miss.
+const APPR_BANDS = [
+  { label:'≤100y',     fn: d => d <= 100 },
+  { label:'101–140y',  fn: d => d > 100 && d <= 140 },
+  { label:'141–175y',  fn: d => d > 140 && d <= 175 },
+  { label:'176y+',     fn: d => d > 175 },
+];
+
+function approachStats(holes) {
+  const A = holes.filter(h => h.apprDist > 0 && h.apprDepth && h.apprSide);
+  if (!A.length) return null;
+  const share = (k, set) => set.length ? Math.round(k / set.length * 100) : null;
+  const girOf = set => set.filter(h => h.gir === 'yes');
+
+  // Proximity is NOT a new field: on a green hit, the first putt distance
+  // already IS how close the approach finished.
+  const prox = set => {
+    const g = girOf(set).filter(h => h.distance > 0);
+    return g.length ? +(g.reduce((a,h) => a + h.distance, 0) / g.length).toFixed(1) : null;
+  };
+
+  return {
+    n: A.length,
+    girPct:   share(girOf(A).length, A),
+    shortPct: share(A.filter(h => h.apprDepth === 'short').length, A),
+    longPct:  share(A.filter(h => h.apprDepth === 'long').length,  A),
+    pinPct:   share(A.filter(h => h.apprDepth === 'pin').length,   A),
+    leftPct:  share(A.filter(h => h.apprSide === 'left').length,   A),
+    onPct:    share(A.filter(h => h.apprSide === 'on').length,     A),
+    rightPct: share(A.filter(h => h.apprSide === 'right').length,  A),
+    prox: prox(A),
+    bands: APPR_BANDS.map(b => {
+      const set = A.filter(h => b.fn(h.apprDist));
+      return { label:b.label, n:set.length,
+               girPct: share(girOf(set).length, set),
+               shortPct: share(set.filter(h => h.apprDepth === 'short').length, set),
+               prox: prox(set) };
+    }),
+    // 3x3 counts, for the pattern grid
+    cell: (d,sd) => A.filter(h => h.apprDepth===d && h.apprSide===sd).length,
+    // Scramble rate by where the approach finished. This is the honest
+    // version of "short-siding": the app does not know where the pin sat on
+    // the green, so it measures the outcome rather than guessing the cause.
+    scrambleBy: ['long','pin','short'].flatMap(d => ['left','on','right'].map(sd => {
+      const set = A.filter(h => h.gir === 'no' && h.apprDepth===d && h.apprSide===sd
+                                && toPar(h) !== null);
+      return { d, sd, n:set.length, pct: share(set.filter(isScramble).length, set) };
+    })).filter(x => x.n >= 3).sort((a,b) => (a.pct ?? 101) - (b.pct ?? 101)),
+  };
+}
+
+function renderApproachTab() {
+  const el = document.getElementById('dtab-approach');
+  if (!el) return;
+  const a = approachStats(loadRounds().flatMap(r => r.holes || []));
+  if (!a) {
+    el.innerHTML = `
+      <div style="background:#fff;border-radius:6px;padding:28px 16px;text-align:center;
+           box-shadow:0 1px 3px rgba(0,0,0,.07)">
+        <div style="font-size:38px">🎯</div>
+        <p style="font-weight:700;color:#374151;margin:8px 0 4px">No approaches logged yet</p>
+        <p style="font-size:12px;color:#9ca3af;line-height:1.5">
+          Set the distance to the pin and tap where the ball finished, on the hole screen.
+          It is optional — skip it on any hole where there was no real approach.</p>
+      </div>`;
+    return;
+  }
+  const card = (v, l, col, sub) => `<div class="kpi">
+      <div class="kpi-v" style="color:${col};font-size:22px">${v}</div>
+      <div class="kpi-l">${l}</div>
+      ${sub ? `<div style="font-size:9px;color:#9ca3af;margin-top:1px">${sub}</div>` : ''}</div>`;
+  const pc = v => v === null ? '—' : v + '%';
+  const heat = v => v === null ? '#f8fafc'
+    : `rgba(234,88,12,${Math.min(.85, 0.08 + v / 100 * 1.6)})`;
+  const maxCell = Math.max(1, ...['long','pin','short'].flatMap(d =>
+    ['left','on','right'].map(sd => a.cell(d,sd))));
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      ${card(pc(a.girPct), 'Greens hit', '#15803d', a.n + ' approaches')}
+      ${card(pc(a.shortPct), 'Finished short', a.shortPct > 45 ? '#dc2626' : '#b45309')}
+      ${card(a.prox === null ? '—' : a.prox + "'", 'Avg proximity', '#2563eb', 'greens hit')}
+    </div>
+
+    <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">By distance</div>
+      <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:9px">
+        Where your scoring range ends. Proximity is the first-putt distance on the greens you hit.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="color:#9ca3af">
+          <th style="text-align:left;padding:4px 2px">Range</th>
+          <th style="text-align:center;padding:4px 2px">Shots</th>
+          <th style="text-align:center;padding:4px 2px">GIR</th>
+          <th style="text-align:center;padding:4px 2px">Short</th>
+          <th style="text-align:right;padding:4px 2px">Proximity</th>
+        </tr></thead>
+        <tbody>
+          ${a.bands.filter(b => b.n).map(b => `
+            <tr style="border-top:1px solid #f3f4f6">
+              <td style="padding:6px 2px;font-weight:700;color:#374151">${b.label}</td>
+              <td style="padding:6px 2px;text-align:center;color:#9ca3af">${b.n}</td>
+              <td style="padding:6px 2px;text-align:center;font-weight:700;color:${colorForPct(b.girPct)}">${pc(b.girPct)}</td>
+              <td style="padding:6px 2px;text-align:center;font-weight:700;color:${b.shortPct>45?'#dc2626':'#b45309'}">${pc(b.shortPct)}</td>
+              <td style="padding:6px 2px;text-align:right;font-weight:700;color:#2563eb">${b.prox===null?'—':b.prox+"'"}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">Where it finishes</div>
+      <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:10px">
+        Every logged approach, as you saw it. Darker is more often.
+      </div>
+      <div style="display:grid;grid-template-columns:52px repeat(3,1fr);gap:4px">
+        <div></div>
+        ${['LEFT','ON LINE','RIGHT'].map(l => `<div style="font-size:8.5px;font-weight:800;color:#94a3b8;text-align:center">${l}</div>`).join('')}
+        ${[['long','LONG'],['pin','PIN HIGH'],['short','SHORT']].map(([d,dl]) => `
+          <div style="font-size:8.5px;font-weight:800;color:#475569;display:flex;align-items:center">${dl}</div>
+          ${['left','on','right'].map(sd => {
+            const c = a.cell(d,sd), pctv = Math.round(c / a.n * 100);
+            return `<div style="height:40px;border-radius:4px;display:flex;flex-direction:column;
+                         align-items:center;justify-content:center;background:${heat(c/maxCell*100)};
+                         color:${c/maxCell>0.5?'#fff':'#475569'}">
+                      <b style="font-size:13px;font-weight:800">${c}</b>
+                      <span style="font-size:8px;opacity:.8">${pctv}%</span>
+                    </div>`;
+          }).join('')}`).join('')}
+      </div>
+      <div style="font-size:11px;color:#64748b;line-height:1.6;margin-top:10px;border-top:1px solid #f3f4f6;padding-top:9px">
+        ${a.shortPct > (a.longPct ?? 0) + 15
+          ? `You finish short <b style="color:#c2410c">${a.shortPct}%</b> of the time against
+             long ${a.longPct}%. That is a club-selection gap, not a swing fault — it is the
+             cheapest shot in this app to get back.`
+          : `Short ${a.shortPct}% against long ${a.longPct}% — your distance control is
+             reasonably centred, so the work is in direction rather than club choice.`}
+      </div>
+    </div>
+
+    ${a.scrambleBy.length ? `
+    <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">Recovering from a miss</div>
+      <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:9px">
+        How often you still made par, by where the approach left you. Worst first, minimum 3 shots.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        ${a.scrambleBy.slice(0,5).map(x => `
+          <tr style="border-top:1px solid #f3f4f6">
+            <td style="padding:6px 2px;font-weight:600;color:#374151">
+              ${x.d === 'pin' ? 'Pin high' : x.d[0].toUpperCase()+x.d.slice(1)},
+              ${x.sd === 'on' ? 'on line' : x.sd}</td>
+            <td style="padding:6px 2px;text-align:center;color:#9ca3af">${x.n}</td>
+            <td style="padding:6px 2px;text-align:right;font-weight:800;color:${colorForPct(x.pct)}">${pc(x.pct)}</td>
+          </tr>`).join('')}
+      </table>
+    </div>` : ''}`;
+}
 
 // ═══════════════════════════════════════
 //  PRACTICE
