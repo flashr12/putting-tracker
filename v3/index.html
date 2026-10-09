@@ -552,7 +552,8 @@
        width, and the drum's track is 2000px+ of values, so without it the
        column blows out and the drum scrolls inside a box wider than the
        phone — the parked value ends up off-screen. */
-    .arow{display:grid;align-items:center;gap:4px;margin-bottom:4px}
+    .arow{display:grid;align-items:center;gap:4px;margin-bottom:8px}
+    .arow .hd-outer{margin-top:0}
     .arow > *{min-width:0}
     .arow-l{font-size:8.5px;font-weight:800;color:#475569;letter-spacing:.06em;
             display:flex;align-items:center;white-space:nowrap}
@@ -569,7 +570,7 @@
             border:1px solid rgba(255,255,255,.45);color:#fff;font-size:9px;font-weight:800;
             font-style:italic;line-height:1;cursor:pointer;padding:0;letter-spacing:0;
             display:flex;align-items:center;justify-content:center}
-    .sect-h{text-align:center;margin:8px 0 4px;background:#475569;border-radius:4px;padding:2px 0;
+    .sect-h{text-align:center;margin:8px 0;background:#475569;border-radius:4px;padding:2px 0;
             font-size:10px;font-weight:800;color:#fff;text-transform:uppercase;
             /* spaced out letters; the padding offsets the trailing space so
                the word stays optically centred */
@@ -1796,8 +1797,9 @@ function buildHoleFormHTML(h, i) {
       </div>
     </div>
 
-    <div class="tgrid" id="grida-${i}" style="grid-template-columns:52px repeat(3,1fr);max-width:330px">
-      <div class="arow-l">FINISH</div>
+    <div class="tgrid" id="grida-${i}" style="grid-template-columns:46px 44px repeat(3,1fr)">
+      <div class="arow-l" style="grid-column:1;grid-row:1/span 4">FINISH</div>
+      <div class="t-h"></div>
       ${APPR_SIDES.map(([,l]) => `<div class="t-h">${l}</div>`).join('')}
       ${APPR_DEPTHS.map(([dv,dl]) => `<div class="t-rl wide">${dl}</div>` +
         APPR_SIDES.map(([sv]) => {
