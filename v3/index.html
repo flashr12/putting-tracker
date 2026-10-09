@@ -565,6 +565,24 @@
     /* derived from the fairway you entered — visibly an assumption, not a choice */
     .chip.derived{background:#eef4ff;border-color:#93c5fd;color:#1d4ed8;border-style:dashed}
     .chip.fixed{background:#f1f4f8;border-color:#e3e9f0;color:#94a3b8;cursor:default}
+    /* FINISH as a plan view. No gaps between cells — it has to read as one
+       continuous piece of ground, not nine buttons. The axes are drawn
+       behind, so a selected cell covers them rather than being cut by them. */
+    .fgraph{position:relative;display:grid;
+            grid-template-columns:1fr 70px 1fr;
+            grid-template-rows:32px 30px 32px;
+            border:1px solid #dfe5ed;border-radius:4px;overflow:hidden;background:#fff}
+    .fgraph .fax-h,.fgraph .fax-v{position:absolute;background:#cbd5e1;z-index:0;pointer-events:none}
+    .fgraph .fax-h{left:0;right:0;top:50%;height:3px;transform:translateY(-1.5px)}
+    .fgraph .fax-v{top:0;bottom:0;left:50%;width:3px;transform:translateX(-1.5px)}
+    .fcell{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
+           font-size:8px;font-weight:800;color:#94a3b8;letter-spacing:.06em;cursor:pointer;
+           -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+    .fcell:active{background:#dbeafe}
+    .fcell.on{background:#2563eb;color:#fff}
+    .fpin{font-size:18px;letter-spacing:0}
+    .fcell.on.fpin{color:#fff}
+
     .sect-i{position:absolute;right:6px;top:50%;transform:translateY(-50%);
             width:15px;height:15px;border-radius:50%;background:transparent;
             border:1px solid rgba(255,255,255,.45);color:#fff;font-size:9px;font-weight:800;
@@ -1797,16 +1815,9 @@ function buildHoleFormHTML(h, i) {
       </div>
     </div>
 
-    <div class="tgrid" id="grida-${i}" style="grid-template-columns:46px 44px repeat(3,1fr)">
-      <div class="arow-l" style="grid-column:1;grid-row:1/span 4">FINISH</div>
-      <div class="t-h"></div>
-      ${APPR_SIDES.map(([,l]) => `<div class="t-h">${l}</div>`).join('')}
-      ${APPR_DEPTHS.map(([dv,dl]) => `<div class="t-rl wide">${dl}</div>` +
-        APPR_SIDES.map(([sv]) => {
-          const sel = h.apprDepth===dv && h.apprSide===sv;
-          return `<div class="tile appr${sel?' on':''}" id="ga-${i}-${dv}-${sv}"
-                       onclick="onApproach(${i},'${dv}','${sv}')">${sel?'✓':''}</div>`;
-        }).join('')).join('')}
+    <div class="arow" style="grid-template-columns:46px 1fr">
+      <div class="arow-l">FINISH</div>
+      <div class="fgraph" id="grida-${i}">${finishGraphHTML(h, i)}</div>
     </div>
   </div>`;
 
@@ -2220,6 +2231,23 @@ function onGrid2(hi, numPutts, variance) {
   saveDraft();
 }
 
+// The nine outcomes drawn as a plan view rather than a table: the flag in the
+// middle, the axes through it, and the four quadrants around it. Same nine
+// values the grid stored — long/pin/short against left/on/right — but you tap
+// where the ball was rather than reading a row against a column.
+const FGRAPH_CELLS = [
+  ['long','left','↖'],  ['long','on','LONG'],   ['long','right','↗'],
+  ['pin','left','LEFT'],['pin','on','⛳'],       ['pin','right','RIGHT'],
+  ['short','left','↙'], ['short','on','SHORT'], ['short','right','↘'],
+];
+function finishGraphHTML(h, i) {
+  return `<i class="fax-h"></i><i class="fax-v"></i>` + FGRAPH_CELLS.map(([d,sd,lbl]) => {
+    const sel = h.apprDepth===d && h.apprSide===sd;
+    return `<div class="fcell${sel?' on':''}${sd==='on'&&d==='pin'?' fpin':''}"
+                 id="ga-${i}-${d}-${sd}" onclick="onApproach(${i},'${d}','${sd}')">${lbl}</div>`;
+  }).join('');
+}
+
 // Approach: one tap sets depth and side together. Tapping the selected cell
 // clears it, because approach is optional and there has to be a way back out.
 function onApproach(hi, depth, side) {
@@ -2230,10 +2258,10 @@ function onApproach(hi, depth, side) {
   h.apprDepth = same ? null : depth;
   h.apprSide  = same ? null : side;
   const g = document.getElementById(`grida-${hi}`);
-  if (g) g.querySelectorAll('.tile.on').forEach(c => { c.classList.remove('on'); c.textContent=''; });
+  if (g) g.querySelectorAll('.fcell.on').forEach(c => c.classList.remove('on'));
   if (!same) {
     const cell = document.getElementById(`ga-${hi}-${depth}-${side}`);
-    if (cell) { cell.classList.add('on'); cell.textContent = '✓'; }
+    if (cell) cell.classList.add('on');
   }
   if (!wasDone && isHoleDone(h)) onHoleDone(hi);
   else refreshHoleSummary(hi);
