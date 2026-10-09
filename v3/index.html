@@ -483,9 +483,12 @@
     .scard{position:relative}
     /* par sits in the corner of the card, on the score's own row — the hole
        number is already the highlighted marker directly above */
-    .scard-h{position:absolute;top:6px;left:11px;
+    /* top matches the card's own padding, which is where the score box
+       starts — so the gap above the label and above the box is the same */
+    .scard-h{position:absolute;top:12px;left:11px;line-height:1;
              font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;
              text-transform:uppercase}
+    .scard-h b{font-size:13px;font-weight:800;color:#cbd5e1;letter-spacing:0}
     /* bare glyphs: the 48px target stays, only the box goes */
     .hero3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:13px}
     .hbtn{height:48px;border:none;background:transparent;color:#94a3b8;
@@ -535,15 +538,11 @@
               border:1px solid #bfdbfe;background:#fff;color:#1d4ed8;border-radius:4px;
               padding:1px 6px;font-size:8.5px;font-weight:800;letter-spacing:.04em;
               cursor:pointer;text-transform:uppercase}
-    /* Deeper teal than the first pass — the 50/100 tints were so pale the
-       section barely read as its own. Green is deliberately avoided: it
-       already means under par, and the downhill slope band. */
-    .sect-h.appr{background:#5eead4;color:#134e4a}
-    .sub-h.appr{background:#ccfbf1;color:#115e59}
-    .tile.appr.on{background:#0f766e;border-color:#0f766e}
-    .hd-outer.appr .hd-band{background:#0f766e}
-    .hd-outer.appr.unset .hd-band{background:transparent;border:1px dashed #14b8a6}
-    .hd-outer.appr.unset .hd-item.hd-sel{color:#115e59}
+    /* Approach is marked by a solid grey divider rather than a colour wash.
+       Selections stay blue throughout the app — one rule for "chosen" rather
+       than one per section — so the section identity sits in the headers. */
+    .sect-h.appr{background:#475569;color:#fff}
+    .sub-h.appr{background:#eef1f5;color:#475569}
     .sect-h{text-align:center;margin:8px 0 4px;background:#e4eaf2;border-radius:4px;padding:2px 0;
             font-size:10px;font-weight:800;color:#1d4ed8;text-transform:uppercase;
             /* spaced out letters; the padding offsets the trailing space so
@@ -1669,7 +1668,7 @@ function buildHoleFormHTML(h, i) {
 
   const scorecard = `
   <div class="scard">
-    <span class="scard-h">Par ${par}</span>
+    <span class="scard-h">Par <b>${par}</b></span>
     <div class="hero3">
       <button class="hbtn" onclick="bumpScore(${i},-1)" aria-label="One less">−</button>
       <div class="sbox ${assumed ? 'open' : 'fill ' + resultClass(h)}" id="sbox-${i}"
