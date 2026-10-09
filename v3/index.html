@@ -569,19 +569,45 @@
        continuous piece of ground, not nine buttons. The axes are drawn
        behind, so a selected cell covers them rather than being cut by them. */
     .fgraph{position:relative;display:grid;
-            grid-template-columns:1fr 70px 1fr;
-            grid-template-rows:32px 30px 32px;
-            border:1px solid #dfe5ed;border-radius:4px;overflow:hidden;background:#fff}
-    .fgraph .fax-h,.fgraph .fax-v{position:absolute;background:#cbd5e1;z-index:0;pointer-events:none}
-    .fgraph .fax-h{left:0;right:0;top:50%;height:3px;transform:translateY(-1.5px)}
-    .fgraph .fax-v{top:0;bottom:0;left:50%;width:3px;transform:translateX(-1.5px)}
+            grid-template-columns:1fr 78px 1fr;
+            grid-template-rows:33px 32px 33px;
+            background:transparent}
+    /* Four arms, not two crossing lines: each stops short of the flag and
+       ends in an arrowhead, so the axes read as axes and nothing is drawn
+       across the pin. */
+    .fgraph .fax{position:absolute;background:#cbd5e1;z-index:0;pointer-events:none}
+    /* the arrowheads need the same specificity as the base rule, or its
+       `border` shorthand repaints them transparent */
+    .fgraph .fax::after{content:'';position:absolute;width:0;height:0}
+    .fgraph .fax-l{left:0;right:calc(50% + 42px);top:50%;height:1px;transform:translateY(-.5px)}
+    .fgraph .fax-r{right:0;left:calc(50% + 42px);top:50%;height:1px;transform:translateY(-.5px)}
+    .fgraph .fax-t{top:0;bottom:calc(50% + 19px);left:50%;width:1px;transform:translateX(-.5px)}
+    .fgraph .fax-b{bottom:0;top:calc(50% + 19px);left:50%;width:1px;transform:translateX(-.5px)}
+    .fgraph .fax-l::after{left:0;top:-3.5px;
+      border-top:4px solid transparent;border-bottom:4px solid transparent;
+      border-right:5px solid #cbd5e1}
+    .fgraph .fax-r::after{right:0;top:-3.5px;
+      border-top:4px solid transparent;border-bottom:4px solid transparent;
+      border-left:5px solid #cbd5e1}
+    .fgraph .fax-t::after{top:0;left:-3.5px;
+      border-left:4px solid transparent;border-right:4px solid transparent;
+      border-bottom:5px solid #cbd5e1}
+    .fgraph .fax-b::after{bottom:0;left:-3.5px;
+      border-left:4px solid transparent;border-right:4px solid transparent;
+      border-top:5px solid #cbd5e1}
+
     .fcell{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
-           font-size:8px;font-weight:800;color:#94a3b8;letter-spacing:.06em;cursor:pointer;
-           -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-    .fcell:active{background:#dbeafe}
-    .fcell.on{background:#2563eb;color:#fff}
-    .fpin{font-size:18px;letter-spacing:0}
-    .fcell.on.fpin{color:#fff}
+           cursor:pointer;-webkit-tap-highlight-color:transparent;
+           -webkit-user-select:none;user-select:none}
+    /* The label carries the highlight, not the cell. It keeps the selected
+       area the size of the word rather than the whole quadrant, gives it a
+       rounded edge, and its white backing breaks the axis line behind the
+       text instead of letting the line run through it. */
+    .fcell span{background:#fff;border-radius:4px;padding:3px 9px;line-height:1;
+                font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:.06em}
+    .fcell:active span{background:#dbeafe;color:#1d4ed8}
+    .fcell.on span{background:#2563eb;color:#fff}
+    .fpin span{font-size:19px;padding:2px 6px;letter-spacing:0}
 
     .sect-i{position:absolute;right:6px;top:50%;transform:translateY(-50%);
             width:15px;height:15px;border-radius:50%;background:transparent;
@@ -2241,11 +2267,15 @@ const FGRAPH_CELLS = [
   ['short','left','↙'], ['short','on','SHORT'], ['short','right','↘'],
 ];
 function finishGraphHTML(h, i) {
-  return `<i class="fax-h"></i><i class="fax-v"></i>` + FGRAPH_CELLS.map(([d,sd,lbl]) => {
-    const sel = h.apprDepth===d && h.apprSide===sd;
-    return `<div class="fcell${sel?' on':''}${sd==='on'&&d==='pin'?' fpin':''}"
-                 id="ga-${i}-${d}-${sd}" onclick="onApproach(${i},'${d}','${sd}')">${lbl}</div>`;
-  }).join('');
+  // four arms rather than two crossing lines, so nothing is drawn through
+  // the flag, and each arm ends in an arrowhead
+  return `<i class="fax fax-l"></i><i class="fax fax-r"></i>` +
+         `<i class="fax fax-t"></i><i class="fax fax-b"></i>` +
+    FGRAPH_CELLS.map(([d,sd,lbl]) => {
+      const sel = h.apprDepth===d && h.apprSide===sd;
+      return `<div class="fcell${sel?' on':''}${sd==='on'&&d==='pin'?' fpin':''}"
+                   id="ga-${i}-${d}-${sd}" onclick="onApproach(${i},'${d}','${sd}')"><span>${lbl}</span></div>`;
+    }).join('');
 }
 
 // Approach: one tap sets depth and side together. Tapping the selected cell
