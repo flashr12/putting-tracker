@@ -379,9 +379,10 @@
       background:#2563eb; border:none; border-radius:4px; width:32px;
       pointer-events:none;
     }
-    /* nothing chosen yet (resting on 0') — no chip at all */
-    .hd-outer.unset .hd-band { background:transparent; }
-    .hd-outer.unset .hd-item.hd-sel { color:#94a3b8; font-size:13px; }
+    /* nothing chosen yet: an outline round the resting value, in the same
+       language the unanswered Fairway and GIR buttons use */
+    .hd-outer.unset .hd-band { background:transparent; border:1px dashed #93c5fd; }
+    .hd-outer.unset .hd-item.hd-sel { color:#64748b; font-size:13px; }
     /* fade the values either side so the centre reads as selected */
     .hd-fade-l, .hd-fade-r { position:absolute; z-index:4; top:0; bottom:0; width:40px; pointer-events:none; }
     .hd-fade-l { left:0;  background:linear-gradient(to right,#fff 12%,rgba(255,255,255,0)); }
@@ -534,17 +535,19 @@
               border:1px solid #bfdbfe;background:#fff;color:#1d4ed8;border-radius:4px;
               padding:1px 6px;font-size:8.5px;font-weight:800;letter-spacing:.04em;
               cursor:pointer;text-transform:uppercase}
-    .sect-h.appr{background:#ffedd5;color:#c2410c}
-    .sub-h.appr{background:#fff7ed;color:#c2410c}
-    .tile.appr.on{background:#ea580c;border-color:#ea580c}
-    .hd-outer.appr .hd-band{background:#ea580c}
-    .sect-h{text-align:center;margin:1px 0 2px;background:#e4eaf2;border-radius:4px;padding:2px 0;
+    .sect-h.appr{background:#ccfbf1;color:#0f766e}
+    .sub-h.appr{background:#f0fdfa;color:#0f766e}
+    .tile.appr.on{background:#0d9488;border-color:#0d9488}
+    .hd-outer.appr .hd-band{background:#0d9488}
+    .hd-outer.appr.unset .hd-band{background:transparent;border:1px dashed #2dd4bf}
+    .hd-outer.appr.unset .hd-item.hd-sel{color:#0f766e}
+    .sect-h{text-align:center;margin:8px 0 4px;background:#e4eaf2;border-radius:4px;padding:2px 0;
             font-size:10px;font-weight:800;color:#1d4ed8;text-transform:uppercase;
             /* spaced out letters; the padding offsets the trailing space so
                the word stays optically centred */
             letter-spacing:.45em;padding-left:.45em}
     .sub-h{font-size:9px;font-weight:800;color:#1d4ed8;letter-spacing:.09em;
-           margin:6px 0 4px;text-transform:uppercase;text-align:center;
+           margin:8px 0 4px;text-transform:uppercase;text-align:center;
            background:#f1f4f8;border-radius:4px;padding:5px 0;position:relative}
     .sub-h .fl-i{border-color:#b9c4d4;color:#64748b}
     .sub-h .fl-i:active{background:rgba(29,78,216,.1)}
@@ -958,12 +961,21 @@ const HD_ITEM_W = 36;    // px width of one drum value (must match .hd-item CSS)
 // on the track maps to a value through `step`, so the yard drum can move in
 // 5s — 250 yards at 1-yard detents would be an absurd amount of scrolling,
 // and nothing downstream reads approach distance finer than a 25-yard band.
+// `park` is where an untouched drum rests. It used to rest on 0, which sits at
+// the extreme left of the track and leaves the whole left half of the box
+// blank. Parking mid-range fills both sides; the value is drawn as a hollow
+// outline until it is actually chosen, so resting on 10 feet never reads as a
+// recorded 10 feet. There is no 0 on either track any more — "not set" is a
+// state, not a value.
 const DRUMS = {
-  putt: { max: MAX_DIST, step: 1, unit: "'",
-          get: h => h.distance,   set: (h,v) => { h.distance  = v > 0 ? v : null; } },
-  appr: { max: 50,       step: 5, unit: 'y',
-          get: h => h.apprDist,   set: (h,v) => { h.apprDist  = v > 0 ? v : null; } },
+  putt: { min: 1, max: MAX_DIST, step: 1, unit: "'", park: 10,
+          get: h => h.distance,  set: (h,v) => { h.distance = v; } },
+  appr: { min: 1, max: 50,       step: 5, unit: '',  park: 150,
+          get: h => h.apprDist,  set: (h,v) => { h.apprDist = v; } },
 };
+// index on the track  <->  value in feet / yards
+const drumIdxOf = (d, val) => Math.max(0, Math.min(d.max - d.min, Math.round(val / d.step) - d.min));
+const drumValOf = (d, idx) => (idx + d.min) * d.step;
 const drumSpec = sc => DRUMS[(sc && sc.dataset.kind) || 'putt'];
 
 // Reporting bands, applied to h.distance (integer feet)
@@ -1234,15 +1246,20 @@ function resultWord(h) {
   return '+' + t;
 }
 
-// Every field answered. Says nothing about whether the score was confirmed.
+// Enough to be worth keeping. The scorecard layer only: a hole with a score,
+// a green and a fairway is a real hole and is saved, whatever else is blank.
+// It used to also demand the full putting detail, which meant skipping the
+// putting block threw the score, fairway, GIR and approach away with it.
 function isHoleLogged(h) {
-  // scorecard layer
   if (h.score == null || !h.gir) return false;
   if (fairwayApplies(h) && !h.fairway) return false;
-  // putting layer. Approach is deliberately absent — it is optional.
+  return true;
+}
+// Every field for the current mode answered — this is what drives the green
+// marker and the auto-advance, and it is stricter than "worth saving".
+function isHolePuttComplete(h) {
   if (!h.distance || h.distance < 1) return false;
   if (!h.numPutts) return false;
-  // Simple mode asks for nothing beyond putts and distance.
   if (PUTT_MODE === 'simple') return true;
   if (!h.slope || !h.direction) return false;
   if (h.numPutts === '1') return true;   // holed: variance/miss not applicable
@@ -1252,7 +1269,7 @@ function isHoleLogged(h) {
 // assumed par never counts as done and never auto-advances — which is the
 // whole point: the app should not move on from a number nobody looked at.
 function isHoleDone(h) {
-  return isHoleLogged(h) && !scoreAssumed(h);
+  return isHoleLogged(h) && isHolePuttComplete(h) && !scoreAssumed(h);
 }
 // Anything entered at all — used at save time to spot a half-filled hole
 // before it is silently dropped.
@@ -1696,13 +1713,13 @@ function buildHoleFormHTML(h, i) {
   // Distance in yards, then one tap for where it finished relative to the
   // flag. The centre column is ON LINE, not holed — "short and on line" is
   // a routine, uphill-putt outcome and the commonest miss in golf.
-  const APPR_SIDES  = [['left','LEFT'],['on','ON LINE'],['right','RIGHT']];
-  const APPR_DEPTHS = [['long','LONG'],['pin','PIN HIGH'],['short','SHORT']];
+  const APPR_SIDES  = [['left','◀ LEFT'],['on','ON LINE'],['right','RIGHT ▶']];
+  const APPR_DEPTHS = [['long','▲ LONG'],['pin','PIN HIGH'],['short','▼ SHORT']];
   const approach = `
   <div>
     <div class="sect-h appr">Approach</div>
     ${subHead('Distance to pin · yards', `ia-${i}`, true)}
-    ${flInfo(`ia-${i}`, 'How far you were from the flag for the shot you were trying to hit the green with — the third on most par 5s. In 5-yard steps; nothing reads it finer than a 25-yard band. Leave it at 0 on any hole where there was no real approach.')}
+    ${flInfo(`ia-${i}`, 'The last full shot you hit AT the green, whichever number it was — the second on most par 4s, the third on most par 5s. Not a greenside chip or pitch. If you were hacking out of trouble and the shot was never really an attempt at the green, leave this blank: it is optional, and a recovery shot logged as an approach makes the distance bands lie. Tap the highlighted value again to clear it.')}
     <div class="hd-outer${h.apprDist>0?'':' unset'} appr" id="hdoA-${i}">
       <div class="hd-wrap">
         <div class="hd-band"></div>
@@ -1713,7 +1730,7 @@ function buildHoleFormHTML(h, i) {
       </div>
     </div>
     ${subHead('Where it finished', `ib-${i}`, true)}
-    ${flInfo(`ib-${i}`, 'Where the ball came to rest relative to the flag, whether or not you hit the green. ON LINE means neither left nor right of the flag — not holed. Pin high and on line is a good one.')}
+    ${flInfo(`ib-${i}`, 'Where the ball came to rest relative to the flag, whether or not you hit the green. ON LINE means neither left nor right of it — it does not mean holed. PIN HIGH means level with it. So pin high and on line is the good one: right at the flag.')}
     <div class="tgrid" id="grida-${i}" style="grid-template-columns:48px repeat(3,1fr)">
       <div class="t-h"></div>
       ${APPR_SIDES.map(([,l]) => `<div class="t-h">${l}</div>`).join('')}
@@ -1909,8 +1926,8 @@ function onGrid1(hi, slope, dir) {
 function drumItemsHTML(sel, kind) {
   const d = DRUMS[kind] || DRUMS.putt;
   let s = '';
-  for (let n = 0; n <= d.max; n++) {
-    s += `<div class="hd-item${sel===n?' hd-sel':''}">${n * d.step}${d.unit}</div>`;
+  for (let i = 0; i <= d.max - d.min; i++) {
+    s += `<div class="hd-item${sel===i?' hd-sel':''}">${drumValOf(d, i)}${d.unit}</div>`;
   }
   return s;
 }
@@ -1924,8 +1941,8 @@ function paintDrum(scroller, idx) {
 }
 
 function drumIdx(scroller) {
-  return Math.max(0, Math.min(drumSpec(scroller).max,
-                              Math.round(scroller.scrollLeft / HD_ITEM_W)));
+  const d = drumSpec(scroller);
+  return Math.max(0, Math.min(d.max - d.min, Math.round(scroller.scrollLeft / HD_ITEM_W)));
 }
 
 // ── Drum detent click ─────────────────────────────────────────────────────
@@ -1992,7 +2009,7 @@ function toggleSound() {
 }
 
 // Keyed by drum, not by hole — a hole now carries two of them.
-const DRUM_T = {}, DRUM_LAST = {};
+const DRUM_T = {}, DRUM_LAST = {}, DRUM_QUIET = {};
 const drumKey = (hi, kind) => kind + ':' + hi;
 
 function onDistScroll(hi, scroller) {
@@ -2000,12 +2017,15 @@ function onDistScroll(hi, scroller) {
   if (!scroller.firstElementChild) return;
   const kind = scroller.dataset.kind || 'putt';
   const key  = drumKey(hi, kind);
+  // ...and nor is the app positioning the track itself.
+  if (DRUM_QUIET[key]) return;
   // Repaint live while the finger is moving, clicking on each value crossed…
   const live = drumIdx(scroller);
   if (DRUM_LAST[key] !== live) { DRUM_LAST[key] = live; drumTick(); }
   paintDrum(scroller, live);
+  // the moment the track moves, the value stops being a resting suggestion
   const outerLive = document.getElementById(`hdo${kind==='appr'?'A':''}-${hi}`);
-  if (outerLive) outerLive.classList.toggle('unset', live === 0);
+  if (outerLive) outerLive.classList.remove('unset');
   // …but only commit once scrolling settles.
   clearTimeout(DRUM_T[key]);
   DRUM_T[key] = setTimeout(() => {
@@ -2039,6 +2059,12 @@ function onDrumTap(hi, ev, scroller) {
   const idx = Array.prototype.indexOf.call(scroller.children, item);
   if (idx < 0) return;
   const kind = scroller.dataset.kind || 'putt';
+  // Tapping the value that is already selected clears it again — otherwise a
+  // drum touched by accident could never be put back to "not set", which
+  // matters most for approach, where blank is a legitimate answer.
+  const d = DRUMS[kind];
+  const cur = d.get(AR.holes[hi]);
+  if (cur != null && drumIdxOf(d, cur) === idx) { commitDist(hi, idx, kind, true); return; }
   // Direct assignment, not scrollTo({behavior:'smooth'}) — mandatory scroll-snap
   // fights the smooth animation and the scroll never lands.
   scroller.scrollLeft = idx * HD_ITEM_W;
@@ -2051,15 +2077,15 @@ function onDrumTap(hi, ev, scroller) {
   commitDist(hi, idx, kind);
 }
 
-function commitDist(hi, idx, kind = 'putt') {
+function commitDist(hi, idx, kind = 'putt', clear = false) {
   ensureScorecardDefaults(hi);
   const h = AR.holes[hi];
   const wasDone = isHoleDone(h);
   const d = DRUMS[kind];
-  d.set(h, idx * d.step);
+  d.set(h, clear ? null : drumValOf(d, idx));
 
   const outer = document.getElementById(`hdo${kind==='appr'?'A':''}-${hi}`);
-  if (outer) outer.classList.toggle('unset', !(idx > 0));
+  if (outer) outer.classList.toggle('unset', clear);
 
   // Advance only when the hole GOES from incomplete to complete. Firing on
   // any edit meant returning to a finished hole bounced you forward again
@@ -2077,10 +2103,21 @@ function initDrums(hi) {
     const sc = document.getElementById(`hds${kind==='appr'?'A':''}-${hi}`);
     if (!sc) return;
     const d   = DRUMS[kind];
-    const val = Math.round((d.get(h) > 0 ? d.get(h) : 0) / d.step);
-    if (!sc.firstElementChild) sc.innerHTML = drumItemsHTML(val, kind);
-    if (drumIdx(sc) !== val) sc.scrollLeft = val * HD_ITEM_W;
-    paintDrum(sc, val);
+    const set = d.get(h) > 0;
+    // an untouched drum rests on `park`, drawn hollow — never on the edge
+    const idx = drumIdxOf(d, set ? d.get(h) : d.park);
+    const key = drumKey(hi, kind);
+    if (!sc.firstElementChild) sc.innerHTML = drumItemsHTML(idx, kind);
+    if (drumIdx(sc) !== idx) {
+      DRUM_QUIET[key] = true;
+      sc.scrollLeft = idx * HD_ITEM_W;
+      // two frames: one for the scroll to apply, one for its event to flush
+      requestAnimationFrame(() => requestAnimationFrame(() => { delete DRUM_QUIET[key]; }));
+    }
+    paintDrum(sc, idx);
+    DRUM_LAST[key] = idx;
+    const outer = document.getElementById(`hdo${kind==='appr'?'A':''}-${hi}`);
+    if (outer) outer.classList.toggle('unset', !set);
   });
 }
 
@@ -2483,29 +2520,37 @@ function saveRound() {
   const logged  = AR.holes.filter(isHoleLogged);
   if (!logged.length) { alert('Fill in at least one hole before saving.'); return; }
 
-  // Half-filled holes are NOT saved, so say so by number rather than letting
-  // them disappear. With fairway and GIR no longer defaulted this is easy to
-  // do by accident — one missed tap and the hole is incomplete.
+  // Touched but without even a scorecard — these genuinely cannot be saved.
   const partial = AR.holes.filter(h => holeTouched(h) && !isHoleLogged(h));
+  // Saved, but with the putting block left blank: they still count towards
+  // scoring, fairways, GIR and approach, and sit out the putting stats.
+  const noPutts = logged.filter(h => !isHolePuttComplete(h));
   // Everything answered but the score never looked at. It saves as par, and
   // every scoring average is built on that number, so it is worth one ask.
   const unsure  = logged.filter(scoreAssumed);
 
-  if (partial.length || unsure.length) {
+  if (partial.length || noPutts.length || unsure.length) {
     const nums = hs => hs.map(h => h.n).join(', ');
+    const plural = hs => hs.length !== 1;
     let msg = '';
     if (partial.length) {
-      msg += `${partial.length} hole${partial.length!==1?'s':''} ` +
-             `(${nums(partial)}) ${partial.length!==1?'are':'is'} incomplete and ` +
+      msg += `${partial.length} hole${plural(partial)?'s':''} ` +
+             `(${nums(partial)}) ${plural(partial)?'have':'has'} no score yet and ` +
              `will NOT be saved.\n\n`;
     }
-    if (unsure.length) {
-      msg += `${unsure.length} hole${unsure.length!==1?'s':''} ` +
-             `(${nums(unsure)}) still ${unsure.length!==1?'have':'has'} the ` +
-             `assumed par — ${unsure.length!==1?'they':'it'} will be saved as par.\n\n`;
+    if (noPutts.length) {
+      msg += `${noPutts.length} hole${plural(noPutts)?'s':''} ` +
+             `(${nums(noPutts)}) ${plural(noPutts)?'have':'has'} no putting detail. ` +
+             `${plural(noPutts)?'They':'It'} will be saved and will count towards ` +
+             `scoring, fairways, GIR and approach — just not the putting stats.\n\n`;
     }
-    if (!confirm(msg + 'OK to save anyway, or Cancel to go back and fix them.')) {
-      jumpHole(AR.holes.indexOf(partial[0] || unsure[0]));
+    if (unsure.length) {
+      msg += `${unsure.length} hole${plural(unsure)?'s':''} ` +
+             `(${nums(unsure)}) still ${plural(unsure)?'have':'has'} the ` +
+             `assumed par — ${plural(unsure)?'they':'it'} will be saved as par.\n\n`;
+    }
+    if (!confirm(msg + 'OK to save, or Cancel to go back and fix them.')) {
+      jumpHole(AR.holes.indexOf(partial[0] || unsure[0] || noPutts[0]));
       return;
     }
   }
@@ -2951,7 +2996,68 @@ function renderScoringTab(s, roundsCount) {
       ${card(sc.penPerRound, 'Penalties / 18', '#b45309')}
       ${card(`${roundsCount} / ${sc.n}`, 'Rounds / scored holes', '#1f2937')}
     </div>
+    ${fwGirHTML()}
     ${costOfMissHTML(sc)}`;
+}
+
+// Fairways crossed with greens. Missing a green from the short grass is a
+// different fault from missing one out of the rough: the first is strike or
+// club, the second is usually the lie choosing the shot for you. Separately
+// the two numbers cannot tell you which — crossed, they can. No new field:
+// both have been recorded since stage 2.
+function fwGirHTML() {
+  const holes = loadRounds().flatMap(r => r.holes)
+    .filter(h => h.score != null && h.par && fairwayApplies(h) && h.fairway && h.gir);
+  if (holes.length < 18) return '';
+  const cell = (fwHit, girHit) => holes.filter(h =>
+    (h.fairway === 'hit') === fwHit && (h.gir === 'yes') === girHit);
+  const avg = set => set.length
+    ? +(set.reduce((a,h) => a + (h.score - h.par), 0) / set.length).toFixed(2) : null;
+  const fmt = v => v === null ? '—' : (v > 0 ? '+' : '') + v;
+  const fwOn  = holes.filter(h => h.fairway === 'hit');
+  const fwOff = holes.filter(h => h.fairway !== 'hit');
+  const girFrom = set => set.length
+    ? Math.round(set.filter(h => h.gir === 'yes').length / set.length * 100) : null;
+  const gOn = girFrom(fwOn), gOff = girFrom(fwOff);
+
+  const box = (set, label, good) => {
+    const v = avg(set);
+    return `<div style="background:${good?'#eff6ff':'#fff7ed'};
+         border:1px solid ${good?'#bfdbfe':'#fed7aa'};border-radius:4px;padding:8px 6px;text-align:center">
+      <div style="font-size:17px;font-weight:800;color:${v===null?'#cbd5e1':v>0.5?'#dc2626':v>0.2?'#b45309':'#16a34a'}">${fmt(v)}</div>
+      <div style="font-size:8.5px;font-weight:800;color:#64748b;text-transform:uppercase;
+           letter-spacing:.03em;margin-top:2px">${label}</div>
+      <div style="font-size:8px;color:#9ca3af;margin-top:1px">${set.length} holes</div>
+    </div>`;
+  };
+
+  return `
+  <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">Fairways × greens</div>
+    <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:10px">
+      Average score to par in each of the four cases. Par 4s and 5s only, since a par 3 has no fairway to hit.
+    </div>
+    <div style="display:grid;grid-template-columns:54px 1fr 1fr;gap:6px;align-items:center">
+      <div></div>
+      <div style="font-size:8.5px;font-weight:800;color:#94a3b8;text-align:center">GREEN HIT</div>
+      <div style="font-size:8.5px;font-weight:800;color:#94a3b8;text-align:center">GREEN MISSED</div>
+      <div style="font-size:8.5px;font-weight:800;color:#475569">FROM<br>FAIRWAY</div>
+      ${box(cell(true,true),  'fw · gir', true)}
+      ${box(cell(true,false), 'fw · no gir', false)}
+      <div style="font-size:8.5px;font-weight:800;color:#475569">FROM<br>ROUGH</div>
+      ${box(cell(false,true),  'off fw · gir', true)}
+      ${box(cell(false,false), 'off fw · no gir', false)}
+    </div>
+    <div style="font-size:11px;color:#64748b;line-height:1.6;margin-top:10px;border-top:1px solid #f3f4f6;padding-top:9px">
+      From the fairway you hit <b style="color:#15803d">${gOn === null ? '—' : gOn + '%'}</b> of greens.
+      From off it, <b style="color:#b45309">${gOff === null ? '—' : gOff + '%'}</b>.
+      ${(gOn !== null && gOff !== null) ? (gOn - gOff >= 18
+        ? `That ${gOn - gOff} point drop is the real cost of a wayward tee shot — it shows up as an approach
+           problem in the stats, but it starts on the tee.`
+        : `Only ${Math.max(0, gOn - gOff)} points between them, so your greens are being missed on
+           their own merits rather than because of where the tee shot finished.`) : ''}
+    </div>
+  </div>`;
 }
 
 // What each kind of miss actually costs, measured on your own rounds.
