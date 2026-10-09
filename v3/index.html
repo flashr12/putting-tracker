@@ -4535,10 +4535,9 @@ function importFromV2() {
 // ═══════════════════════════════════════
 //  PRACTICE
 // ═══════════════════════════════════════
-// Eight drills, plus a counter for the ones that only work under a
-// consecutive-makes target. Which drills are pushed to the top is decided by
-// the rounds already logged, so the tab answers "what should I practise
-// today" rather than being a list to scroll past.
+// Eight drills. Which ones are pushed to the top is decided by the rounds
+// already logged, so the tab answers "what should I practise today" rather
+// than being a list to scroll past.
 
 const DRILLS = [
   { id:'gate', name:'The Gate Drill, with a twist', trains:'Start line',
@@ -4565,7 +4564,7 @@ const DRILLS = [
     why:'If your trail hand has been taking over and steering the face, this exposes it within three putts. Doing it before normal practice resets the feel for the rest of the session.' },
 
   { id:'clock', name:'The Clock Drill, under pressure', trains:'Short putts',
-    kit:'Nothing', mins:'15 min', target:18, targetLabel:'from 3 feet',
+    kit:'Nothing', mins:'15 min',
     how:[
       'Place balls around the hole at 3 feet.',
       'Make <b>18 in a row</b> before you are allowed to stop. Or 12 in a row from 6 feet.',
@@ -4638,47 +4637,6 @@ function practicePlan() {
   return { enough:true, n:holes.length, recs:recs.slice(0, 3) };
 }
 
-const TRAIN_KEY = 'scratch_streak';
-function loadStreak() {
-  try { return JSON.parse(localStorage.getItem(TRAIN_KEY)) || { cur:0, best:0, target:18 }; }
-  catch { return { cur:0, best:0, target:18 }; }
-}
-function saveStreak(v) { localStorage.setItem(TRAIN_KEY, JSON.stringify(v)); }
-function streakHit()  { const v = loadStreak(); v.cur++; if (v.cur > v.best) v.best = v.cur; saveStreak(v); renderStreak(); }
-function streakMiss() { const v = loadStreak(); v.cur = 0; saveStreak(v); renderStreak(); }
-function streakReset(){ const v = loadStreak(); v.cur = 0; v.best = 0; saveStreak(v); renderStreak(); }
-function streakTarget(d) {
-  const v = loadStreak();
-  v.target = Math.max(3, Math.min(50, (v.target || 18) + d));
-  saveStreak(v); renderStreak();
-}
-function renderStreak() {
-  const el = document.getElementById('streak-box'); if (!el) return;
-  const v = loadStreak();
-  const done = v.cur >= v.target;
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-      <span style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;text-transform:uppercase">Consecutive makes</span>
-      <span style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#94a3b8">
-        TARGET
-        <button onclick="streakTarget(-1)" style="width:20px;height:20px;border:1px solid #dfe5ed;background:#fff;border-radius:4px;font-weight:800;color:#475569;cursor:pointer">−</button>
-        <b style="min-width:18px;text-align:center;color:#1f2937;font-size:12px">${v.target}</b>
-        <button onclick="streakTarget(1)" style="width:20px;height:20px;border:1px solid #dfe5ed;background:#fff;border-radius:4px;font-weight:800;color:#475569;cursor:pointer">+</button>
-      </span>
-    </div>
-    <div style="text-align:center;margin-bottom:9px">
-      <div style="font-size:44px;font-weight:800;line-height:1;color:${done ? '#16a34a' : '#2563eb'}">${v.cur}</div>
-      <div style="font-size:10px;font-weight:700;color:#94a3b8;margin-top:3px;text-transform:uppercase;letter-spacing:.05em">
-        ${done ? 'target reached — well done! 🎯' : `best today ${v.best}`}
-      </div>
-    </div>
-    <div style="display:flex;gap:7px">
-      <button onclick="streakHit()" style="flex:2;height:42px;border:none;border-radius:4px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Holed</button>
-      <button onclick="streakMiss()" style="flex:2;height:42px;border:none;border-radius:4px;background:#ea580c;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Missed</button>
-      <button onclick="streakReset()" style="flex:1;height:42px;border:1px solid #dfe5ed;border-radius:4px;background:#fff;color:#64748b;font-size:12px;font-weight:600;cursor:pointer">Reset</button>
-    </div>`;
-}
-
 let OPEN_DRILL = null;
 function toggleDrill(id) {
   OPEN_DRILL = (OPEN_DRILL === id) ? null : id;
@@ -4715,10 +4673,6 @@ function drillCardHTML(d, flagged) {
            padding:9px 11px;font-size:11.5px;line-height:1.5;color:#334155">
         <b style="color:#1d4ed8">Why it works.</b> ${d.why}
       </div>
-      ${d.target ? `
-      <div style="margin-top:9px;font-size:11px;color:#64748b;font-style:italic">
-        Use the counter at the top of this tab — target ${d.target} ${d.targetLabel}.
-      </div>` : ''}
     </div>` : ''}
   </div>`;
 }
@@ -4731,11 +4685,8 @@ function renderTraining() {
 
   el.innerHTML = `
     <h2 style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px">Practice</h2>
-    <p style="font-size:11.5px;color:#94a3b8;margin-bottom:12px">
-      Eight putting drills, and a counter for the ones that need one.</p>
-
-    <div id="streak-box" style="background:#f7f9fc;border:1px solid #e3e9f0;border-radius:4px;
-         padding:11px 12px;margin-bottom:14px"></div>
+    <p style="font-size:11.5px;color:#94a3b8;margin-bottom:14px">
+      Eight putting drills, with the ones your rounds point at first.</p>
 
     <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
          text-transform:uppercase;margin-bottom:7px">What your rounds say</div>
@@ -4766,11 +4717,7 @@ function renderTraining() {
     <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
          text-transform:uppercase;margin:16px 0 7px">All drills</div>
     ${DRILLS.map(d => drillCardHTML(d, flagged.has(d.id))).join('')}
-
-    <p style="font-size:10.5px;color:#b0b8c4;line-height:1.5;margin-top:14px;font-style:italic">
-      The counter is yours to use however you like — it is not saved into a round and does not
-      affect any statistic.</p>`;
-  renderStreak();
+`;
 }
 
 function renderHistory() {
