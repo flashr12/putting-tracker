@@ -355,11 +355,11 @@
       scrollbar-width:none; overscroll-behavior-x:contain;
       /* half the track minus half an item, so item 0 can sit dead centre.
          With this, scrollLeft === index * HD_ITEM_W exactly. */
-      padding:0 calc(50% - 18px);
+      padding:0 calc(50% - 21px);
     }
     .hd-scroller::-webkit-scrollbar { display:none; }
     .hd-item {
-      flex:0 0 36px; height:26px;
+      flex:0 0 42px; height:26px;
       display:flex; align-items:center; justify-content:center;
       /* NOT scroll-snap-stop:always — that forces the scroll to halt at every
          single value, so a fast flick moved one foot instead of twenty. With
@@ -374,9 +374,9 @@
     /* centre band: bordered highlight marking the selected value */
     /* the selected value is a filled blue chip, like every other selection */
     .hd-band {
-      position:absolute; z-index:1; top:2px; bottom:2px; left:50%; width:34px;
+      position:absolute; z-index:1; top:2px; bottom:2px; left:50%; width:38px;
       transform:translateX(-50%);
-      background:#2563eb; border:none; border-radius:4px; width:32px;
+      background:#2563eb; border:none; border-radius:4px;
       pointer-events:none;
     }
     /* nothing chosen yet: an outline round the resting value, in the same
@@ -956,7 +956,7 @@
 // ═══════════════════════════════════════
 // v2: exact distance in feet. Bands below are for reporting only — raw feet is stored.
 const MAX_DIST  = 100;   // putt drum upper bound (feet)
-const HD_ITEM_W = 36;    // px width of one drum value (must match .hd-item CSS)
+const HD_ITEM_W = 42;    // px width of one drum value (must match .hd-item CSS)
 // Two drums now: putt distance in feet, approach distance in yards. An index
 // on the track maps to a value through `step`, so the yard drum can move in
 // 5s — 250 yards at 1-yard detents would be an absurd amount of scrolling,
@@ -1730,7 +1730,7 @@ function buildHoleFormHTML(h, i) {
       </div>
     </div>
     ${subHead('Where it finished', `ib-${i}`, true)}
-    ${flInfo(`ib-${i}`, 'Where the ball came to rest relative to the flag, whether or not you hit the green. ON LINE means neither left nor right of it — it does not mean holed. PIN HIGH means level with it. So pin high and on line is the good one: right at the flag.')}
+    ${flInfo(`ib-${i}`, 'Where the ball came to rest relative to the flag. Each axis has a tolerance of about 10 feet — three paces — so ON LINE means within roughly 10 feet left or right of the flag, and PIN HIGH means within roughly 10 feet nearer or past it. The centre cell is therefore not a hole-out: it is any shot that finished close on both axes. How close is already recorded by the putt distance, so this grid only has to carry the direction of the miss.')}
     <div class="tgrid" id="grida-${i}" style="grid-template-columns:48px repeat(3,1fr)">
       <div class="t-h"></div>
       ${APPR_SIDES.map(([,l]) => `<div class="t-h">${l}</div>`).join('')}
