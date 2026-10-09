@@ -287,6 +287,37 @@
     }
     /* Section heading inside the round sheet — the scoring and putting
        halves need telling apart now that both are there. */
+    /* ── Scorecard ── */
+    .sc-wrap{background:#fff;border:1px solid #e3e9f0;border-radius:6px;padding:10px 8px;margin-bottom:14px}
+    .sctbl{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:9px}
+    .sctbl th,.sctbl td{text-align:center;font-size:10.5px;padding:3px 0;color:#374151}
+    .sctbl thead th{font-size:9px;font-weight:800;color:#94a3b8;border-bottom:1px solid #e3e9f0;
+                    padding-bottom:4px}
+    .sctbl .sc-rl{width:38px;text-align:left;font-size:8px;font-weight:800;color:#94a3b8;
+                  letter-spacing:.04em}
+    .sctbl .sc-tot{width:32px;font-weight:800;color:#1f2937;background:#f4f7fb}
+    .sctbl thead .sc-tot{color:#475569}
+    .sctbl tr.sc-par td{color:#94a3b8}
+    .sctbl tr.sc-score td{font-size:13px;font-weight:800;padding:4px 0}
+    .sc-dash{color:#d8dee6}
+    .sc-good{color:#16a34a;font-weight:700}
+    .sc-miss{color:#dc2626;font-weight:700}
+    /* golf's own notation: a circle is a birdie, a square is a bogey */
+    .sc-v{display:inline-flex;align-items:center;justify-content:center;
+          min-width:21px;height:21px;line-height:1}
+    .sc-v.sc-bird {border:1.5px solid #16a34a;border-radius:50%;color:#16a34a}
+    .sc-v.sc-eagle{border:1.5px solid #16a34a;border-radius:50%;color:#16a34a;
+                   box-shadow:0 0 0 2.5px #fff,0 0 0 4px #16a34a}
+    .sc-v.sc-bog  {border:1.5px solid #b45309;border-radius:3px;color:#b45309}
+    .sc-v.sc-dbl  {border:1.5px solid #dc2626;border-radius:3px;color:#dc2626;
+                   box-shadow:0 0 0 2.5px #fff,0 0 0 4px #dc2626}
+    .sc-sum{margin-bottom:4px}
+    .sc-sum td,.sc-sum th{font-size:11px;padding:4px 0}
+    .sc-sum .sc-rl{font-size:8.5px}
+    .sc-sum tbody tr{border-top:1px solid #f1f4f8}
+    .sc-sum tr.sc-grand td{font-weight:800;color:#1f2937;background:#f4f7fb}
+    .sc-note{font-size:9.5px;color:#aab3bf;line-height:1.45;font-style:italic;margin-top:6px}
+
     .msec-h {
       font-size:10px; font-weight:800; color:#2563eb; text-transform:uppercase;
       letter-spacing:.08em; margin:0 0 7px; padding-bottom:5px;
@@ -835,6 +866,9 @@
         📥 Import rounds from Putting Tracker
       </button>
     </div>
+    <div id="hist-health" style="font-size:10.5px;color:#64748b;line-height:1.55;
+         background:#f7f9fc;border:1px solid #e3e9f0;border-radius:4px;padding:8px 10px;
+         margin-bottom:12px"></div>
     <div id="hist-empty" style="display:none;text-align:center;padding:48px 0;color:#9ca3af;font-size:13px">No rounds recorded yet.</div>
     <div id="hist-list" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
@@ -1211,18 +1245,66 @@ const STORAGE_KEY = 'scratch_v1';   // v3 has its own store; v1/v2 are untouched
 // ═══════════════════════════════════════
 //  STORAGE
 // ═══════════════════════════════════════
+const PREV_KEY = STORAGE_KEY + '_prev';
 function loadRounds()   {
-  try {
-    const rounds = JSON.parse(localStorage.getItem(STORAGE_KEY))||[];
-    // Migrate any 'straight' records written during a brief schema change back to 'short'
-    // (short = on the right line but under-hit; long = on the right line but over-hit)
-    rounds.forEach(r => (r.holes||[]).forEach(h => {
-      if (h.missDirection === 'straight') h.missDirection = 'short';
-    }));
-    return rounds;
-  } catch { return []; }
+  const parse = k => {
+    const raw = localStorage.getItem(k);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : null;
+  };
+  let rounds = null;
+  try { rounds = parse(STORAGE_KEY); } catch { rounds = null; }
+  // A half-written or corrupted store used to read as "no rounds at all",
+  // which looks exactly like data loss and invites the user to start again
+  // on top of it. Fall back to the previous good copy instead.
+  if (rounds === null) {
+    try { rounds = parse(PREV_KEY); } catch { rounds = null; }
+    if (rounds) {
+      console.warn('scratch: main store unreadable, recovered previous snapshot');
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rounds)); } catch {}
+    }
+  }
+  rounds = rounds || [];
+  // Migrate any 'straight' records written during a brief schema change back to 'short'
+  // (short = on the right line but under-hit; long = on the right line but over-hit)
+  rounds.forEach(r => (r.holes||[]).forEach(h => {
+    if (h.missDirection === 'straight') h.missDirection = 'short';
+  }));
+  return rounds;
 }
-function saveRounds(r)  { localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
+// Keep the last good copy. It costs one extra write and roughly doubles the
+// space — a season of rounds is a few hundred KB against a multi-MB budget —
+// and it is the difference between a bad write costing one round and costing
+// everything.
+function saveRounds(r)  {
+  const next = JSON.stringify(r);
+  try {
+    const prev = localStorage.getItem(STORAGE_KEY);
+    if (prev && prev !== next) localStorage.setItem(PREV_KEY, prev);
+  } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch (e) {
+    alert('Could not save — the phone refused the write, usually because ' +
+          'storage is full.\n\nBack up now from History before closing the app, ' +
+          'and free some space.');
+    throw e;
+  }
+}
+
+// Ask the browser not to evict this origin. Without it, iOS treats the store
+// as discardable cache and can clear a season of rounds under storage
+// pressure. It is a request, not a guarantee, so the answer is reported in
+// History rather than assumed.
+let STORAGE_PERSISTED = null;
+async function requestPersistence() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) { STORAGE_PERSISTED = 'na'; return; }
+    STORAGE_PERSISTED = await navigator.storage.persisted();
+    if (!STORAGE_PERSISTED) STORAGE_PERSISTED = await navigator.storage.persist();
+  } catch { STORAGE_PERSISTED = 'na'; }
+}
 
 // Draft round (auto-saved after every chip tap so Safari crashes don't lose data)
 // Full records slope, break, first-putt pace and miss side. Simple records
@@ -4849,6 +4931,16 @@ function backupData() {
   markBackedUp(rounds);
   renderBackupBanner();
   renderHistory();   // the button lives here and says how far behind it is
+  // There is no event for "the user actually saved the file", so a cancelled
+  // share sheet would otherwise be recorded as a successful backup and the
+  // nudge would stop. Offer the undo rather than guess.
+  setTimeout(() => showToast('💾',
+    `Backup file created for ${rounds.length} round${rounds.length!==1?'s':''}. ` +
+    `If you cancelled the save, undo it so the reminder keeps working.`,
+    'info', { ms: 9000, action: 'Not saved', onAction: () => {
+      localStorage.removeItem(BACKUP_KEY);
+      renderBackupBanner(); renderHistory();
+    }}), 600);
   const payload = { version: STORAGE_KEY, exportDate: new Date().toISOString(), rounds };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -5402,6 +5494,24 @@ function renderHistory() {
     btn.style.color        = behind >= 3 ? '#c2410c' : '#1d4ed8';
     btn.style.borderColor  = behind >= 3 ? '#ea580c' : '#93c5fd';
   }
+  const health = document.getElementById('hist-health');
+  if (health) {
+    const info = getBackupInfo();
+    const when = info ? new Date(info.date).toLocaleDateString('en-US',
+                   {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : null;
+    const holeCount = rounds.reduce((a,r) => a + (r.holes||[]).length, 0);
+    const pill = (ok, txt) => `<span style="color:${ok?'#15803d':'#b45309'};font-weight:700">${txt}</span>`;
+    health.innerHTML =
+      `${rounds.length} round${rounds.length!==1?'s':''} · ${holeCount} holes on this phone · ` +
+      (when ? `last backup ${when}` : pill(false, 'never backed up')) + '<br>' +
+      (STORAGE_PERSISTED === true
+        ? pill(true, 'Storage marked persistent — the browser has agreed not to evict it.')
+        : STORAGE_PERSISTED === false
+          ? pill(false, 'Storage is not persistent. The phone may clear it under pressure — keep backing up.')
+          : STORAGE_PERSISTED === 'na'
+            ? pill(false, 'This browser will not say whether storage is safe from eviction. Keep backing up.')
+            : 'Checking storage…');
+  }
   document.getElementById('hist-empty').style.display = rounds.length ? 'none' : 'block';
   document.getElementById('hist-list').innerHTML = rounds.map(r=>{
     const s = computeStats(r.holes);
@@ -5439,6 +5549,107 @@ function renderHistory() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════
+//  SCORECARD
+// ═══════════════════════════════════════
+// A real card: nine across, OUT, nine across, IN, TOTAL. Built to be read
+// while typing the round into GHIN, so the score row is the loudest thing on
+// it and every hole is shown even when nothing was logged for it.
+const puttsOf = h => h.numPutts ? (h.numPutts === '4+' ? 4 : parseInt(h.numPutts)) : null;
+const sumOf   = (hs, f) => {
+  const v = hs.map(f).filter(x => x != null && !isNaN(x));
+  return v.length ? v.reduce((a,b) => a+b, 0) : null;
+};
+
+// Golf's own notation carries more than a colour does: a circle is a birdie
+// and a square is a bogey to anyone who has seen a scorecard.
+function scoreMark(h) {
+  const t = toPar(h);
+  if (t === null) return '';
+  if (t <= -2) return 'sc-eagle';
+  if (t === -1) return 'sc-bird';
+  if (t === 0)  return '';
+  if (t === 1)  return 'sc-bog';
+  return 'sc-dbl';
+}
+
+function nineTableHTML(hs, label) {
+  if (!hs.length) return '';
+  const cell = (v, cls) => `<td class="${cls||''}">${v == null || v === '' ? '<span class="sc-dash">–</span>' : v}</td>`;
+  const parTot   = sumOf(hs, h => h.par);
+  const scoreTot = sumOf(hs, h => h.score);
+  const puttTot  = sumOf(hs, puttsOf);
+  const fwMark = h => !fairwayApplies(h) ? '' : h.fairway === 'hit' ? '✓'
+                    : h.fairway === 'left' ? '◀' : h.fairway === 'right' ? '▶' : null;
+  return `
+  <table class="sctbl">
+    <thead>
+      <tr><th class="sc-rl">HOLE</th>
+        ${hs.map(h => `<th>${h.n}</th>`).join('')}
+        <th class="sc-tot">${label}</th></tr>
+    </thead>
+    <tbody>
+      <tr class="sc-par"><td class="sc-rl">PAR</td>
+        ${hs.map(h => cell(h.par)).join('')}
+        <td class="sc-tot">${parTot ?? '–'}</td></tr>
+      <tr class="sc-score"><td class="sc-rl">SCORE</td>
+        ${hs.map(h => `<td><span class="sc-v ${scoreMark(h)}">${h.score ?? '–'}</span></td>`).join('')}
+        <td class="sc-tot">${scoreTot ?? '–'}</td></tr>
+      <tr><td class="sc-rl">FW</td>
+        ${hs.map(h => cell(fwMark(h), fwMark(h) === '✓' ? 'sc-good' : fwMark(h) ? 'sc-miss' : '')).join('')}
+        <td class="sc-tot"></td></tr>
+      <tr><td class="sc-rl">GIR</td>
+        ${hs.map(h => cell(h.gir === 'yes' ? '✓' : h.gir === 'no' ? '✗' : null,
+                           h.gir === 'yes' ? 'sc-good' : h.gir === 'no' ? 'sc-miss' : '')).join('')}
+        <td class="sc-tot"></td></tr>
+      <tr><td class="sc-rl">PUTTS</td>
+        ${hs.map(h => cell(puttsOf(h), puttsOf(h) >= 3 ? 'sc-miss' : '')).join('')}
+        <td class="sc-tot">${puttTot ?? '–'}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+function scorecardHTML(r) {
+  const holes = (r.holes || []).slice().sort((a,b) => a.n - b.n);
+  if (!holes.length) return '';
+  const front = holes.filter(h => h.n <= 9);
+  const back  = holes.filter(h => h.n >= 10);
+
+  const line = (hs, name) => {
+    if (!hs.length) return '';
+    const scored = hs.filter(h => h.score != null && h.par);
+    const fwE    = scored.filter(h => fairwayApplies(h) && h.fairway);
+    const girE   = scored.filter(h => h.gir);
+    const tp     = sumOf(scored, h => h.score - h.par);
+    return `<tr>
+      <td class="sc-rl">${name}</td>
+      <td><b>${sumOf(hs, h => h.score) ?? '–'}</b></td>
+      <td style="color:${tp == null ? '#cbd5e1' : toParColor(tp)};font-weight:800">${tp == null ? '–' : fmtToPar(tp)}</td>
+      <td>${fwE.length ? fwE.filter(h => h.fairway === 'hit').length + '/' + fwE.length : '–'}</td>
+      <td>${girE.length ? girE.filter(h => h.gir === 'yes').length + '/' + girE.length : '–'}</td>
+      <td>${sumOf(hs, puttsOf) ?? '–'}</td>
+    </tr>`;
+  };
+
+  return `
+  <div class="sc-wrap">
+    ${nineTableHTML(front, 'OUT')}
+    ${back.length ? nineTableHTML(back, 'IN') : ''}
+    <table class="sctbl sc-sum">
+      <thead><tr>
+        <th class="sc-rl"></th><th>Score</th><th>To par</th><th>FW</th><th>GIR</th><th>Putts</th>
+      </tr></thead>
+      <tbody>
+        ${line(front, 'OUT')}
+        ${back.length ? line(back, 'IN') : ''}
+        ${back.length ? `<tr class="sc-grand">${line(holes, 'TOTAL').replace('<tr>','').replace('</tr>','')}</tr>` : ''}
+      </tbody>
+    </table>
+    <p class="sc-note">Circle = birdie or better, square = bogey, double square = double or worse.
+      A dash means nothing was logged for that hole.</p>
+  </div>`;
 }
 
 function openModal(id) {
@@ -5523,6 +5734,7 @@ function openModal(id) {
 
   document.getElementById('modal-body').innerHTML = `
     <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">${dt} · ${s.n} holes</p>
+    ${scorecardHTML(r)}
     ${scoringBlock}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:14px">
       <div class="mkpi">
@@ -5699,6 +5911,9 @@ function confirmDelete() {
 // ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
+requestPersistence().then(() => {
+  if (document.getElementById('view-history').style.display !== 'none') renderHistory();
+});
 showMain('dashboard');
 
 // Register service worker for offline support
