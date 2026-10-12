@@ -2765,7 +2765,10 @@ function onHoleDone(i) {
   // Auto-advance to the next hole after a short beat
   if (i < AR.holeCount - 1) {
     setTimeout(() => {
-      if (AH === i) {           // only advance if the user hasn't moved on themselves
+      // AR is null if the round was saved inside the beat — finishing a hole
+      // and tapping Save straight after used to throw here and leave the
+      // screen half-rendered.
+      if (AR && AH === i) {     // only advance if the user hasn't moved on themselves
         AH = i + 1;
         renderAccordion();
         renderPills();
@@ -5681,6 +5684,32 @@ function nineTableHTML(hs, label) {
   </table>`;
 }
 
+// A round keeps its own copy of the pars on purpose: correcting a course
+// card months later must not silently re-score every round played on it.
+// The cost is that a round saved with a wrong card stays wrong, so offer the
+// card as a one-tap repair whenever the two disagree.
+function roundParsDiffer(r) {
+  if (!r || !r.course) return false;
+  const card = getCoursePars(r.course);
+  if (!card) return false;
+  return (r.holes || []).some(h => card[h.n - 1] && card[h.n - 1] !== h.par);
+}
+function applyCardToRound() {
+  const rounds = loadRounds();
+  const r = rounds.find(x => x.id === modalRoundId);
+  if (!r) return;
+  const card = getCoursePars(r.course);
+  if (!card) return;
+  const changed = (r.holes || []).filter(h => card[h.n - 1] && card[h.n - 1] !== h.par).length;
+  if (!confirm(`Re-par ${changed} hole${changed!==1?'s':''} from the saved card for ${r.course}?\n\n` +
+               `Scores are not touched — only the par each one is measured against.`)) return;
+  (r.holes || []).forEach(h => { if (card[h.n - 1]) h.par = card[h.n - 1]; });
+  r.pars = (r.holes || []).map(h => h.par);
+  saveRounds(rounds);
+  openModal(modalRoundId);
+  renderHistory();
+}
+
 // Editing pars on a round already saved. Needed because a wrong card is only
 // obvious afterwards, and because every scoring stat is computed from par.
 let SC_EDIT = false;
@@ -5741,6 +5770,15 @@ function scorecardHTML(r) {
     ${SC_EDIT ? `<p style="font-size:10px;color:#b45309;line-height:1.5;margin-bottom:7px;font-style:italic">
       Changing par here re-scores the round and updates the saved card for ${r.course||'this course'},
       so the next round starts with it right.</p>` : ''}
+    ${roundParsDiffer(r) ? `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;padding:9px 11px;
+         margin-bottom:9px;font-size:11px;color:#7c2d12;line-height:1.5">
+      These pars do not match the saved card for <b>${r.course}</b>. A round keeps the pars it was
+      played with, so fixing the card later does not reach back to it.
+      <button onclick="applyCardToRound()" style="display:block;width:100%;margin-top:7px;
+              border:none;border-radius:4px;background:#ea580c;color:#fff;padding:7px;
+              font-size:11px;font-weight:800;cursor:pointer">Apply the saved card to this round</button>
+    </div>` : ''}
     ${nineTableHTML(front, 'OUT')}
     ${back.length ? nineTableHTML(back, 'IN') : ''}
     <table class="sctbl sc-sum">
