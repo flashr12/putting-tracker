@@ -311,6 +311,10 @@
     .sc-v.sc-bog  {border:1.5px solid #b45309;border-radius:3px;color:#b45309}
     .sc-v.sc-dbl  {border:1.5px solid #dc2626;border-radius:3px;color:#dc2626;
                    box-shadow:0 0 0 2.5px #fff,0 0 0 4px #dc2626}
+    .sc-pedit{padding:0}
+    .sc-pedit button{display:block;width:100%;border:none;background:transparent;color:#2563eb;
+                     font-size:8px;line-height:1;cursor:pointer;padding:1px 0}
+    .sc-pedit b{display:block;font-size:11px;font-weight:800;color:#1f2937;line-height:1.2}
     .sc-sum{margin-bottom:4px}
     .sc-sum td,.sc-sum th{font-size:11px;padding:4px 0}
     .sc-sum .sc-rl{font-size:8.5px}
@@ -522,6 +526,11 @@
              font-size:10px;font-weight:800;letter-spacing:.1em;color:#94a3b8;
              text-transform:uppercase}
     .scard-h b{font-size:13px;font-weight:800;color:#cbd5e1;letter-spacing:0}
+    .parpick{position:absolute;top:28px;left:9px;z-index:12;display:flex;gap:4px;
+             background:#334155;border:1px solid #475569;border-radius:4px;padding:4px}
+    .parpick-b{width:30px;height:26px;border:none;border-radius:4px;background:#1e293b;
+               color:#cbd5e1;font-size:12px;font-weight:800;cursor:pointer}
+    .parpick-b.on{background:#2563eb;color:#fff}
     /* bare glyphs: the 48px target stays, only the box goes */
     .hero3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:13px}
     .hbtn{height:48px;border:none;background:transparent;color:#94a3b8;
@@ -1346,10 +1355,18 @@ function getCoursePars(name) {
   const c = loadCourses()[courseKey(name)];
   return c && Array.isArray(c.pars) ? c.pars.slice() : null;
 }
+// MERGE, never replace. startRound saves the card on every round with the
+// pars already truncated to that round's hole count, so a 9-hole knock used
+// to shorten the stored card to 9 — and the next 18-hole round padded holes
+// 10-18 with par 4 and saved THAT back. A few short rounds and a real card
+// degrades towards all-4s with nothing to say it happened.
 function setCoursePars(name, pars) {
   if (!courseKey(name)) return;
-  const all = loadCourses();
-  all[courseKey(name)] = { name:(name||'').trim(), pars:pars.slice() };
+  const all  = loadCourses();
+  const prev = (all[courseKey(name)] || {}).pars || [];
+  const merged = prev.slice();
+  pars.forEach((p, i) => { if (p) merged[i] = p; });
+  all[courseKey(name)] = { name:(name||'').trim(), pars:merged };
   saveCourses(all);
 }
 
@@ -1364,7 +1381,7 @@ function blankHole(n, par) {
   // hacked out of, a driveable par 4 — none of those should stop the hole
   // being saved. It is never required for a hole to count as logged.
   return { n, par: par || 4, score:null, scoreSet:false, fairway:null, penalty:0,
-           sand:false,
+           sand:0,
            apprDist:null, apprDepth:null, apprSide:null, apprLie:null,
            distance:null, slope:null, direction:null, numPutts:null,
            variance:null, missDirection:null, gir:null };
@@ -1396,8 +1413,13 @@ function derivedLie(h) {
 // derivation. Only overrides are stored.
 function effectiveLie(h) { return h.apprLie || derivedLie(h); }
 
+// Sand was a yes/no before it was a count, so old rounds carry booleans.
+function sandShots(h) {
+  if (!h || h.sand == null || h.sand === false) return 0;
+  return h.sand === true ? 1 : (parseInt(h.sand) || 0);
+}
 // Sand save: in a greenside bunker and still got up and down.
-function isSandSave(h)   { return !!h && h.sand === true && toPar(h) !== null && toPar(h) <= 0; }
+function isSandSave(h)   { return !!h && sandShots(h) > 0 && toPar(h) !== null && toPar(h) <= 0; }
 // What a confirmed score should be coloured: birdie, par, bogey, double+.
 function resultClass(h) {
   const t = toPar(h);
@@ -1835,7 +1857,12 @@ function buildHoleFormHTML(h, i) {
 
   const scorecard = `
   <div class="scard">
-    <span class="scard-h">Par <b>${par}</b></span>
+    <span class="scard-h" onclick="toggleParPick(${i})" style="cursor:pointer"
+          title="Tap to change this hole's par">Par <b>${par}</b> ✎</span>
+    <div class="parpick" id="parpick-${i}" style="display:none">
+      ${[3,4,5].map(v => `<button class="parpick-b${v===par?' on':''}"
+            onclick="setHolePar(${i},${v})">${v}</button>`).join('')}
+    </div>
     <div class="hero3">
       <button class="hbtn" onclick="bumpScore(${i},-1)" aria-label="One less">−</button>
       <div class="sbox ${assumed ? 'open' : 'fill ' + resultClass(h)}" id="sbox-${i}"
@@ -1846,10 +1873,11 @@ function buildHoleFormHTML(h, i) {
       <button class="hbtn" onclick="bumpScore(${i},1)" aria-label="One more">+</button>
     </div>
     ${fairwayApplies(h) ? `
-    <div class="fw3" id="fw-${i}">
+    <div class="fw3" id="fw-${i}" style="grid-template-columns:1fr 1fr 1fr 1fr">
       <button class="fwb${fwU}${fw==='left' ?' on':''}" onclick="setFairway(${i},'left')">◀ Left</button>
       <button class="fwb${fwU}${fw==='hit'  ?' on':''}" onclick="setFairway(${i},'hit')">Fairway</button>
       <button class="fwb${fwU}${fw==='right'?' on':''}" onclick="setFairway(${i},'right')">Right ▶</button>
+      <button class="fwb${fwU}${fw==='short'?' on':''}" onclick="setFairway(${i},'short')">▼ Short</button>
     </div>` : ''}
     <div class="trip">
       <div class="grp">
@@ -1862,17 +1890,19 @@ function buildHoleFormHTML(h, i) {
       <div class="rule"></div>
       <div class="grp">
         <div class="grp-l">Greenside</div>
-        <div class="grp-b" id="sand-${i}">
-          <button class="gbtn warn${h.sand?' on':''}" onclick="setSand(${i})"
-                  aria-label="Greenside bunker">🏖</button>
+        <div class="grp-b">
+          <button class="gbtn warn${sandShots(h)?' on':''}" id="sand-${i}" onclick="bumpSand(${i})"
+                  aria-label="Shots from a greenside bunker — tap to add one"
+                  >🏖${sandShots(h) ? ' ' + sandShots(h) : ''}</button>
         </div>
       </div>
       <div class="rule"></div>
       <div class="grp">
         <div class="grp-l">Penalty</div>
-        <div class="grp-b" id="pen-${i}">
-          <button class="gbtn warn${pen===1?' on':''}" onclick="setPenalty(${i},1)">1</button>
-          <button class="gbtn warn${pen>=2 ?' on':''}" onclick="setPenalty(${i},2)">2</button>
+        <div class="grp-b">
+          <button class="gbtn warn${pen?' on':''}" id="pen-${i}" onclick="bumpPenalty(${i})"
+                  aria-label="Penalty strokes — tap to add one"
+                  >⚠${pen ? ' ' + pen : ''}</button>
         </div>
       </div>
     </div>
@@ -2380,6 +2410,30 @@ function onApproach(hi, depth, side) {
   saveDraft();
 }
 
+// Par can be wrong — a card typed in once, a course that changed, a hole
+// played off a different tee. It is editable from the hole itself, and the
+// correction is written back to the saved course card so the next round
+// starts right.
+function toggleParPick(hi) {
+  const el = document.getElementById(`parpick-${hi}`);
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+function setHolePar(hi, par) {
+  const h = AR.holes[hi];
+  const wasDone = isHoleDone(h);
+  const oldPar = h.par || 4;
+  h.par = par;
+  if (AR.pars) AR.pars[hi] = par;
+  // a score still sitting on the assumed par should follow it; one you
+  // actually entered must not move
+  if (scoreAssumed(h) && h.score === oldPar) h.score = par;
+  if (AR.course) setCoursePars(AR.course, AR.pars || AR.holes.map(x => x.par));
+  saveDraft();
+  renderPills();
+  renderAccordion();
+  if (!wasDone && isHoleDone(h)) onHoleDone(hi);
+}
+
 // Lie. Tapping the derived answer makes it explicit; tapping an explicit one
 // again drops back to the derivation, so there is always a way out.
 function onApprLie(hi, v) {
@@ -2501,7 +2555,7 @@ function paintGroup(sel, onIdx, answered) {
 function setFairway(hi, v) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
   h.fairway = v;
-  paintGroup(`#fw-${hi}`, {left:0, hit:1, right:2}[v], true);
+  paintGroup(`#fw-${hi}`, {left:0, hit:1, right:2, short:3}[v], true);
   // the lie follows the fairway, so repaint it unless it was answered directly
   if (!h.apprLie) {
     const derv = derivedLie(h);
@@ -2512,20 +2566,22 @@ function setFairway(hi, v) {
   }
   afterScoreEdit(hi, wasDone);
 }
-// Penalty has no zero button: nothing selected IS zero, and tapping the
-// selected one clears it back.
-function setPenalty(hi, n) {
+// Both of these are counts, not yes/no. Three shots to get out of a bunker
+// is a different hole from one, and the old toggle recorded them the same.
+// Each tap adds one and wraps back to none, which is one control instead of
+// two and loses nothing.
+function bumpSand(hi) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
-  h.penalty = (h.penalty === n) ? 0 : n;
-  paintGroup(`#pen-${hi}`, h.penalty === 0 ? -1 : h.penalty - 1);
+  h.sand = (sandShots(h) + 1) % 5;        // 0,1,2,3,4 then back to none
+  const b = document.getElementById(`sand-${hi}`);
+  if (b) { b.textContent = '🏖' + (h.sand ? ' ' + h.sand : ''); b.classList.toggle('on', !!h.sand); }
   afterScoreEdit(hi, wasDone);
 }
-// Greenside bunker. A toggle, off by default — it only costs a tap on the
-// holes you were actually in one.
-function setSand(hi) {
+function bumpPenalty(hi) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
-  h.sand = !h.sand;
-  paintGroup(`#sand-${hi}`, h.sand ? 0 : -1);
+  h.penalty = ((h.penalty || 0) + 1) % 5;
+  const b = document.getElementById(`pen-${hi}`);
+  if (b) { b.textContent = '⚠' + (h.penalty ? ' ' + h.penalty : ''); b.classList.toggle('on', !!h.penalty); }
   afterScoreEdit(hi, wasDone);
 }
 function setGir(hi, v) {
@@ -2854,10 +2910,12 @@ function computeStats(holes) {
     scrambleN:  girMiss.length,
     // Sand saves split scrambling into two quite different problems: missing
     // a green into grass and missing it into a bunker.
-    sandN:      scored.filter(h => h.sand === true).length,
-    sandPct:    scored.filter(h => h.sand === true).length
+    sandN:      scored.filter(h => sandShots(h) > 0).length,
+    sandPct:    scored.filter(h => sandShots(h) > 0).length
                   ? pct(scored.filter(isSandSave).length,
-                        scored.filter(h => h.sand === true).length) : null,
+                        scored.filter(h => sandShots(h) > 0).length) : null,
+    // how many shots those bunkers actually cost, not just how many holes
+    sandStrokes: scored.reduce((a,h) => a + sandShots(h), 0),
     dblPct:     pct(scored.filter(isDoublePlus).length, scN),
     birdiePct:  pct(scored.filter(isBirdieBetter).length, scN),
     penPerRound: +((scored.reduce((a,h) => a + (h.penalty||0), 0) / scN) * 18).toFixed(2),
@@ -4866,7 +4924,7 @@ function exportCSV() {
   // silently drops score, fairways and approach would misrepresent the round
   // to anything reading it.
   const headers = ['Date','Course','Hole','Par','Score','ToPar','ScoreConfirmed',
-                   'Fairway','GIR','Sand','Penalty',
+                   'Fairway','GIR','SandShots','Penalty',
                    'ApproachYards','ApproachDepth','ApproachSide',
                    'PuttFeet','Slope','Direction','Putts','Variance','Miss',
                    'ExpPutts','StrokesGained'];
@@ -4875,7 +4933,7 @@ function exportCSV() {
     return [
       r.date, r.course||'', h.n, h.par||'', h.score??'', tp===null?'':tp,
       h.score==null ? '' : (h.scoreSet === false ? 'assumed' : 'yes'),
-      h.fairway||'', h.gir||'', h.sand ? 'yes' : '', h.penalty||0,
+      h.fairway||'', h.gir||'', sandShots(h) || '', h.penalty||0,
       h.apprDist||'', h.apprDepth||'', h.apprSide||'',
       h.distance||'', h.slope||'', h.direction||'',
       h.numPutts||'', varDisplay(h.variance, h.missDirection)||h.variance||'', h.missDirection||'',
@@ -5592,7 +5650,10 @@ function nineTableHTML(hs, label) {
     </thead>
     <tbody>
       <tr class="sc-par"><td class="sc-rl">PAR</td>
-        ${hs.map(h => cell(h.par)).join('')}
+        ${hs.map(h => SC_EDIT
+            ? `<td class="sc-pedit"><button onclick="bumpSavedPar(${h.n},1)">▲</button>` +
+              `<b>${h.par ?? '–'}</b><button onclick="bumpSavedPar(${h.n},-1)">▼</button></td>`
+            : cell(h.par)).join('')}
         <td class="sc-tot">${parTot ?? '–'}</td></tr>
       <tr class="sc-score"><td class="sc-rl">SCORE</td>
         ${hs.map(h => `<td><span class="sc-v ${scoreMark(h)}">${h.score ?? '–'}</span></td>`).join('')}
@@ -5604,11 +5665,44 @@ function nineTableHTML(hs, label) {
         ${hs.map(h => cell(h.gir === 'yes' ? '✓' : h.gir === 'no' ? '✗' : null,
                            h.gir === 'yes' ? 'sc-good' : h.gir === 'no' ? 'sc-miss' : '')).join('')}
         <td class="sc-tot"></td></tr>
+      ${hs.some(h => sandShots(h) || h.penalty) ? `
+      <tr><td class="sc-rl">SAND / PEN</td>
+        ${hs.map(h => {
+          const bits = [];
+          if (sandShots(h)) bits.push('🏖' + sandShots(h));
+          if (h.penalty)    bits.push('⚠' + h.penalty);
+          return cell(bits.join(' ') || null, bits.length ? 'sc-miss' : '');
+        }).join('')}
+        <td class="sc-tot"></td></tr>` : ''}
       <tr><td class="sc-rl">PUTTS</td>
         ${hs.map(h => cell(puttsOf(h), puttsOf(h) >= 3 ? 'sc-miss' : '')).join('')}
         <td class="sc-tot">${puttTot ?? '–'}</td></tr>
     </tbody>
   </table>`;
+}
+
+// Editing pars on a round already saved. Needed because a wrong card is only
+// obvious afterwards, and because every scoring stat is computed from par.
+let SC_EDIT = false;
+function toggleScEdit() { SC_EDIT = !SC_EDIT; openModal(modalRoundId); }
+function bumpSavedPar(holeN, d) {
+  const rounds = loadRounds();
+  const r = rounds.find(x => x.id === modalRoundId);
+  if (!r) return;
+  const h = (r.holes || []).find(x => x.n === holeN);
+  if (!h) return;
+  const oldPar = h.par || 4;
+  h.par = Math.max(3, Math.min(5, oldPar + d));
+  if (Array.isArray(r.pars)) r.pars[holeN - 1] = h.par;
+  saveRounds(rounds);
+  // carry the correction to the course card so the next round starts right
+  if (r.course) {
+    const card = [];
+    (r.holes || []).forEach(x => { card[x.n - 1] = x.par; });
+    setCoursePars(r.course, card);
+  }
+  openModal(modalRoundId);
+  renderHistory();
 }
 
 function scorecardHTML(r) {
@@ -5635,6 +5729,18 @@ function scorecardHTML(r) {
 
   return `
   <div class="sc-wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+      <span style="font-size:9px;font-weight:800;letter-spacing:.09em;color:#94a3b8;
+            text-transform:uppercase">Scorecard</span>
+      <button onclick="toggleScEdit()" style="border:1px solid ${SC_EDIT?'#2563eb':'#dfe5ed'};
+              background:${SC_EDIT?'#2563eb':'#fff'};color:${SC_EDIT?'#fff':'#475569'};
+              border-radius:4px;padding:3px 9px;font-size:9px;font-weight:800;cursor:pointer;
+              text-transform:uppercase;letter-spacing:.04em">
+        ${SC_EDIT ? 'Done' : '✎ Edit pars'}</button>
+    </div>
+    ${SC_EDIT ? `<p style="font-size:10px;color:#b45309;line-height:1.5;margin-bottom:7px;font-style:italic">
+      Changing par here re-scores the round and updates the saved card for ${r.course||'this course'},
+      so the next round starts with it right.</p>` : ''}
     ${nineTableHTML(front, 'OUT')}
     ${back.length ? nineTableHTML(back, 'IN') : ''}
     <table class="sctbl sc-sum">
