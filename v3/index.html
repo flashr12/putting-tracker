@@ -427,8 +427,9 @@
        itself blocks input while it is up. ── */
     #toast-wrap {
       position: fixed; left: 0; right: 0; z-index: 300;
-      /* sits just above the bottom nav, clear of the home indicator */
-      bottom: calc(66px + env(safe-area-inset-bottom));
+      /* a quarter of the way up rather than hugging the nav — far enough
+         from Prev/Next to not read as part of it */
+      bottom: calc(26% + env(safe-area-inset-bottom));
       display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 0 12px; pointer-events: none;
     }
@@ -561,14 +562,16 @@
     .fwb.unset,.gbtn.unset{background:transparent;border:1px dashed rgba(255,255,255,.5);
                            color:#cbd5e1}
     /* GIR | Sand | Penalty — three separate questions, ruled apart */
-    .trip{display:grid;grid-template-columns:1fr 1px 64px 1px 1fr;gap:8px;align-items:center;
+    .trip{display:grid;grid-template-columns:1fr 1px 56px 1px 56px;gap:8px;align-items:center;
           margin-top:6px;padding-top:6px;border-top:1px solid #334155}
     .trip .rule{background:#475569;height:32px;align-self:center}
     .grp{text-align:center}
     .grp-l{font-size:8px;font-weight:800;color:#94a3b8;letter-spacing:.09em;
            margin-bottom:3px;text-transform:uppercase}
     .grp-b{display:flex;gap:4px;justify-content:center}
-    .gbtn{flex:1;max-width:58px;text-align:center;font-size:11px;font-weight:700;padding:5px 0;
+    /* no cap: GIR now has the room the two single-button groups gave back,
+       and Sand and Penalty are already held to their own narrow columns */
+    .gbtn{flex:1;text-align:center;font-size:11px;font-weight:700;padding:5px 0;
           border-radius:4px;background:#334155;color:#cbd5e1;border:none;cursor:pointer;
           -webkit-tap-highlight-color:transparent}
     .gbtn.on{background:#2563eb;color:#fff}
@@ -1876,8 +1879,8 @@ function buildHoleFormHTML(h, i) {
     <div class="fw3" id="fw-${i}" style="grid-template-columns:1fr 1fr 1fr 1fr">
       <button class="fwb${fwU}${fw==='left' ?' on':''}" onclick="setFairway(${i},'left')">◀ Left</button>
       <button class="fwb${fwU}${fw==='hit'  ?' on':''}" onclick="setFairway(${i},'hit')">Fairway</button>
-      <button class="fwb${fwU}${fw==='right'?' on':''}" onclick="setFairway(${i},'right')">Right ▶</button>
       <button class="fwb${fwU}${fw==='short'?' on':''}" onclick="setFairway(${i},'short')">▼ Short</button>
+      <button class="fwb${fwU}${fw==='right'?' on':''}" onclick="setFairway(${i},'right')">Right ▶</button>
     </div>` : ''}
     <div class="trip">
       <div class="grp">
@@ -2555,7 +2558,7 @@ function paintGroup(sel, onIdx, answered) {
 function setFairway(hi, v) {
   const h = AR.holes[hi]; const wasDone = isHoleDone(h);
   h.fairway = v;
-  paintGroup(`#fw-${hi}`, {left:0, hit:1, right:2, short:3}[v], true);
+  paintGroup(`#fw-${hi}`, {left:0, hit:1, short:2, right:3}[v], true);
   // the lie follows the fairway, so repaint it unless it was answered directly
   if (!h.apprLie) {
     const derv = derivedLie(h);
