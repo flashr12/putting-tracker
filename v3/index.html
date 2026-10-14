@@ -1221,7 +1221,7 @@ function holeSGP(h, baseKey) {
   const putts = h.numPutts === '4+' ? 4 : parseInt(h.numPutts);
   return sgpExpected(h.distance, baseKey) - putts;
 }
-function fmtSG(v, dp = 2) {
+function fmtSG(v, dp = 1) {
   if (v === null || v === undefined || isNaN(v)) return '—';
   return (v >= 0 ? '+' : '') + v.toFixed(dp);
 }
@@ -2938,12 +2938,12 @@ function computeStats(holes) {
     sandStrokes: scored.reduce((a,h) => a + sandShots(h), 0),
     dblPct:     pct(scored.filter(isDoublePlus).length, scN),
     birdiePct:  pct(scored.filter(isBirdieBetter).length, scN),
-    penPerRound: +((scored.reduce((a,h) => a + (h.penalty||0), 0) / scN) * 18).toFixed(2),
+    penPerRound: +((scored.reduce((a,h) => a + (h.penalty||0), 0) / scN) * 18).toFixed(1),
     byPar: [3,4,5].map(p => {
       const hs = scored.filter(h => h.par === p);
       return { par:p, n:hs.length,
-        avg: hs.length ? +(hs.reduce((a,h)=>a+h.score,0)/hs.length).toFixed(2) : null,
-        toPar: hs.length ? +(hs.reduce((a,h)=>a+(h.score-h.par),0)/hs.length).toFixed(2) : null,
+        avg: hs.length ? +(hs.reduce((a,h)=>a+h.score,0)/hs.length).toFixed(1) : null,
+        toPar: hs.length ? +(hs.reduce((a,h)=>a+(h.score-h.par),0)/hs.length).toFixed(1) : null,
         girPct: hs.length ? pct(hs.filter(h=>h.gir==='yes').length, hs.length) : null };
     }),
   } : null;
@@ -3036,8 +3036,8 @@ function computeStats(holes) {
 
   return {
     n, makes, makesPct:pct(makes,n), three, threePct:pct(three,n),
-    girCount:girH.length, puttsPerGir: girH.length?(girPuts/girH.length).toFixed(2):null,
-    avgPutts:(total/n).toFixed(2), totalPutts: total,
+    girCount:girH.length, puttsPerGir: girH.length?(girPuts/girH.length).toFixed(1):null,
+    avgPutts:(total/n).toFixed(1), totalPutts: total,
     byDist, bySlope, byDir, misses:misses.length, mL, mS, mLo, mR, byMissByDir, byVar,
     varByDist, varBySlope, varByDir,
     // v2
@@ -3148,7 +3148,7 @@ function setTrendMetric(btn, m) {
 // support the metric (e.g. an imported putting-only round has no score).
 function roundSeries() {
   const rounds = [...loadRounds()].sort((a,b) => a.date.localeCompare(b.date));
-  const per18 = (v, n) => n ? +((v / n) * 18).toFixed(2) : null;
+  const per18 = (v, n) => n ? +((v / n) * 18).toFixed(1) : null;
   return {
     labels: rounds.map(r => {
       const d = new Date(r.date + 'T12:00:00');
@@ -3171,17 +3171,17 @@ function roundSeries() {
 }
 
 const TREND_SPECS = {
-  score: { lbl:'Score to par / 18', col:'#2563eb', fmt:v => (v>0?'+':'') + v,
+  score: { lbl:'Score to par / 18', col:'#2563eb', fmt:v => (v>0?'+':'') + (+v.toFixed(1)),
            cap:'Strokes over or under par per 18 holes. Lower is better.' },
-  gir:   { lbl:'GIR %',    col:'#15803d', fmt:v => v + '%', higher:true, pct:true,
+  gir:   { lbl:'GIR %',    col:'#15803d', fmt:v => Math.round(v) + '%', higher:true, pct:true,
            cap:'Greens in regulation. The stat most tied to scoring at your level — higher is better.' },
-  fw:    { lbl:'Fairways %', col:'#2563eb', fmt:v => v + '%', higher:true, pct:true,
+  fw:    { lbl:'Fairways %', col:'#2563eb', fmt:v => Math.round(v) + '%', higher:true, pct:true,
            cap:'Tee shots finding the fairway, on par 4s and 5s. Higher is better.' },
-  putts: { lbl:'Putts / 18', col:'#7c3aed', fmt:v => String(v),
+  putts: { lbl:'Putts / 18', col:'#7c3aed', fmt:v => String(+v.toFixed(1)),
            cap:'Putts per 18 holes, counting only strokes played on the green. Lower is better.' },
-  sg:    { lbl:'SG Putting / 18', col:'#1d4ed8', fmt:v => (v>0?'+':'') + v, higher:true,
+  sg:    { lbl:'SG Putting / 18', col:'#1d4ed8', fmt:v => (v>0?'+':'') + (+v.toFixed(1)), higher:true,
            cap:'Strokes gained putting against the benchmark chosen in Insights. Higher is better.' },
-  dbl:   { lbl:'Double+ %', col:'#dc2626', fmt:v => v + '%', pct:true,
+  dbl:   { lbl:'Double+ %', col:'#dc2626', fmt:v => Math.round(v) + '%', pct:true,
            cap:'Holes taking two or more over par. Eliminating these is the fastest route down a handicap.' },
 };
 
@@ -3268,8 +3268,8 @@ function renderTrendSummary(S) {
     }
     return `<tr style="border-top:1px solid #f3f4f6">
       <td style="padding:7px 4px;font-size:11.5px;font-weight:600;color:#374151">${spec.lbl}</td>
-      <td style="padding:7px 4px;text-align:right;font-size:12px;font-weight:800;color:#1f2937">${spec.fmt(+l.toFixed(2))}</td>
-      <td style="padding:7px 4px;text-align:right;font-size:11px;color:#9ca3af">${p===null?'—':spec.fmt(+p.toFixed(2))}</td>
+      <td style="padding:7px 4px;text-align:right;font-size:12px;font-weight:800;color:#1f2937">${spec.fmt(l)}</td>
+      <td style="padding:7px 4px;text-align:right;font-size:11px;color:#9ca3af">${p===null?'—':spec.fmt(p)}</td>
       <td style="padding:7px 6px;text-align:right;font-size:12px;font-weight:800;color:${col}">${dir||'·'}</td></tr>`;
   }).filter(Boolean).join('');
   el.innerHTML = !rows ? '' : `
@@ -3349,7 +3349,7 @@ function fwGirHTML() {
   const cell = (fwHit, girHit) => holes.filter(h =>
     (h.fairway === 'hit') === fwHit && (h.gir === 'yes') === girHit);
   const avg = set => set.length
-    ? +(set.reduce((a,h) => a + (h.score - h.par), 0) / set.length).toFixed(2) : null;
+    ? +(set.reduce((a,h) => a + (h.score - h.par), 0) / set.length).toFixed(1) : null;
   const fmt = v => v === null ? '—' : (v > 0 ? '+' : '') + v;
   const fwOn  = holes.filter(h => h.fairway === 'hit');
   const fwOff = holes.filter(h => h.fairway !== 'hit');
@@ -3408,7 +3408,7 @@ function fwGirHTML() {
 function costOfMissHTML(sc) {
   const holes = loadRounds().flatMap(r => r.holes).filter(h => h.score != null && h.par);
   if (holes.length < 18) return '';
-  const avg = a => a.length ? +(a.reduce((x,h) => x + (h.score - h.par), 0) / a.length).toFixed(2) : null;
+  const avg = a => a.length ? +(a.reduce((x,h) => x + (h.score - h.par), 0) / a.length).toFixed(1) : null;
   const fmt = v => v === null ? '—' : (v > 0 ? '+' : '') + v;
   const rows = [
     ['Green hit',    avg(holes.filter(h => h.gir === 'yes'))],
@@ -3419,7 +3419,7 @@ function costOfMissHTML(sc) {
     ['Penalty',    avg(holes.filter(h => h.penalty))],
   ];
   const gap = (a,b) => (rows[a][1] !== null && rows[b][1] !== null)
-      ? ` <span style="color:#dc2626;font-weight:800">${(rows[b][1]-rows[a][1]).toFixed(2)} shots</span>` : '';
+      ? ` <span style="color:#dc2626;font-weight:800">${(rows[b][1]-rows[a][1]).toFixed(1)} shots</span>` : '';
   return `
   <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">What a miss costs</div>
@@ -4368,10 +4368,10 @@ function computeImpactInsights(rounds) {
   const feetOf = pool => pool.reduce((s,h) => s + holeFeetMade(h), 0);
 
   const summary = {
-    avgPutts:  (totalPuttCount / N).toFixed(2),
+    avgPutts:  (totalPuttCount / N).toFixed(1),
     makeR:     Math.round(overallMkR * 100),
     threePR:   Math.round(overall3pR * 100),
-    avgPutts5: last5H.length >= 5 ? (last5H.reduce((s,h)=>s+parseInt(h.numPutts),0)/last5H.length).toFixed(2) : null,
+    avgPutts5: last5H.length >= 5 ? (last5H.reduce((s,h)=>s+parseInt(h.numPutts),0)/last5H.length).toFixed(1) : null,
     makeR5:    last5H.length >= 5 ? Math.round((rate(last5H, is1)||0) * 100) : null,
     threePR5:  last5H.length >= 5 ? Math.round((rate(last5H, is3)||0) * 100) : null,
     sg:        sgAll, sg5,
@@ -4571,7 +4571,7 @@ function shotsLostBreakdown(rounds) {
     if (bad.length < 6 || good.length < 6) return;
     const value = costOverride != null ? costOverride : (avgTP(bad) - avgTP(good));
     if (!(value > 0)) return;
-    out.push({ key, label, unit, value: +value.toFixed(2),
+    out.push({ key, label, unit, value: +value.toFixed(1),
                perRound: +((bad.length / n) * 18).toFixed(1), n: bad.length });
   };
 
@@ -4877,7 +4877,7 @@ function renderInsights() {
         ↑ green = improving vs all-time.
       </div>
       <div class="tc-wrap" id="tcw-sg" style="height:150px;margin-bottom:10px"><canvas id="tc-sg"></canvas></div>
-      ${trendTable(trends.sg, true, v => fmtSG(v, 2))}
+      ${trendTable(trends.sg, true, v => fmtSG(v, 1))}
     </div>
     <div id="tt-make" style="${TREND_TAB==='make'?'':'display:none'}">
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">% of holes holed with 1 putt. ↑ green = improving vs all-time.</div>
@@ -5913,8 +5913,8 @@ function openModal(id) {
           <tr style="border-top:1px solid #f3f4f6">
             <td style="padding:5px 2px;font-weight:600;color:#374151">Par ${p.par}</td>
             <td style="padding:5px 2px;text-align:center;color:#9ca3af">${p.n}</td>
-            <td style="padding:5px 2px;text-align:center;font-weight:700;color:#374151">${p.avg.toFixed(2)}</td>
-            <td style="padding:5px 2px;text-align:center;font-weight:700;color:${toParColor(p.toPar)}">${p.toPar>0?'+':''}${p.toPar.toFixed(2)}</td>
+            <td style="padding:5px 2px;text-align:center;font-weight:700;color:#374151">${p.avg.toFixed(1)}</td>
+            <td style="padding:5px 2px;text-align:center;font-weight:700;color:${toParColor(p.toPar)}">${p.toPar>0?'+':''}${p.toPar.toFixed(1)}</td>
             <td style="padding:5px 2px;text-align:right;color:#2563eb">${p.girPct}%</td>
           </tr>`).join('')}
       </tbody>
