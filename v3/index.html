@@ -293,11 +293,13 @@
     /* the back nine is a separate card, not a continuation of the front */
     .sctbl.sc-in{margin-top:14px;border-top:2px solid #e3e9f0;padding-top:4px}
     .sctbl th,.sctbl td{text-align:center;font-size:10.5px;padding:3px 0;color:#374151}
-    .sctbl thead th{font-size:9px;font-weight:800;color:#94a3b8;border-bottom:1px solid #e3e9f0;
-                    padding-bottom:4px}
+    .sctbl thead th{font-size:9px;font-weight:800;color:#475569;background:#e8edf4;
+                    padding:4px 0;border-bottom:1px solid #d9e1ea}
+    .sctbl thead th:first-child{border-radius:4px 0 0 4px}
+    .sctbl thead th:last-child{border-radius:0 4px 4px 0}
     .sctbl .sc-rl{width:46px;text-align:left;font-size:7.5px;font-weight:800;color:#94a3b8;
                   letter-spacing:.02em;white-space:nowrap}
-    .sctbl .sc-tot{width:34px;font-weight:800;color:#1f2937;background:#f4f7fb}
+    .sctbl .sc-tot{width:40px;font-weight:800;color:#1f2937;background:#f4f7fb;line-height:1.2}
     .sctbl thead .sc-tot{color:#475569}
     .sctbl tr.sc-par td{color:#94a3b8}
     /* the row's big type must not reach the label cell — SCORE at 13px
@@ -1935,7 +1937,7 @@ function buildHoleFormHTML(h, i) {
   <div>
     <div class="sect-h appr">Approach<button class="sect-i"
          onclick="toggleInfo('ia-${i}')" aria-label="What goes here?">i</button></div>
-    ${flInfo(`ia-${i}`, 'Your FIRST real attempt at the green, from more than about 30 yards — normally the second on a par 4 and the third on a par 5. If it misses, the shot you play next is short game, not another approach: log the first one and leave it. A punch-out or a layup is not an attempt at the green, so the approach is the first proper go you have after it. All of this is optional; tap the highlighted distance again to clear it.<br><br>LIE is where you played it from. Bunker means a fairway bunker — the greenside one is the Sand toggle on the scorecard. On a par 4 it follows the fairway you already entered and is shown outlined; tap to correct it. On a par 5 it starts blank, because nothing in the app knows where your layup finished.<br><br>FINISH is where the ball came to rest relative to the flag, with about 10 feet of tolerance on each axis — so ON LINE is within roughly 10 feet left or right, PIN HIGH within roughly 10 feet nearer or past. The centre cell is not a hole-out; it is any shot close on both. How close is already in the putt distance.')}
+    ${flInfo(`ia-${i}`, 'Your FIRST real attempt at the green, from more than about 30 yards — the second on most par 4s, the third on most par 5s, and on a par 3 the tee shot itself (the lie shows Tee). If it misses, the shot you play next is short game, not another approach: log the first one and leave it. A punch-out or a layup is not an attempt at the green, so the approach is the first proper go you have after it. All of this is optional; tap the highlighted distance again to clear it.<br><br>LIE is where you played it from. Bunker means a fairway bunker — the greenside one is the Sand toggle on the scorecard. On a par 4 it follows the fairway you already entered and is shown outlined; tap to correct it. On a par 5 it starts blank, because nothing in the app knows where your layup finished.<br><br>FINISH is where the ball came to rest relative to the flag, with about 10 feet of tolerance on each axis — so ON LINE is within roughly 10 feet left or right, PIN HIGH within roughly 10 feet nearer or past. The centre cell is not a hole-out; it is any shot close on both. How close is already in the putt distance.')}
 
     <div class="arow" style="grid-template-columns:52px repeat(3,1fr)">
       <div class="arow-l">LIE</div>
@@ -2820,11 +2822,15 @@ function saveRound() {
   // A hole is saved once every field is answered. Confirming the score is
   // not one of those fields — an unconfirmed hole still saves, it just gets
   // named first, because dropping it would lose real putting data.
-  const logged  = AR.holes.filter(isHoleLogged);
+  // A hole already in this round keeps its place as long as it still holds
+  // something, whatever the current rules say about it.
+  const orig    = new Set(AR.origHoles || []);
+  const keep    = h => isHoleLogged(h) || (orig.has(h.n) && holeTouched(h));
+  const logged  = AR.holes.filter(keep);
   if (!logged.length) { alert('Fill in at least one hole before saving.'); return; }
 
   // Touched but without even a scorecard — these genuinely cannot be saved.
-  const partial = AR.holes.filter(h => holeTouched(h) && !isHoleLogged(h));
+  const partial = AR.holes.filter(h => holeTouched(h) && !keep(h));
   // Saved, but with the putting block left blank: they still count towards
   // scoring, fairways, GIR and approach, and sit out the putting stats.
   const noPutts = logged.filter(h => !isHolePuttComplete(h));
@@ -2859,7 +2865,9 @@ function saveRound() {
   }
   const round = { ...AR, holes: logged };
   const rounds = loadRounds();
-  rounds.unshift(round);
+  const at = rounds.findIndex(r => r.id === round.id);
+  if (at >= 0) rounds[at] = round;            // editing an existing round
+  else rounds.unshift(round);
   saveRounds(rounds);
   clearDraft(); // round properly saved, discard draft
   AR = null; AH = 0; RVIEW = 'form';
@@ -3165,17 +3173,30 @@ function roundSeries() {
 const TREND_SPECS = {
   score: { lbl:'Score to par / 18', col:'#2563eb', fmt:v => (v>0?'+':'') + v,
            cap:'Strokes over or under par per 18 holes. Lower is better.' },
-  gir:   { lbl:'GIR %',    col:'#15803d', fmt:v => v + '%', higher:true,
+  gir:   { lbl:'GIR %',    col:'#15803d', fmt:v => v + '%', higher:true, pct:true,
            cap:'Greens in regulation. The stat most tied to scoring at your level — higher is better.' },
-  fw:    { lbl:'Fairways %', col:'#2563eb', fmt:v => v + '%', higher:true,
+  fw:    { lbl:'Fairways %', col:'#2563eb', fmt:v => v + '%', higher:true, pct:true,
            cap:'Tee shots finding the fairway, on par 4s and 5s. Higher is better.' },
   putts: { lbl:'Putts / 18', col:'#7c3aed', fmt:v => String(v),
            cap:'Putts per 18 holes, counting only strokes played on the green. Lower is better.' },
   sg:    { lbl:'SG Putting / 18', col:'#1d4ed8', fmt:v => (v>0?'+':'') + v, higher:true,
            cap:'Strokes gained putting against the benchmark chosen in Insights. Higher is better.' },
-  dbl:   { lbl:'Double+ %', col:'#dc2626', fmt:v => v + '%',
+  dbl:   { lbl:'Double+ %', col:'#dc2626', fmt:v => v + '%', pct:true,
            cap:'Holes taking two or more over par. Eliminating these is the fastest route down a handicap.' },
 };
+
+// Tight bounds round whatever is actually plotted, with a little air. A
+// percentage never pads past 0 or 100 — an axis reaching 104% is showing a
+// value the metric cannot take.
+function trendBounds(data, isPct) {
+  const v = data.filter(x => x !== null && !isNaN(x));
+  if (v.length < 2) return {};
+  let lo = Math.min(...v), hi = Math.max(...v);
+  const pad = Math.max((hi - lo) * 0.18, Math.abs(hi || lo || 1) * 0.04, 0.5);
+  lo -= pad; hi += pad;
+  if (isPct) { lo = Math.max(0, lo); hi = Math.min(100, hi); }
+  return { suggestedMin: lo, suggestedMax: hi };
+}
 
 function drawDashTrend() {
   const cv = document.getElementById('chart-dtrend');
@@ -3215,7 +3236,11 @@ function drawDashTrend() {
       plugins: { legend: { display:false },
         tooltip: { callbacks: { label: c => `${spec.lbl}: ${spec.fmt(c.parsed.y)}` } } },
       scales: {
-        y: { ticks:{ font:{size:10}, callback:v => spec.fmt(v) }, grid:{ color:'#f3f4f6' } },
+        // Chart.js was padding the axis down towards zero, which flattens
+        // every line — a putting average that moves between 30 and 34 looked
+        // like a straight line across the top. Frame the data instead.
+        y: { ...trendBounds(data, spec.pct),
+             ticks:{ font:{size:10}, callback:v => spec.fmt(v) }, grid:{ color:'#f3f4f6' } },
         x: { ticks:{ font:{size:9}, maxRotation:0, autoSkip:true, maxTicksLimit:6 }, grid:{ display:false } },
       },
     },
@@ -5652,7 +5677,13 @@ function nineTableHTML(hs, label, isIn) {
   const scoreTot = sumOf(hs, h => h.score);
   const puttTot  = sumOf(hs, puttsOf);
   const fwMark = h => !fairwayApplies(h) ? '' : h.fairway === 'hit' ? '✓'
-                    : h.fairway === 'left' ? '◀' : h.fairway === 'right' ? '▶' : null;
+                    : h.fairway === 'left' ? '◀' : h.fairway === 'right' ? '▶'
+                    : h.fairway === 'short' ? '▼' : null;
+  // the nine's own tally, so you do not have to read it off the summary
+  const tally = (hit, all) => all
+    ? `<b>${hit}/${all}</b><span class="sc-sub">${Math.round(hit/all*100)}%</span>` : '';
+  const fwE  = hs.filter(h => fairwayApplies(h) && h.fairway);
+  const girE = hs.filter(h => h.gir);
   return `
   <table class="sctbl${isIn ? ' sc-in' : ''}">
     <thead>
@@ -5672,11 +5703,11 @@ function nineTableHTML(hs, label, isIn) {
         <td class="sc-tot">${scoreTot ?? '–'}</td></tr>
       <tr><td class="sc-rl">FW</td>
         ${hs.map(h => cell(fwMark(h), fwMark(h) === '✓' ? 'sc-good' : fwMark(h) ? 'sc-miss' : '')).join('')}
-        <td class="sc-tot"></td></tr>
+        <td class="sc-tot">${tally(fwE.filter(h => h.fairway === 'hit').length, fwE.length)}</td></tr>
       <tr><td class="sc-rl">GIR</td>
         ${hs.map(h => cell(h.gir === 'yes' ? '✓' : h.gir === 'no' ? '✗' : null,
                            h.gir === 'yes' ? 'sc-good' : h.gir === 'no' ? 'sc-miss' : '')).join('')}
-        <td class="sc-tot"></td></tr>
+        <td class="sc-tot">${tally(girE.filter(h => h.gir === 'yes').length, girE.length)}</td></tr>
       ${hs.some(h => sandShots(h) || h.penalty) ? `
       <tr><td class="sc-rl">SAND / PEN</td>
         ${hs.map(h => {
@@ -5772,13 +5803,18 @@ function scorecardHTML(r) {
   return `
   <div class="sc-wrap">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
-      <span style="font-size:9px;font-weight:800;letter-spacing:.09em;color:#94a3b8;
+      <span style="font-size:10px;font-weight:800;letter-spacing:.3em;color:#1d4ed8;
             text-transform:uppercase">Scorecard</span>
+      <span style="display:flex;gap:6px">
+      <button onclick="editSavedRound()" style="border:1px solid #dfe5ed;background:#fff;
+              color:#475569;border-radius:4px;padding:3px 9px;font-size:9px;font-weight:800;
+              cursor:pointer;text-transform:uppercase;letter-spacing:.04em">✎ Edit round</button>
       <button onclick="toggleScEdit()" style="border:1px solid ${SC_EDIT?'#2563eb':'#dfe5ed'};
               background:${SC_EDIT?'#2563eb':'#fff'};color:${SC_EDIT?'#fff':'#475569'};
               border-radius:4px;padding:3px 9px;font-size:9px;font-weight:800;cursor:pointer;
               text-transform:uppercase;letter-spacing:.04em">
         ${SC_EDIT ? 'Done' : '✎ Edit pars'}</button>
+      </span>
     </div>
     ${SC_EDIT ? `<p style="font-size:10px;color:#b45309;line-height:1.5;margin-bottom:7px;font-style:italic">
       Changing par here re-scores the round and updates the saved card for ${r.course||'this course'},
@@ -6054,6 +6090,44 @@ function setModalStab(el, name) {
     const e = document.getElementById('mstab-'+t);
     if (e) e.style.display = t===name ? 'block' : 'none';
   });
+}
+
+// Editing a saved round reuses the round screen rather than a second editor:
+// every rule about what a complete hole is lives there, and a parallel editor
+// would drift from it. The round keeps its id, so saving replaces it in place.
+function editSavedRound() {
+  const r = loadRounds().find(x => x.id === modalRoundId);
+  if (!r) return;
+  if (AR && AR.id !== r.id && AR.holes.some(holeTouched) &&
+      !confirm('You have a round in progress. Open this saved round instead?\n\n' +
+               'The one in progress is kept as a draft.')) return;
+  // a deep copy, so abandoning the edit cannot leave the stored round changed
+  const copy = JSON.parse(JSON.stringify(r));
+  const hc = copy.holeCount || copy.holes.length;
+  // holes that were never logged are missing from a saved round — put them
+  // back as blanks so every hole is reachable while editing
+  const byN = new Map(copy.holes.map(h => [h.n, h]));
+  const pars = copy.pars || copy.holes.map(h => h.par);
+  AR = { ...copy, holeCount: hc,
+         // which holes were already stored — saving must not drop one just
+         // because it predates a rule, e.g. a Putting Tracker import has no
+         // score, GIR or fairway at all and would otherwise vanish entirely
+         origHoles: copy.holes.map(h => h.n),
+         holes: Array.from({length: hc}, (_, i) =>
+           byN.get(i+1) || blankHole(i+1, pars[i] || 4)) };
+  AH = 0; RVIEW = 'form';
+  closeModalBtn();
+  document.getElementById('step-setup').style.display = 'none';
+  document.getElementById('step-pars').style.display  = 'none';
+  document.getElementById('step-holes').style.display = 'flex';
+  document.getElementById('ri-course').textContent = AR.course || 'Round';
+  document.getElementById('ri-date').textContent =
+    new Date(AR.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('ri-holecount').textContent = hc + 'H ✎';
+  showMain('round');
+  syncModeBtn(); setRoundView('form'); renderPills(); renderAccordion(); updateBottomNav();
+  showToast('✎', `Editing ${AR.course||'this round'}. Save when you are done — it replaces the ` +
+                 `saved round rather than adding another.`, 'info', { ms: 7000 });
 }
 
 function closeModal(e) { if(e.target===document.getElementById('modal-wrap')) closeModalBtn(); }
