@@ -293,6 +293,7 @@
     /* the back nine is a separate card, not a continuation of the front */
     .sctbl.sc-in{margin-top:14px;border-top:2px solid #e3e9f0;padding-top:4px}
     .sctbl th,.sctbl td{text-align:center;font-size:10.5px;padding:3px 0;color:#374151}
+    .sctbl tbody tr{border-top:1px solid #f0f3f7}
     .sctbl thead th{font-size:9px;font-weight:800;color:#475569;background:#e8edf4;
                     padding:4px 0;border-bottom:1px solid #d9e1ea}
     .sctbl thead th:first-child{border-radius:4px 0 0 4px}
@@ -808,6 +809,11 @@
 
       <!-- ══ PUTTING ══ -->
       <div id="dtab-putting" style="display:none">
+        <div class="stab-row" style="margin-bottom:12px">
+          <button class="stab on" onclick="setPuttingFilter(this,'all')">All Rounds</button>
+          <button class="stab"    onclick="setPuttingFilter(this,10)">Last 10</button>
+          <button class="stab"    onclick="setPuttingFilter(this,5)">Last 5</button>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
           <div class="kpi"><div class="kpi-v" id="kpi-ppr" style="color:#2563eb">—</div><div class="kpi-l">Putts / 18 Holes</div></div>
           <div class="kpi"><div class="kpi-v" id="kpi-3p" style="color:#f59e0b">—</div><div class="kpi-l">3-Putt %</div></div>
@@ -835,6 +841,7 @@
             <button class="stab"    onclick="setStab(this,'dir')">Direction</button>
             <button class="stab"    onclick="setStab(this,'miss')">Miss</button>
             <button class="stab"    onclick="setStab(this,'var')">Variance</button>
+            <button class="stab"    onclick="setStab(this,'trend')">Trend</button>
           </div>
           <div style="padding:12px">
             <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:4px">
@@ -852,6 +859,16 @@
             <div id="stab-var"    style="display:none">
               <div style="height:150px"><canvas id="chart-var"></canvas></div>
               <div id="tbl-var"  style="margin-top:8px"></div>
+            </div>
+            <div id="stab-trend"  style="display:none">
+              <div class="stab-row" style="margin-bottom:10px">
+                <button class="stab on" onclick="setPuttTrendMetric(this,'putts')">Putts/18</button>
+                <button class="stab"    onclick="setPuttTrendMetric(this,'three')">3-Putt%</button>
+                <button class="stab"    onclick="setPuttTrendMetric(this,'one')">1-Putt%</button>
+                <button class="stab"    onclick="setPuttTrendMetric(this,'sg')">SG Putt</button>
+              </div>
+              <div style="height:180px"><canvas id="chart-putt-trend"></canvas></div>
+              <div id="tbl-putt-trend" style="margin-top:10px"></div>
             </div>
           </div>
         </div>
@@ -2893,13 +2910,17 @@ function colorForPct(p) {
 
 function computeStats(holes) {
   if (!holes.length) return null;
-  const n       = holes.length;
-  const makes   = holes.filter(h=>h.numPutts==='1').length;
-  const three   = holes.filter(h=>parseInt(h.numPutts)>=3).length;
-  const girH    = holes.filter(h=>h.gir==='yes');
+  // Only holes where putting was actually recorded (excludes chip-ins and
+  // any hole where the putting block was skipped entirely).
+  const pH      = holes.filter(h => h.numPutts);
+  const n       = pH.length;
+  if (!n) return null;
+  const makes   = pH.filter(h=>h.numPutts==='1').length;
+  const three   = pH.filter(h=>parseInt(h.numPutts)>=3).length;
+  const girH    = pH.filter(h=>h.gir==='yes');
   const girPuts = girH.reduce((s,h)=>s+parseInt(h.numPutts),0);
-  const total   = holes.reduce((s,h)=>s+parseInt(h.numPutts),0);
-  const misses  = holes.filter(h=>parseInt(h.numPutts)>=2);
+  const total   = pH.reduce((s,h)=>s+parseInt(h.numPutts),0);
+  const misses  = pH.filter(h=>parseInt(h.numPutts)>=2);
 
   const byDist = DIST_BANDS.map(band => {
     const bh = holes.filter(h => h.distance && band.fn(h));
@@ -2958,13 +2979,13 @@ function computeStats(holes) {
   const avgDist  = sgH.length ? (sgH.reduce((s,h)=>s+h.distance,0) / sgH.length) : null;
 
   const bySlope = SLOPE_OPTS.map(s => {
-    const sh = holes.filter(h=>h.slope===s.v);
+    const sh = pH.filter(h=>h.slope===s.v);
     return { ...s, n:sh.length, mp:pct(sh.filter(h=>h.numPutts==='1').length,sh.length),
              tp:pct(sh.filter(h=>parseInt(h.numPutts)>=3).length,sh.length) };
   });
 
   const byDir = DIR_OPTS.map(d => {
-    const dh = holes.filter(h=>h.direction===d.v);
+    const dh = pH.filter(h=>h.direction===d.v);
     return { ...d, n:dh.length, mp:pct(dh.filter(h=>h.numPutts==='1').length,dh.length),
              tp:pct(dh.filter(h=>parseInt(h.numPutts)>=3).length,dh.length) };
   });
@@ -3008,9 +3029,9 @@ function computeStats(holes) {
   // structurally always 0. Show the DISTRIBUTION instead — which pace errors
   // happen most — including 0 (pin-high but off line).
   const VAR_ALL  = ['>-7','-5','-3','-1','0','+1','+3','+5','>+7'];
-  const varTotal = holes.filter(h => h.variance && parseInt(h.numPutts) >= 2).length;
+  const varTotal = pH.filter(h => h.variance && parseInt(h.numPutts) >= 2).length;
   const byVar = VAR_ALL.map(v => {
-    const n = holes.filter(h => h.variance === v && parseInt(h.numPutts) >= 2).length;
+    const n = pH.filter(h => h.variance === v && parseInt(h.numPutts) >= 2).length;
     return { v, n, share: pct(n, varTotal) };
   });
 
@@ -3018,7 +3039,7 @@ function computeStats(holes) {
   // Missed first putts only. This previously filtered on `h.variance` alone,
   // which kept 1-putts (they store variance '0') in the denominator — every
   // putt you HOLED diluted the pace percentages, worst at short range.
-  const varHoles = holes.filter(h => h.variance && parseInt(h.numPutts) >= 2);
+  const varHoles = pH.filter(h => h.variance && parseInt(h.numPutts) >= 2);
   const paceSplit = pool => {
     const sc = pool.filter(h=>SHORT_VAR.includes(h.variance)).length;
     const lo = pool.filter(h=>LONG_VAR.includes(h.variance)).length;
@@ -3083,13 +3104,159 @@ function brkHTML(label, mp, n) {
 }
 
 let activeStab = 'dist';
+let PUTT_TREND_METRIC = 'putts';
+
 function setStab(el, name) {
-  document.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));
+  [...el.parentElement.children].forEach(b=>b.classList.remove('on'));
   el.classList.add('on');
-  ['dist','slope','dir','miss','var'].forEach(t => {
+  ['dist','slope','dir','miss','var','trend'].forEach(t => {
     document.getElementById('stab-'+t).style.display = t===name?'block':'none';
   });
   activeStab = name;
+  if (name === 'trend') drawPuttTrend();
+}
+
+function setPuttTrendMetric(btn, m) {
+  PUTT_TREND_METRIC = m;
+  [...btn.parentElement.children].forEach(b => b.classList.toggle('on', b === btn));
+  drawPuttTrend();
+}
+
+function drawPuttTrend() {
+  const allRounds = [...loadRounds()].sort((a,b) => a.date.localeCompare(b.date));
+  const filtered  = PUTTING_FILTER === 'all' ? allRounds : allRounds.slice(-PUTTING_FILTER);
+  if (!filtered.length) return;
+
+  const per18 = (v, n) => n ? +((v / n) * 18).toFixed(1) : null;
+  const MON   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const rows = filtered.map(r => {
+    const ph = r.holes.filter(h => h.numPutts);
+    if (!ph.length) return null;
+    const toN  = h => h.numPutts === '4+' ? 4 : parseInt(h.numPutts);
+    const n    = ph.length;
+    const tot  = ph.reduce((s,h) => s + toN(h), 0);
+    const one  = ph.filter(h => h.numPutts === '1').length;
+    const thr  = ph.filter(h => toN(h) >= 3).length;
+    const sgH  = ph.filter(h => h.distance);
+    const sg   = sgH.length >= 5 ? per18(sgH.reduce((s,h) => s + holeSGP(h), 0), sgH.length) : null;
+    const d    = new Date(r.date + 'T12:00:00');
+    return {
+      label: `${d.getDate()} ${MON[d.getMonth()]}`,
+      putts: per18(tot, n),
+      three: pct(thr, n),
+      one:   pct(one, n),
+      sg,
+      n,
+    };
+  }).filter(Boolean);
+
+  if (!rows.length) return;
+
+  const specs = {
+    putts: { label:'Putts / 18', col:'#2563eb', fmt: v => v.toFixed(1), lower:true,
+             caption:'Total putts scaled to 18 holes. Tour ≈ 29.' },
+    three: { label:'3-Putt %',   col:'#dc2626', fmt: v => v+'%',        lower:true,
+             caption:'Share of holes taking 3 or more putts. Lower is better.' },
+    one:   { label:'1-Putt %',   col:'#16a34a', fmt: v => v+'%',        lower:false,
+             caption:'Holes holed from the first putt. Higher is better.' },
+    sg:    { label:'SG Putting / 18', col:'#7c3aed', fmt: v => (v>=0?'+':'')+v.toFixed(1), lower:false,
+             caption:'Strokes gained vs benchmark. Above 0 = better than benchmark.' },
+  };
+  const sp   = specs[PUTT_TREND_METRIC];
+  const vals = rows.map(r => r[PUTT_TREND_METRIC]);
+  const def  = vals.filter(v => v !== null);
+
+  const ctx = document.getElementById('chart-putt-trend');
+  if (!ctx) return;
+  if (charts['putt-trend']) charts['putt-trend'].destroy();
+
+  // 5-round rolling avg (only draw when ≥5 data points)
+  const rollingAvg = rows.length >= 5 ? vals.map((_, i) => {
+    const slice = vals.slice(Math.max(0, i-2), i+3).filter(v => v !== null);
+    return slice.length ? +(slice.reduce((a,b)=>a+b,0)/slice.length).toFixed(1) : null;
+  }) : null;
+
+  const datasets = [{
+    label: sp.label,
+    data: vals,
+    borderColor: sp.col,
+    backgroundColor: sp.col + '22',
+    tension: 0.3,
+    pointRadius: 5,
+    pointHoverRadius: 7,
+    fill: false,
+  }];
+  if (rollingAvg) datasets.push({
+    label: '5-round avg',
+    data: rollingAvg,
+    borderColor: sp.col + '88',
+    borderDash: [4,3],
+    tension: 0.4,
+    pointRadius: 0,
+    fill: false,
+  });
+
+  charts['putt-trend'] = new Chart(ctx.getContext('2d'), {
+    type: 'line',
+    data: { labels: rows.map(r=>r.label), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: datasets.length > 1,
+        labels: { boxWidth:12, font:{size:10}, color:'#6b7280' } } },
+      scales: {
+        y: {
+          reverse: sp.lower && false, // never flip — arrows in table handle direction
+          ticks: { callback: v => sp.fmt(v), font:{size:10} },
+          grid: { color:'#f3f4f6' },
+        },
+        x: { ticks: { font:{size:10}, maxRotation:45 }, grid:{display:false} },
+      },
+    },
+  });
+
+  // Summary table below chart
+  const best = sp.lower ? Math.min(...def) : Math.max(...def);
+  const recent3 = def.slice(-3);
+  const r3avg = recent3.length ? +(recent3.reduce((a,b)=>a+b,0)/recent3.length).toFixed(1) : null;
+  const allAvg = def.length ? +(def.reduce((a,b)=>a+b,0)/def.length).toFixed(1) : null;
+
+  document.getElementById('tbl-putt-trend').innerHTML = `
+    <div style="font-size:10px;color:#9ca3af;margin-bottom:10px">${sp.caption}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:#f8fafc;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:15px;font-weight:800;color:#1f2937">${allAvg !== null ? sp.fmt(allAvg) : '—'}</div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:2px">Avg (all)</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:15px;font-weight:800;color:#1f2937">${r3avg !== null ? sp.fmt(r3avg) : '—'}</div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:2px">Avg (last 3)</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:15px;font-weight:800;color:${sp.col}">${best !== undefined && isFinite(best) ? sp.fmt(best) : '—'}</div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:2px">${sp.lower?'Best (low)':'Best (high)'}</div>
+      </div>
+    </div>
+    <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <thead><tr style="color:#9ca3af">
+        <th style="text-align:left;padding:3px 2px">Round</th>
+        <th style="text-align:center;padding:3px 2px">Holes</th>
+        <th style="text-align:right;padding:3px 2px">${sp.label}</th>
+      </tr></thead>
+      <tbody>
+        ${[...rows].reverse().map(r => {
+          const v = r[PUTT_TREND_METRIC];
+          const isBest = v !== null && v === best;
+          return `<tr style="border-top:1px solid #f3f4f6">
+            <td style="padding:5px 2px;font-weight:600;color:#374151">${r.label}</td>
+            <td style="text-align:center;color:#9ca3af">${r.n}</td>
+            <td style="text-align:right;font-weight:${isBest?800:600};color:${v===null?'#d1d5db':isBest?sp.col:'#374151'}">
+              ${v !== null ? sp.fmt(v) : '—'}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
 }
 
 // Persistent warning on the dashboard once the backup is meaningfully behind
@@ -3123,6 +3290,7 @@ function renderBackupBanner() {
 //  DASHBOARD TABS + TRENDS
 // ═══════════════════════════════════════
 let DASH_TAB = 'trends', TREND_METRIC = 'score';
+let PUTTING_FILTER = 'all';
 let dashTrendChart = null;
 
 function setDashTab(btn, name) {
@@ -3136,6 +3304,12 @@ function setDashTab(btn, name) {
   // a canvas inside a hidden box lays out at zero, so draw on reveal
   if (name === 'trends')   drawDashTrend();
   if (name === 'approach') renderApproachTab();
+}
+
+function setPuttingFilter(btn, n) {
+  PUTTING_FILTER = n;
+  [...btn.parentElement.children].forEach(b => b.classList.toggle('on', b === btn));
+  renderDashboard();
 }
 
 function setTrendMetric(btn, m) {
@@ -3520,6 +3694,11 @@ function renderDashboard() {
   const allHoles = rounds.flatMap(r=>r.holes);
   const s = computeStats(allHoles);
 
+  // Filtered rounds for the putting tab
+  const pRounds = PUTTING_FILTER === 'all' ? rounds : rounds.slice(0, PUTTING_FILTER);
+  const pHoles  = pRounds.flatMap(r=>r.holes.filter(h=>h.numPutts));
+  const sP = pHoles.length ? computeStats(pHoles) : s;
+
   if (!s) {
     document.getElementById('db-empty').style.display = 'block';
     document.getElementById('db-content').style.display = 'none';
@@ -3530,18 +3709,19 @@ function renderDashboard() {
 
   // Per 18 HOLES, not per round: averaging a 9-hole round with an 18-hole one
   // gives a figure that describes neither. Rate x 18 is comparable either way.
-  const puttsPer18 = s.n ? ((s.totalPutts / s.n) * 18).toFixed(1) : null;
+  const puttsPer18 = sP.n ? ((sP.totalPutts / sP.n) * 18).toFixed(1) : null;
   document.getElementById('kpi-ppr').textContent    = puttsPer18 ?? '—';
-  document.getElementById('kpi-3p').textContent     = s.threePct!==null  ? s.threePct+'%' : '—';
-  document.getElementById('kpi-gir').textContent    = s.puttsPerGir ?? '—';
-  document.getElementById('kpi-avg').textContent    = s.avgPutts;
-  document.getElementById('kpi-rounds').textContent = `${rounds.length} / ${s.n}`;
+  document.getElementById('kpi-3p').textContent     = sP.threePct!==null  ? sP.threePct+'%' : '—';
+  document.getElementById('kpi-gir').textContent    = sP.puttsPerGir ?? '—';
+  document.getElementById('kpi-avg').textContent    = sP.avgPutts;
+  document.getElementById('kpi-rounds').textContent =
+    PUTTING_FILTER === 'all' ? `${rounds.length} / ${sP.n}` : `${pRounds.length} / ${sP.n}`;
 
   // ── v2 KPIs: strokes gained per round, feet holed per round ──────────────
   // SG is scaled to an 18-hole round so it's comparable to Tour figures.
   const sgEl = document.getElementById('kpi-sgp');
-  if (s.sgN >= 5) {
-    const sgRound = s.sgPerHole * 18;
+  if (sP.sgN >= 5) {
+    const sgRound = sP.sgPerHole * 18;
     sgEl.textContent = fmtSG(sgRound, 1);
     sgEl.style.color = sgRound >= 0 ? '#16a34a' : '#dc2626';
   } else { sgEl.textContent = '—'; sgEl.style.color = '#d1d5db'; }
@@ -3549,16 +3729,16 @@ function renderDashboard() {
   if (sgBaseEl) sgBaseEl.textContent = 'vs ' + sgBaseLabel();
 
   document.getElementById('kpi-feet').textContent =
-    s.n ? Math.round((s.feetMade / s.n) * 18) + "'" : '—';
-  document.getElementById('kpi-longest').textContent = s.longestMade ? s.longestMade + "'" : '—';
-  document.getElementById('kpi-avgdist').textContent = s.avgDist ? s.avgDist.toFixed(1) + "'" : '—';
+    sP.n ? Math.round((sP.feetMade / sP.n) * 18) + "'" : '—';
+  document.getElementById('kpi-longest').textContent = sP.longestMade ? sP.longestMade + "'" : '—';
+  document.getElementById('kpi-avgdist').textContent = sP.avgDist ? sP.avgDist.toFixed(1) + "'" : '—';
 
   renderScoringTab(s, rounds.length);
   renderByParTab(s);
   if (DASH_TAB === 'trends') drawDashTrend();
 
   // Distance chart + table
-  const ad = s.byDist.filter(d=>d.n>0);
+  const ad = sP.byDist.filter(d=>d.n>0);
   if (charts.dist) charts.dist.destroy();
   charts.dist = new Chart(document.getElementById('chart-dist').getContext('2d'),{
     type:'bar',
@@ -3580,7 +3760,7 @@ function renderDashboard() {
         <th style="text-align:right;padding:4px 2px">3-Putt%</th>
       </tr></thead>
       <tbody>
-        ${s.byDist.filter(d=>d.n>0).map(d=>`
+        ${sP.byDist.filter(d=>d.n>0).map(d=>`
           <tr style="border-top:1px solid #f3f4f6">
             <td style="padding:5px 2px;font-weight:600;color:#374151">${d.b}</td>
             <td style="text-align:center;color:#9ca3af">${d.n}</td>
@@ -3594,20 +3774,20 @@ function renderDashboard() {
   // Slope tab
   document.getElementById('stab-slope').innerHTML = `
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Make % by Slope</div>
-    ${s.bySlope.map(sl=>brkHTML(sl.l,sl.mp,sl.n)).join('')}
+    ${sP.bySlope.map(sl=>brkHTML(sl.l,sl.mp,sl.n)).join('')}
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">3-Putt % by Slope</div>
-    ${s.bySlope.map(sl=>brkHTML(sl.l,sl.tp,sl.n)).join('')}`;
+    ${sP.bySlope.map(sl=>brkHTML(sl.l,sl.tp,sl.n)).join('')}`;
 
   // Direction tab
   document.getElementById('stab-dir').innerHTML = `
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Make % by Break</div>
-    ${s.byDir.map(d=>brkHTML(d.l,d.mp,d.n)).join('')}
+    ${sP.byDir.map(d=>brkHTML(d.l,d.mp,d.n)).join('')}
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">3-Putt % by Break</div>
-    ${s.byDir.map(d=>brkHTML(d.l,d.tp,d.n)).join('')}`;
+    ${sP.byDir.map(d=>brkHTML(d.l,d.tp,d.n)).join('')}`;
 
   // Miss tab
-  const mt = s.mL+s.mS+s.mLo+s.mR;
-  const pv = s.paceVsLine;
+  const mt = sP.mL+sP.mS+sP.mLo+sP.mR;
+  const pv = sP.paceVsLine;
   const paceBar = (label, n, p, col) => !n ? '' : `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
       <div style="min-width:64px;font-size:11px;color:#374151;font-weight:600">${label}</div>
@@ -3682,19 +3862,19 @@ function renderDashboard() {
         The same short / pin-high / long split, by where the putt was from.
         Conditions with fewer than 3 misses are hidden.
       </div>
-      ${group('By distance',  s.varByDist.map(d => paceStack(d.b, d)))}
-      ${group('By slope',     s.varBySlope.map(d => paceStack(d.v==='flat'?'Flat':d.v==='up'?'Uphill':'Downhill', d)))}
-      ${group('By break',     s.varByDir.map(d => paceStack(d.v==='straight'?'Straight':d.v==='l-to-r'?'L→R':'R→L', d)))}
+      ${group('By distance',  sP.varByDist.map(d => paceStack(d.b, d)))}
+      ${group('By slope',     sP.varBySlope.map(d => paceStack(d.v==='flat'?'Flat':d.v==='up'?'Uphill':'Downhill', d)))}
+      ${group('By break',     sP.varByDir.map(d => paceStack(d.v==='straight'?'Straight':d.v==='l-to-r'?'L→R':'R→L', d)))}
     </div>`;
 
   document.getElementById('stab-miss').innerHTML = `
     ${paceVsLineHTML}
     ${paceByCondHTML}
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">Miss Side <span style="font-weight:400;text-transform:none;color:#cbd5e1">— the tag you picked</span></div>
-    ${mt?brkHTML('◀ Left',pct(s.mL,mt),s.mL)+brkHTML('▶ Right',pct(s.mR,mt),s.mR)+brkHTML('▼ Short',pct(s.mS,mt),s.mS)+brkHTML('▲ Long',pct(s.mLo,mt),s.mLo)
+    ${mt?brkHTML('◀ Left',pct(sP.mL,mt),sP.mL)+brkHTML('▶ Right',pct(sP.mR,mt),sP.mR)+brkHTML('▼ Short',pct(sP.mS,mt),sP.mS)+brkHTML('▲ Long',pct(sP.mLo,mt),sP.mLo)
        :'<p style="font-size:12px;color:#9ca3af">No miss data yet</p>'}
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#9ca3af;margin:12px 0 8px">Miss by Break Direction</div>
-    ${s.byMissByDir.filter(d=>d.total>0).map(d=>`
+    ${sP.byMissByDir.filter(d=>d.total>0).map(d=>`
       <div class="brk">
         <div class="brk-l" style="font-size:11px">${d.l}</div>
         <div style="display:flex;gap:6px;flex:1">
@@ -3705,7 +3885,7 @@ function renderDashboard() {
       </div>`).join('') || '<p style="font-size:12px;color:#9ca3af">No data yet</p>'}`;
 
   // Variance tab
-  const av = s.byVar.filter(v=>v.n>0);
+  const av = sP.byVar.filter(v=>v.n>0);
   if (charts.var) charts.var.destroy();
   charts.var = new Chart(document.getElementById('chart-var').getContext('2d'),{
     type:'bar',
@@ -3716,7 +3896,7 @@ function renderDashboard() {
       scales:{y:{ticks:{font:{size:10}},grid:{color:'#f3f4f6'}},
               x:{ticks:{font:{size:10}},grid:{display:false}}}}
   });
-  const varMax = Math.max(1, ...s.byVar.map(v=>v.n));
+  const varMax = Math.max(1, ...sP.byVar.map(v=>v.n));
   document.getElementById('tbl-var').innerHTML = `
     <div style="font-size:10px;color:#9ca3af;margin-bottom:6px">Where your first putt finished, on holes you did not hole out. 0 = pin-high.</div>
     <table style="width:100%;font-size:11px;border-collapse:collapse">
@@ -3727,7 +3907,7 @@ function renderDashboard() {
         <th style="text-align:right;padding:3px 2px">%</th>
       </tr></thead>
       <tbody>
-        ${s.byVar.filter(v=>v.n>0).map(v=>{
+        ${sP.byVar.filter(v=>v.n>0).map(v=>{
           const isZero = v.v==='0';
           const col = isZero ? '#2563eb' : v.v.startsWith('+') || v.v==='>+7' ? '#ea580c' : '#2563eb';
           return `
@@ -5842,6 +6022,27 @@ function scorecardHTML(r) {
     </table>
     <p class="sc-note">Circle = birdie or better, square = bogey, double square = double or worse.
       A dash means nothing was logged for that hole.</p>
+    ${(() => {
+      const ph = holes.filter(h => h.numPutts);
+      if (!ph.length) return '';
+      const c1 = ph.filter(h => h.numPutts === '1').length;
+      const c2 = ph.filter(h => h.numPutts === '2').length;
+      const c3 = ph.filter(h => parseInt(h.numPutts) === 3).length;
+      const c4 = ph.filter(h => h.numPutts === '4+' || parseInt(h.numPutts) >= 4).length;
+      const chip = holes.filter(h => !h.numPutts).length;
+      const pill = (n, label, col) => `<span style="display:inline-flex;align-items:center;gap:3px;
+        background:${col}18;border:1px solid ${col}40;border-radius:20px;padding:3px 9px;font-size:11px">
+        <b style="color:${col};font-size:13px">${n}</b>
+        <span style="color:#64748b">${label}</span></span>`;
+      return `<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+               margin-top:8px;padding-top:8px;border-top:1px solid #f0f3f7">
+        ${pill(c1,'1-putt','#16a34a')}
+        ${pill(c2,'2-putt','#2563eb')}
+        ${pill(c3,'3-putt','#d97706')}
+        ${c4 ? pill(c4,'4+-putt','#dc2626') : ''}
+        ${chip ? pill(chip,'chip-in','#7c3aed') : ''}
+      </div>`;
+    })()}
   </div>`;
 }
 
@@ -5926,7 +6127,7 @@ function openModal(id) {
      </div>`;
 
   document.getElementById('modal-body').innerHTML = `
-    <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">${dt} · ${s.n} holes</p>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">${dt} · ${r.holes.length} holes</p>
     ${scorecardHTML(r)}
     ${scoringBlock}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:14px">
