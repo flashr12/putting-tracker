@@ -5490,10 +5490,13 @@ function renderApproachTab() {
       <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:10px">
         Every logged approach, as you saw it. Darker is more often.
       </div>
-      <div style="display:grid;grid-template-columns:52px repeat(3,1fr);gap:4px">
+      <div style="display:grid;grid-template-columns:52px repeat(3,1fr) 36px;gap:4px">
         <div></div>
         ${['LEFT','ON LINE','RIGHT'].map(l => `<div style="font-size:8.5px;font-weight:800;color:#94a3b8;text-align:center">${l}</div>`).join('')}
-        ${[['long','LONG'],['pin','PIN HIGH'],['short','SHORT']].map(([d,dl]) => `
+        <div style="font-size:8.5px;font-weight:800;color:#94a3b8;text-align:center">TOT</div>
+        ${[['long','LONG'],['pin','PIN HIGH'],['short','SHORT']].map(([d,dl]) => {
+          const rowTotal = Math.round(['left','on','right'].reduce((s,sd) => s + a.cell(d,sd), 0) / a.n * 100);
+          return `
           <div style="font-size:8.5px;font-weight:800;color:#475569;display:flex;align-items:center">${dl}</div>
           ${['left','on','right'].map(sd => {
             const c = a.cell(d,sd), pctv = Math.round(c / a.n * 100);
@@ -5503,7 +5506,19 @@ function renderApproachTab() {
                          color:${c/maxCell>0.5?'#fff':'#475569'}">
                       <b style="font-size:14px;font-weight:800">${pctv}%</b>
                     </div>`;
-          }).join('')}`).join('')}
+          }).join('')}
+          <div style="height:40px;display:flex;align-items:center;justify-content:center">
+            <b style="font-size:12px;font-weight:800;color:${d==='pin'?'#16a34a':'#64748b'}">${rowTotal}%</b>
+          </div>`;
+        }).join('')}
+        <div></div>
+        ${['left','on','right'].map(sd => {
+          const colTotal = Math.round(['long','pin','short'].reduce((s,d) => s + a.cell(d,sd), 0) / a.n * 100);
+          return `<div style="display:flex;align-items:center;justify-content:center;padding-top:2px">
+            <b style="font-size:12px;font-weight:800;color:#64748b">${colTotal}%</b>
+          </div>`;
+        }).join('')}
+        <div></div>
       </div>
       <div style="font-size:11px;color:#64748b;line-height:1.6;margin-top:10px;border-top:1px solid #f3f4f6;padding-top:9px">
         ${a.shortPct > (a.longPct ?? 0) + 15
