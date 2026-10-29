@@ -739,7 +739,7 @@
   <div class="ntab on" id="tab-dashboard" onclick="showMain('dashboard')">Dashboard</div>
   <div class="ntab"    id="tab-round"     onclick="showMain('round')">New Round</div>
   <div class="ntab"    id="tab-history"   onclick="showMain('history')">History</div>
-  <div class="ntab"    id="tab-insights"  onclick="showMain('insights')">💡 Insights</div>
+  <div class="ntab"    id="tab-insights"  onclick="showMain('insights')">Insights</div>
   <div class="ntab"    id="tab-holes"     onclick="showMain('holes')">Holes</div>
   <div class="ntab"    id="tab-training"  onclick="showMain('training')">Practice</div>
 </div>
@@ -6503,66 +6503,69 @@ function confirmDelete() {
 //  HOLES TAB
 // ═══════════════════════════════════════
 let HOLES_COURSE = null;
+let HOLES_FILTER = 'all';
 
-function setHolesCourse(name) {
-  HOLES_COURSE = name;
-  renderHoles();
-}
+function setHolesCourse(name) { HOLES_COURSE = name; renderHoles(); }
+function setHolesFilter(f)    { HOLES_FILTER = f;    renderHoles(); }
 
 function renderHoles() {
   const el = document.getElementById('view-holes');
-  const rounds = loadRounds();
+  const allRounds = loadRounds();
 
-  // Collect courses with at least one scored hole
   const courseCounts = {};
-  rounds.forEach(r => {
-    if (r.course && r.holes.some(h => h.score != null && h.par)) {
+  allRounds.forEach(r => {
+    if (r.course && r.holes.some(h => h.score != null && h.par))
       courseCounts[r.course] = (courseCounts[r.course] || 0) + 1;
-    }
   });
   const courses = Object.entries(courseCounts).sort((a,b) => b[1]-a[1]).map(([c]) => c);
 
   if (!courses.length) {
-    el.innerHTML = `
-      <h2 style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px">Holes</h2>
+    el.innerHTML = `<h2 style="font-size:17px;font-weight:800;color:#1f2937;margin:0 0 4px">Holes</h2>
       <p style="font-size:13px;color:#9ca3af;margin-top:24px;text-align:center">No scored rounds yet.</p>`;
     return;
   }
 
   if (!HOLES_COURSE || !courses.includes(HOLES_COURSE)) HOLES_COURSE = courses[0];
 
-  const courseRounds = rounds.filter(r =>
-    r.course === HOLES_COURSE && r.holes.some(h => h.score != null && h.par));
+  let courseRounds = allRounds
+    .filter(r => r.course === HOLES_COURSE && r.holes.some(h => h.score != null && h.par))
+    .sort((a,b) => b.date.localeCompare(a.date));
+  const totalRounds = courseRounds.length;
+  if (HOLES_FILTER === 'last5')  courseRounds = courseRounds.slice(0, 5);
+  if (HOLES_FILTER === 'last10') courseRounds = courseRounds.slice(0, 10);
+  const usedRounds = courseRounds.length;
 
-  // Aggregate per hole number
-  const hd = {}; // n -> stats object
+  // Aggregate per hole
+  const hd = {};
   courseRounds.forEach(r => {
     r.holes.forEach(h => {
       if (h.score == null || !h.par) return;
-      if (!hd[h.n]) hd[h.n] = { par:h.par, att:0, scoreSum:0, birdies:0, blowups:0,
-                                  penRounds:0, penLeft:0, penRight:0, penOther:0 };
+      if (!hd[h.n]) hd[h.n] = {
+        par:h.par, att:0, scoreSum:0, birdies:0, blowups:0, penRounds:0,
+        fw:{ hit:0, left:0, right:0, sand:0, total:0 },
+        penFw:{ hit:0, left:0, right:0, sand:0 }
+      };
       const d = hd[h.n];
-      d.att++;
-      d.scoreSum += h.score;
-      if (h.score < h.par) d.birdies++;
+      d.att++; d.scoreSum += h.score;
+      if (h.score < h.par)      d.birdies++;
       if (h.score >= h.par + 2) d.blowups++;
-      if (h.penalty > 0) {
-        d.penRounds++;
-        if (h.fairway === 'left')       d.penLeft++;
-        else if (h.fairway === 'right') d.penRight++;
-        else                            d.penOther++;
+      if (h.penalty > 0)        d.penRounds++;
+      if (h.fairway && fairwayApplies(h)) {
+        d.fw[h.fairway] = (d.fw[h.fairway] || 0) + 1;
+        d.fw.total++;
+        if (h.penalty > 0) d.penFw[h.fairway] = (d.penFw[h.fairway] || 0) + 1;
       }
     });
   });
 
   const hNums = Object.keys(hd).map(Number).sort((a,b) => a-b);
-  const maxH  = Math.max(...hNums);
+  const maxH  = hNums.length ? Math.max(...hNums) : 0;
 
   const avgVP = n => {
     const d = hd[n];
     return d.att ? +((d.scoreSum - d.att * d.par) / d.att).toFixed(2) : null;
   };
-  const col = v => {
+  const scoreCol = v => {
     if (v === null) return '#9ca3af';
     if (v <= 0)   return '#16a34a';
     if (v <= 0.5) return '#ca8a04';
@@ -6571,147 +6574,186 @@ function renderHoles() {
   };
   const fmtV = v => v === null ? '—' : (v > 0 ? '+' : '') + v.toFixed(1);
 
-  // Front / back summary
-  let frontBackHTML = '';
+  // Color-code rows: best / middle / worst third by avg vs par
+  const sorted   = [...hNums].sort((a,b) => avgVP(a) - avgVP(b));
+  const third    = Math.ceil(sorted.length / 3);
+  const bestSet  = new Set(sorted.slice(0, third));
+  const worstSet = new Set(sorted.slice(-third));
+  const rowBg = n => bestSet.has(n) ? '#f0fdf4' : worstSet.has(n) ? '#fff1f2' : '#fff';
+
+  // Front / back nine summary
+  let fbHTML = '';
   if (maxH >= 10) {
-    const front = hNums.filter(n => n <= 9);
-    const back  = hNums.filter(n => n >= 10);
-    const nineAvg = arr => {
-      let sum = 0, rounds = 0;
+    const nineAvg = nArr => {
+      let sum = 0, cnt = 0;
       courseRounds.forEach(r => {
         let s = 0, ct = 0;
         r.holes.forEach(h => {
           if (h.score == null || !h.par) return;
-          if (arr.includes(h.n)) { s += h.score - h.par; ct++; }
+          if (nArr.includes(h.n)) { s += h.score - h.par; ct++; }
         });
-        if (ct > 0) { sum += s; rounds++; }
+        if (ct > 0) { sum += s; cnt++; }
       });
-      return rounds ? +(sum / rounds).toFixed(1) : null;
+      return cnt ? +(sum / cnt).toFixed(1) : null;
     };
-    const fa = nineAvg(front), ba = nineAvg(back);
+    const fa = nineAvg(hNums.filter(n => n <= 9));
+    const ba = nineAvg(hNums.filter(n => n >= 10));
     if (fa !== null && ba !== null) {
-      frontBackHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <div style="background:#fff;border-radius:6px;padding:12px;text-align:center;
-                    box-shadow:0 1px 3px rgba(0,0,0,.07)">
-          <div style="font-size:20px;font-weight:800;color:${col(fa/9)}">${fa>0?'+':''}${fa}</div>
+      fbHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <div style="background:#fff;border-radius:6px;padding:12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+          <div style="font-size:20px;font-weight:800;color:${scoreCol(fa/9)}">${fa>0?'+':''}${fa}</div>
           <div style="font-size:10px;font-weight:700;color:#64748b;margin-top:2px">FRONT 9 vs par</div>
-          <div style="font-size:9px;color:#94a3b8">avg per round</div>
+          <div style="font-size:9px;color:#94a3b8">avg / round</div>
         </div>
-        <div style="background:#fff;border-radius:6px;padding:12px;text-align:center;
-                    box-shadow:0 1px 3px rgba(0,0,0,.07)">
-          <div style="font-size:20px;font-weight:800;color:${col(ba/9)}">${ba>0?'+':''}${ba}</div>
+        <div style="background:#fff;border-radius:6px;padding:12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+          <div style="font-size:20px;font-weight:800;color:${scoreCol(ba/9)}">${ba>0?'+':''}${ba}</div>
           <div style="font-size:10px;font-weight:700;color:#64748b;margin-top:2px">BACK 9 vs par</div>
-          <div style="font-size:9px;color:#94a3b8">avg per round</div>
+          <div style="font-size:9px;color:#94a3b8">avg / round</div>
         </div>
       </div>`;
     }
   }
 
-  // Hole row
-  const holeRow = n => {
-    const d = hd[n];
-    const v = avgVP(n);
-    const barW = Math.min(100, Math.max(0, (v / 2) * 100));
+  // Centred section header with solid background
+  const secHdr = (label, bg='#1d4ed8') =>
+    `<div style="background:${bg};color:#fff;text-align:center;font-size:11px;font-weight:800;
+         letter-spacing:.09em;text-transform:uppercase;padding:8px 10px;
+         border-radius:6px 6px 0 0">${label}</div>`;
+
+  // Score table row — clean data, colour-coded background
+  const scoreRow = n => {
+    const d   = hd[n];
+    const v   = avgVP(n);
     const bPct = d.att ? Math.round(d.birdies  / d.att * 100) : 0;
     const dPct = d.att ? Math.round(d.blowups  / d.att * 100) : 0;
-    const pPct = d.att ? Math.round(d.penRounds/ d.att * 100) : 0;
-    return `<div style="display:flex;align-items:center;padding:6px 10px;
-                        border-bottom:1px solid #f1f5f9;background:#fff">
-      <div style="width:26px;font-size:11.5px;font-weight:800;color:#374151;flex-shrink:0">H${n}</div>
-      <div style="width:16px;font-size:9px;color:#94a3b8;flex-shrink:0;margin-right:2px">p${d.par}</div>
-      <div style="flex:1;margin:0 6px;position:relative;height:5px;background:#f1f5f9;border-radius:3px">
-        <div style="position:absolute;left:0;top:0;height:5px;border-radius:3px;
-                    width:${barW}%;background:${col(v)}"></div>
-      </div>
-      <div style="width:34px;text-align:right;font-size:13px;font-weight:800;color:${col(v)};flex-shrink:0">
-        ${fmtV(v)}</div>
-      <div style="width:34px;text-align:right;font-size:10px;color:#16a34a;font-weight:600;flex-shrink:0">
-        ${bPct ? bPct+'%🟢' : '<span style="color:#e2e8f0">—</span>'}</div>
-      <div style="width:34px;text-align:right;font-size:10px;color:#dc2626;font-weight:600;flex-shrink:0">
-        ${dPct ? dPct+'%🔴' : '<span style="color:#e2e8f0">—</span>'}</div>
-      <div style="width:28px;text-align:right;font-size:9px;color:${pPct?'#dc2626':'#94a3b8'};flex-shrink:0">
-        ${pPct ? '⚠'+pPct+'%' : ''}</div>
+    const pPct = d.att ? Math.round(d.penRounds / d.att * 100) : 0;
+    return `<div style="display:flex;align-items:center;padding:7px 10px;
+                        border-bottom:1px solid #f0f0f0;background:${rowBg(n)}">
+      <div style="width:28px;font-size:12px;font-weight:800;color:#374151;flex-shrink:0">H${n}</div>
+      <div style="width:22px;font-size:10px;color:#94a3b8;flex-shrink:0">p${d.par}</div>
+      <div style="width:46px;font-size:14px;font-weight:800;color:${scoreCol(v)};flex-shrink:0">${fmtV(v)}</div>
+      <div style="flex:1"></div>
+      <div style="width:40px;text-align:right;font-size:11px;color:#15803d;font-weight:600;flex-shrink:0">
+        ${bPct ? bPct+'%' : '<span style="color:#e2e8f0">—</span>'}</div>
+      <div style="width:40px;text-align:right;font-size:11px;color:#dc2626;font-weight:600;flex-shrink:0">
+        ${dPct ? dPct+'%' : '<span style="color:#e2e8f0">—</span>'}</div>
+      <div style="width:38px;text-align:right;font-size:11px;color:${pPct?'#b45309':'#e2e8f0'};font-weight:600;flex-shrink:0">
+        ${pPct ? pPct+'%' : '—'}</div>
     </div>`;
   };
 
-  // Penalty miss map — only holes with penalties
-  const penHoles = hNums.filter(n => hd[n].penRounds > 0);
-  const penHTML = penHoles.length ? `
-    <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
-         text-transform:uppercase;margin:16px 0 7px">Penalty miss map</div>
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;line-height:1.5">
-      Miss direction inferred from fairway entry on penalty holes.</div>
-    <div style="border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07)">
-      ${penHoles.map(n => {
-        const d = hd[n];
-        const pPct = Math.round(d.penRounds / d.att * 100);
-        const lPct = d.penRounds ? Math.round(d.penLeft  / d.penRounds * 100) : 0;
-        const rPct = d.penRounds ? Math.round(d.penRight / d.penRounds * 100) : 0;
-        const oPct = 100 - lPct - rPct;
-        const seg = (flex, bg, label) => flex > 0 ? `
-          <div style="flex:${flex};min-width:${flex<15?'28px':'0'};background:${bg};
-               border-radius:3px;padding:3px 5px;text-align:center;
-               font-size:10px;font-weight:800;color:#fff;white-space:nowrap">${label}</div>` : '';
-        return `<div style="padding:10px 12px;border-bottom:1px solid #f1f5f9;background:#fff">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
-            <span style="font-size:13px;font-weight:800;color:#1f2937">
-              Hole ${n} <span style="font-size:10px;font-weight:500;color:#94a3b8">par ${d.par}</span>
-            </span>
-            <span style="font-size:11.5px;font-weight:700;color:#dc2626">
-              ${d.penRounds}/${d.att} rounds · ${pPct}%</span>
-          </div>
-          <div style="display:flex;gap:4px;height:24px">
-            ${seg(lPct, '#3b82f6', '◀ L '+lPct+'%')}
-            ${seg(oPct, '#94a3b8', oPct+'%')}
-            ${seg(rPct, '#ef4444', rPct+'% R ▶')}
-          </div>
-        </div>`;
-      }).join('')}
-    </div>` : '';
+  // Fairway direction bar — all par 4s & 5s, with penalty rate per direction
+  const fwRow = n => {
+    const d = hd[n];
+    if (!fairwayApplies(d)) {
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+                          border-bottom:1px solid #f0f0f0;background:#fff">
+        <div style="width:28px;font-size:12px;font-weight:800;color:#374151;flex-shrink:0">H${n}</div>
+        <div style="width:22px;font-size:10px;color:#94a3b8;flex-shrink:0">p${d.par}</div>
+        <div style="font-size:10px;color:#cbd5e1">par 3 — no fairway tracked</div>
+      </div>`;
+    }
+    if (d.fw.total === 0) {
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+                          border-bottom:1px solid #f0f0f0;background:#fff">
+        <div style="width:28px;font-size:12px;font-weight:800;color:#374151;flex-shrink:0">H${n}</div>
+        <div style="width:22px;font-size:10px;color:#94a3b8;flex-shrink:0">p${d.par}</div>
+        <div style="font-size:10px;color:#cbd5e1">no fairway data yet</div>
+      </div>`;
+    }
+    const tot  = d.fw.total;
+    const pct  = k => Math.round((d.fw[k]  || 0) / tot * 100);
+    const penP = k => d.fw[k] ? Math.round((d.penFw[k] || 0) / d.fw[k] * 100) : 0;
+    const lPct = pct('left'), fwPct = pct('hit'), rPct = pct('right'), sPct = pct('sand');
+    const penL = penP('left'), penR = penP('right');
+    const seg = (flex, bg, label, pen) => {
+      if (!flex) return '';
+      const inner = flex >= 16
+        ? `${label}${pen ? `<br><span style="opacity:.85;font-size:8px">[Pen ${pen}%]</span>` : ''}`
+        : flex >= 6 ? label : '';
+      return `<div style="flex:${flex};background:${bg};display:flex;align-items:center;
+           justify-content:center;font-size:9px;font-weight:800;color:#fff;
+           text-align:center;line-height:1.3;overflow:hidden;padding:0 2px">${inner}</div>`;
+    };
+    return `<div style="border-bottom:1px solid #f0f0f0;background:#fff">
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px 4px">
+        <div style="width:28px;font-size:12px;font-weight:800;color:#374151;flex-shrink:0">H${n}</div>
+        <div style="width:22px;font-size:10px;color:#94a3b8;flex-shrink:0">p${d.par}</div>
+        <div style="font-size:9px;color:#94a3b8">${tot} rounds</div>
+      </div>
+      <div style="display:flex;height:34px;margin:0 10px 8px;border-radius:4px;overflow:hidden;gap:1px">
+        ${seg(lPct,  '#3b82f6', '◀ L '+lPct+'%', penL)}
+        ${seg(fwPct, '#16a34a', 'FW '+fwPct+'%', 0)}
+        ${seg(sPct,  '#d97706', '⛱ '+sPct+'%',   0)}
+        ${seg(rPct,  '#ef4444', rPct+'% R ▶',    penR)}
+      </div>
+    </div>`;
+  };
+
+  const dropdown = `<select onchange="setHolesCourse(this.value)"
+      style="border:1.5px solid #e2e8f0;border-radius:6px;padding:4px 8px;
+             font-size:13px;font-weight:600;color:#374151;background:#fff;cursor:pointer">
+      ${courses.map(c =>
+        `<option value="${c.replace(/"/g,'&quot;')}" ${c===HOLES_COURSE?'selected':''}>${c} (${courseCounts[c]})</option>`
+      ).join('')}
+    </select>`;
+
+  const pill = (f, lbl) =>
+    `<button onclick="setHolesFilter('${f}')"
+        style="border:1.5px solid ${HOLES_FILTER===f?'#2563eb':'#e2e8f0'};
+               background:${HOLES_FILTER===f?'#2563eb':'#fff'};
+               color:${HOLES_FILTER===f?'#fff':'#374151'};
+               border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer">${lbl}</button>`;
 
   el.innerHTML = `
-    <h2 style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px">Holes</h2>
-    <p style="font-size:11.5px;color:#94a3b8;margin-bottom:12px">
-      Score and strategy by hole, per course.</p>
-
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
-      ${courses.map(c => `<button onclick="setHolesCourse(${JSON.stringify(c)})"
-          style="border:1.5px solid ${c===HOLES_COURSE?'#2563eb':'#e2e8f0'};
-                 background:${c===HOLES_COURSE?'#2563eb':'#fff'};
-                 color:${c===HOLES_COURSE?'#fff':'#374151'};
-                 border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">
-          ${c} <span style="font-size:10px;opacity:.7">${courseCounts[c]}</span>
-        </button>`).join('')}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h2 style="font-size:17px;font-weight:800;color:#1f2937;margin:0">Holes</h2>
+      ${dropdown}
     </div>
 
-    ${courseRounds.length < 3 ? `<div style="background:#fffbeb;border:1px solid #fde68a;
-        border-radius:6px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:12px">
-        Only ${courseRounds.length} scored round${courseRounds.length!==1?'s':''} at ${HOLES_COURSE}
-        — stats will sharpen with more rounds.</div>` : ''}
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+      ${pill('last5','Last 5')}
+      ${pill('last10','Last 10')}
+      ${pill('all','All Time')}
+      <span style="font-size:10px;color:#94a3b8;margin-left:2px">${usedRounds} round${usedRounds!==1?'s':''}</span>
+    </div>
 
-    ${frontBackHTML}
+    ${usedRounds < 3 ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;
+        padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:12px">
+        Only ${usedRounds} round${usedRounds!==1?'s':''} — patterns will sharpen with more data.</div>` : ''}
 
-    <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
-         text-transform:uppercase;margin-bottom:7px">Score by hole</div>
-    <div style="border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:4px">
-      <div style="display:flex;align-items:center;padding:5px 10px;background:#f8fafc;
-                  border-bottom:1px solid #e2e8f0">
-        <div style="width:26px"></div>
-        <div style="width:18px"></div>
-        <div style="flex:1;margin:0 6px;font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase">
-          avg vs par →</div>
-        <div style="width:34px"></div>
-        <div style="width:34px;text-align:right;font-size:9px;font-weight:700;color:#16a34a">birdie</div>
-        <div style="width:34px;text-align:right;font-size:9px;font-weight:700;color:#dc2626">dbl+</div>
-        <div style="width:28px;text-align:right;font-size:9px;color:#94a3b8">pen</div>
+    ${fbHTML}
+
+    ${secHdr('Score by Hole')}
+    <div style="border-radius:0 0 6px 6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:5px">
+      <div style="display:flex;align-items:center;padding:5px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+        <div style="width:28px"></div>
+        <div style="width:22px"></div>
+        <div style="width:46px;font-size:9px;font-weight:700;color:#374151">avg</div>
+        <div style="flex:1"></div>
+        <div style="width:40px;text-align:right;font-size:9px;font-weight:700;color:#15803d">birdie</div>
+        <div style="width:40px;text-align:right;font-size:9px;font-weight:700;color:#dc2626">dbl+</div>
+        <div style="width:38px;text-align:right;font-size:9px;font-weight:700;color:#b45309">pen%</div>
       </div>
-      ${hNums.map(n => holeRow(n)).join('')}
+      ${hNums.map(n => scoreRow(n)).join('')}
     </div>
-    <div style="font-size:9px;color:#94a3b8;text-align:right;margin-bottom:2px">
-      🟢 birdie or better · 🔴 double or worse · ⚠ penalty rate</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;font-size:9px;color:#64748b;flex-wrap:wrap">
+      <span style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:3px;padding:1px 7px">■ best ${third}</span>
+      <span style="background:#fff1f2;border:1px solid #fecdd3;border-radius:3px;padding:1px 7px">■ worst ${third}</span>
+      <span style="color:#94a3b8">pen% = rounds with penalty ÷ rounds played</span>
+    </div>
 
-    ${penHTML}
+    ${secHdr('Tee Shot Direction', '#0f766e')}
+    <div style="border-radius:0 0 6px 6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+      <div style="display:flex;gap:8px;padding:6px 10px;background:#f0fdfa;border-bottom:1px solid #ccfbf1;flex-wrap:wrap;font-size:9px;font-weight:700">
+        <span style="background:#3b82f6;color:#fff;border-radius:3px;padding:1px 6px">◀ LEFT</span>
+        <span style="background:#16a34a;color:#fff;border-radius:3px;padding:1px 6px">FW HIT</span>
+        <span style="background:#d97706;color:#fff;border-radius:3px;padding:1px 6px">⛱ BUNKER</span>
+        <span style="background:#ef4444;color:#fff;border-radius:3px;padding:1px 6px">RIGHT ▶</span>
+        <span style="color:#0f766e;font-weight:400">[Pen X%] = penalty rate going that way</span>
+      </div>
+      ${hNums.map(n => fwRow(n)).join('')}
+    </div>
   `;
 }
 
