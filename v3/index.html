@@ -3002,12 +3002,13 @@ function computeStats(holes) {
   // variance records pace on EVERY missed putt, independently of the tag, so
   // it is the honest source for the pace axis.
   const missedFirst = misses.filter(h => h.variance);
-  const pcShort = missedFirst.filter(h => SHORT_VAR.includes(h.variance)).length;
-  const pcLong  = missedFirst.filter(h => LONG_VAR.includes(h.variance)).length;
-  const pcPin   = missedFirst.filter(h => h.variance === '0').length;
-  // Of the misses you tagged as a LINE miss, how many ALSO had a pace error?
+  // ±1ft putts are acceptable lags — count them with pin-high, not as pace errors
+  const pcShort = missedFirst.filter(h => SHORT_VAR.includes(h.variance) && h.variance !== '-1').length;
+  const pcLong  = missedFirst.filter(h => LONG_VAR.includes(h.variance) && h.variance !== '+1').length;
+  const pcPin   = missedFirst.filter(h => h.variance === '0' || h.variance === '-1' || h.variance === '+1').length;
+  // Of the misses you tagged as a LINE miss, how many ALSO had a significant pace error?
   const lineTagged  = missedFirst.filter(h => h.missDirection==='left' || h.missDirection==='right');
-  const lineAlsoOff = lineTagged.filter(h => h.variance !== '0').length;
+  const lineAlsoOff = lineTagged.filter(h => h.variance !== '0' && h.variance !== '-1' && h.variance !== '+1').length;
   const paceVsLine = {
     n: missedFirst.length,
     short: pcShort, long: pcLong, pin: pcPin,
@@ -3041,9 +3042,9 @@ function computeStats(holes) {
   // putt you HOLED diluted the pace percentages, worst at short range.
   const varHoles = pH.filter(h => h.variance && parseInt(h.numPutts) >= 2);
   const paceSplit = pool => {
-    const sc = pool.filter(h=>SHORT_VAR.includes(h.variance)).length;
-    const lo = pool.filter(h=>LONG_VAR.includes(h.variance)).length;
-    const pn = pool.filter(h=>h.variance === '0').length;
+    const sc = pool.filter(h=>SHORT_VAR.includes(h.variance) && h.variance !== '-1').length;
+    const lo = pool.filter(h=>LONG_VAR.includes(h.variance) && h.variance !== '+1').length;
+    const pn = pool.filter(h=>h.variance === '0' || h.variance === '-1' || h.variance === '+1').length;
     return { n:pool.length, short:sc, long:lo, pin:pn,
              shortPct:pct(sc,pool.length), longPct:pct(lo,pool.length),
              pinPct:pct(pn,pool.length) };
@@ -3806,9 +3807,9 @@ function renderDashboard() {
         variance, which is recorded on <i>every</i> miss — the left/right tag below
         only captures line.
       </div>
-      ${paceBar('Short',    pv.short, pv.shortPct, '#2563eb')}
-      ${paceBar('Pin-high', pv.pin,   pv.pinPct,   '#2563eb')}
-      ${paceBar('Long',     pv.long,  pv.longPct,  '#ea580c')}
+      ${paceBar('Short >1ft', pv.short, pv.shortPct, '#2563eb')}
+      ${paceBar('±1ft / pin-high', pv.pin, pv.pinPct, '#16a34a')}
+      ${paceBar('Long >1ft',  pv.long,  pv.longPct,  '#ea580c')}
       <div style="border-top:1px solid #e2e8f0;margin-top:9px;padding-top:9px;font-size:11.5px;color:#334155;line-height:1.5">
         <b>${pv.offPct}% of misses were short or long.</b>
         ${pv.lineN >= 5 ? `Even among the ${pv.lineN} you tagged as missing left or right,
@@ -3827,7 +3828,7 @@ function renderDashboard() {
     // Empty segments are dropped so a 0% slice cannot leave a stray divider
     const segs = [
       { p:o.shortPct, c:'#2563eb', t:'short' },
-      { p:o.pinPct,   c:'#2563eb', t:'pin'   },
+      { p:o.pinPct,   c:'#16a34a', t:'pin-high' },
       { p:o.longPct,  c:'#ea580c', t:'long'  },
     ].filter(x => x.p > 0);
     // The word only fits on a wide enough slice; narrow ones keep just the %
@@ -3859,7 +3860,7 @@ function renderDashboard() {
     <div style="background:#fff;border:1.5px solid #dde3ea;border-radius:4px;padding:12px;margin-bottom:14px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#334155;margin-bottom:3px">Pace by condition</div>
       <div style="font-size:10px;color:#94a3b8;line-height:1.45;margin-bottom:10px">
-        The same short / pin-high / long split, by where the putt was from.
+        Short/pin-high/long split by condition. ±1ft putts count as pin-high.
         Conditions with fewer than 3 misses are hidden.
       </div>
       ${group('By distance',  sP.varByDist.map(d => paceStack(d.b, d)))}
@@ -5446,6 +5447,8 @@ function renderApproachTab() {
   const pc = v => v === null ? '—' : v + '%';
   const heat = v => v === null ? '#f8fafc'
     : `rgba(234,88,12,${Math.min(.85, 0.08 + v / 100 * 1.6)})`;
+  const heatGreen = v => v === null ? '#f8fafc'
+    : `rgba(22,163,74,${Math.min(.85, 0.08 + v / 100 * 1.6)})`;
   const maxCell = Math.max(1, ...['long','pin','short'].flatMap(d =>
     ['left','on','right'].map(sd => a.cell(d,sd))));
 
@@ -5494,11 +5497,11 @@ function renderApproachTab() {
           <div style="font-size:8.5px;font-weight:800;color:#475569;display:flex;align-items:center">${dl}</div>
           ${['left','on','right'].map(sd => {
             const c = a.cell(d,sd), pctv = Math.round(c / a.n * 100);
-            return `<div style="height:40px;border-radius:4px;display:flex;flex-direction:column;
-                         align-items:center;justify-content:center;background:${heat(c/maxCell*100)};
+            const bg = d === 'pin' ? heatGreen(c/maxCell*100) : heat(c/maxCell*100);
+            return `<div style="height:40px;border-radius:4px;display:flex;align-items:center;
+                         justify-content:center;background:${bg};
                          color:${c/maxCell>0.5?'#fff':'#475569'}">
-                      <b style="font-size:13px;font-weight:800">${c}</b>
-                      <span style="font-size:8px;opacity:.8">${pctv}%</span>
+                      <b style="font-size:14px;font-weight:800">${pctv}%</b>
                     </div>`;
           }).join('')}`).join('')}
       </div>
@@ -5627,6 +5630,137 @@ const DRILLS = [
     why:'With no base you cannot sway, so the stroke has to come from the shoulders. If your distance control <i>improves</i> like this, your body is moving too much when you stand normally.' },
 ];
 
+// ── practice games ────────────────────────────────────────────────────────
+const GAMES = [
+  { id:'tenball', name:'10-Ball Challenge',
+    trains:'Proximity & pace', kit:'10 balls', mins:'5–10 min',
+    intro:'Pick a distance between 15–30 feet. Putt all 10 balls and score each one based on where it finishes. As seen in "Giving Grant Horvat a Putting Lesson" by The Lads.',
+    setup:'Place 10 balls at your chosen distance. Putt each one and tap the result.' }
+];
+
+const GAME_BEST_PREFIX = 'scratch-game-best-';
+let GAME_STATE = { id:null, ball:0, scores:[] };
+
+function startGame(id) {
+  GAME_STATE = { id, ball:0, scores:[] };
+  renderTraining();
+  setTimeout(() => {
+    const el = document.getElementById('game-' + id);
+    if (el) el.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  }, 50);
+}
+
+function recordBallScore(pts) {
+  if (!GAME_STATE.id || GAME_STATE.ball >= 10) return;
+  GAME_STATE.scores.push(pts);
+  GAME_STATE.ball++;
+  if (GAME_STATE.ball === 10) {
+    const total = GAME_STATE.scores.reduce((a,b) => a+b, 0);
+    const key = GAME_BEST_PREFIX + GAME_STATE.id;
+    try {
+      const prev = parseInt(localStorage.getItem(key));
+      if (isNaN(prev) || total > prev) localStorage.setItem(key, total);
+    } catch {}
+  }
+  renderTraining();
+}
+
+function resetGame() {
+  GAME_STATE = { id:null, ball:0, scores:[] };
+  renderTraining();
+}
+
+function gameCardHTML(g) {
+  const active = GAME_STATE.id === g.id;
+  const key = GAME_BEST_PREFIX + g.id;
+  let best = null;
+  try { const v = parseInt(localStorage.getItem(key)); if (!isNaN(v)) best = v; } catch {}
+
+  const total = GAME_STATE.scores.reduce((a,b) => a+b, 0);
+  const done = active && GAME_STATE.ball >= 10;
+
+  const dots = Array.from({length:10}, (_,i) => {
+    if (active && i < GAME_STATE.scores.length) {
+      const s = GAME_STATE.scores[i];
+      const col = s===5 ? '#16a34a' : s===3 ? '#2563eb' : s===1 ? '#d97706' : '#94a3b8';
+      return `<span style="width:28px;height:28px;border-radius:50%;background:${col};color:#fff;
+               display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${s}</span>`;
+    }
+    if (active && i === GAME_STATE.ball) {
+      return `<span style="width:28px;height:28px;border-radius:50%;border:2px solid #2563eb;
+               display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#2563eb;font-weight:700">${i+1}</span>`;
+    }
+    return `<span style="width:28px;height:28px;border-radius:50%;border:1px solid #e3e9f0;
+             background:#f7f9fc;display:inline-flex;align-items:center;justify-content:center;
+             font-size:11px;color:#cbd5e1">${i+1}</span>`;
+  }).join('');
+
+  const scoreDisplay = active ? `
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin:10px 0">${dots}</div>` : '';
+
+  const playBody = active && !done ? `
+    <div style="padding:0 12px 12px">
+      <div style="font-size:11.5px;color:#64748b;margin-bottom:10px;line-height:1.5">${g.setup}</div>
+      ${scoreDisplay}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:12px;color:#64748b">Ball <b style="color:#1f2937">${GAME_STATE.ball+1}</b> of 10</div>
+        <div style="font-size:14px;font-weight:800;color:#1f2937">${total} pts</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px">
+        <button onclick="recordBallScore(5)" style="padding:13px 6px;background:#dcfce7;border:2px solid #16a34a;
+          color:#15803d;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;line-height:1.4">
+          Holed<br><span style="font-size:10px;font-weight:400">5 pts</span></button>
+        <button onclick="recordBallScore(3)" style="padding:13px 6px;background:#eff6ff;border:2px solid #2563eb;
+          color:#1d4ed8;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;line-height:1.4">
+          Tap-in close<br><span style="font-size:10px;font-weight:400">within ~2ft · 3 pts</span></button>
+        <button onclick="recordBallScore(1)" style="padding:13px 6px;background:#fffbeb;border:2px solid #d97706;
+          color:#b45309;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;line-height:1.4">
+          Good lag<br><span style="font-size:10px;font-weight:400">within ~5ft · 1 pt</span></button>
+        <button onclick="recordBallScore(0)" style="padding:13px 6px;background:#f8fafc;border:2px solid #e2e8f0;
+          color:#64748b;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;line-height:1.4">
+          Outside<br><span style="font-size:10px;font-weight:400">0 pts</span></button>
+      </div>
+      <button onclick="resetGame()" style="width:100%;padding:8px;background:none;
+        color:#94a3b8;border:1px solid #e3e9f0;border-radius:6px;font-size:12px;cursor:pointer">Cancel</button>
+    </div>` : '';
+
+  const doneBody = done ? (() => {
+    const newBest = best !== null && total >= best;
+    const msg = total >= 45 ? 'Outstanding!' : total >= 35 ? 'Solid session.' : total >= 25 ? 'Good effort.' : 'Keep at it.';
+    const grade = total >= 45 ? '#16a34a' : total >= 35 ? '#2563eb' : total >= 25 ? '#d97706' : '#94a3b8';
+    return `<div style="padding:0 12px 12px">
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">${dots}</div>
+      <div style="text-align:center;padding:16px;background:#f0fdf4;border-radius:8px;margin-bottom:10px">
+        <div style="font-size:38px;font-weight:800;color:${grade}">${total}<span style="font-size:16px;color:#86efac">/50</span></div>
+        <div style="font-size:13px;color:#166534;margin-top:3px">${msg}${newBest ? ' New best!' : ''}</div>
+        ${best !== null ? `<div style="font-size:11px;color:#94a3b8;margin-top:3px">Best: ${best}/50</div>` : ''}
+      </div>
+      <button onclick="startGame('${g.id}')" style="width:100%;padding:10px;background:#2563eb;color:#fff;
+        border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">Play again</button>
+    </div>`;
+  })() : '';
+
+  const bestBadge = best !== null && !active
+    ? `<span style="font-size:10.5px;color:#2563eb;font-weight:700;margin-left:4px">Best: ${best}/50</span>` : '';
+
+  return `
+  <div id="game-${g.id}" style="background:#fff;border:1px solid ${active ? '#93c5fd' : '#e3e9f0'};
+       border-radius:4px;margin-bottom:8px;overflow:hidden">
+    <div style="padding:11px 12px;${active ? '' : 'cursor:pointer;'}display:flex;align-items:center;gap:9px"
+         onclick="${active ? '' : `startGame('${g.id}')`}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700;color:#1f2937">${g.name}</div>
+        <div style="font-size:10.5px;color:#94a3b8;margin-top:2px">
+          ${g.trains} · ${g.mins} · ${g.kit}${bestBadge}
+        </div>
+      </div>
+      ${active ? '' : '<span style="color:#2563eb;font-size:12px;font-weight:700;flex-shrink:0">Play ›</span>'}
+    </div>
+    ${active && !done ? `<div style="padding:0 12px 2px;font-size:11.5px;color:#64748b;line-height:1.45">${g.intro}</div>` : ''}
+    ${playBody}${doneBody}
+  </div>`;
+}
+
 // ── what to practise, from the rounds already logged ──────────────────────
 // Only speaks when there is enough data to mean it, and always says which
 // number it is reacting to — a recommendation with no reason is just noise.
@@ -5739,6 +5873,10 @@ function renderTraining() {
            ${plan.n} putts logged. From about 30 there is enough to point you at the right drill
            rather than guess.
          </div>`}
+
+    <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
+         text-transform:uppercase;margin:16px 0 7px">Practice games</div>
+    ${GAMES.map(g => gameCardHTML(g)).join('')}
 
     <div style="font-size:10px;font-weight:800;letter-spacing:.09em;color:#1d4ed8;
          text-transform:uppercase;margin:16px 0 7px">All drills</div>
