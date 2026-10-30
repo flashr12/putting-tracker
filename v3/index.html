@@ -6580,12 +6580,12 @@ function renderHoles() {
   };
   const fmtV = v => v === null ? '—' : (v > 0 ? '+' : '') + v.toFixed(1);
 
-  // Color-code rows: best / middle / worst third by avg vs par
+  // Best / worst third highlighted with a left border accent (no background fill)
   const sorted   = [...hNums].sort((a,b) => avgVP(a) - avgVP(b));
   const third    = Math.ceil(sorted.length / 3);
   const bestSet  = new Set(sorted.slice(0, third));
   const worstSet = new Set(sorted.slice(-third));
-  const rowBg = n => bestSet.has(n) ? '#86efac' : worstSet.has(n) ? '#fca5a5' : '#fff';
+  const rowAccent = n => bestSet.has(n) ? '#16a34a' : worstSet.has(n) ? '#dc2626' : 'transparent';
 
   // Front / back nine summary
   let fbHTML = '';
@@ -6626,24 +6626,27 @@ function renderHoles() {
          letter-spacing:.07em;text-transform:uppercase;padding:9px 10px;
          border-radius:6px 6px 0 0">${label}</div>`;
 
-  // Score table row — clean data, colour-coded background
+  // Score table row — stacked H#/par, big avg, large stat %s, left-border accent
   const scoreRow = n => {
     const d   = hd[n];
     const v   = avgVP(n);
     const bPct = d.att ? Math.round(d.birdies  / d.att * 100) : 0;
     const dPct = d.att ? Math.round(d.blowups  / d.att * 100) : 0;
     const pPct = d.att ? Math.round(d.penRounds / d.att * 100) : 0;
-    return `<div style="display:grid;grid-template-columns:32px 26px 58px 1fr 1fr 1fr;
-                        align-items:center;padding:8px 10px;
-                        border-bottom:1px solid #f0f0f0;background:${rowBg(n)}">
-      <div style="font-size:14px;font-weight:800;color:#374151">H${n}</div>
-      <div style="font-size:12px;color:#94a3b8">p${d.par}</div>
-      <div style="font-size:16px;font-weight:800;color:${scoreCol(v)}">${fmtV(v)}</div>
-      <div style="text-align:right;font-size:13px;color:#15803d;font-weight:600">
-        ${bPct ? bPct+'%' : '<span style="color:#e2e8f0">—</span>'}</div>
-      <div style="text-align:right;font-size:13px;color:#dc2626;font-weight:600">
-        ${dPct ? dPct+'%' : '<span style="color:#e2e8f0">—</span>'}</div>
-      <div style="text-align:right;font-size:13px;color:${pPct?'#b45309':'#e2e8f0'};font-weight:600">
+    return `<div style="display:grid;grid-template-columns:44px 68px 1fr 1fr 1fr;
+                        align-items:center;padding:9px 10px 9px 8px;
+                        border-bottom:1px solid #f0f0f0;background:#fff;
+                        border-left:4px solid ${rowAccent(n)}">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:#374151">H${n}</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px">p${d.par}</div>
+      </div>
+      <div style="font-size:20px;font-weight:800;color:${scoreCol(v)}">${fmtV(v)}</div>
+      <div style="text-align:right;font-size:15px;font-weight:700;color:#15803d">
+        ${bPct ? bPct+'%' : '<span style="color:#d1d5db">—</span>'}</div>
+      <div style="text-align:right;font-size:15px;font-weight:700;color:#dc2626">
+        ${dPct ? dPct+'%' : '<span style="color:#d1d5db">—</span>'}</div>
+      <div style="text-align:right;font-size:15px;font-weight:700;color:${pPct?'#b45309':'#d1d5db'}">
         ${pPct ? pPct+'%' : '—'}</div>
     </div>`;
   };
@@ -6654,11 +6657,13 @@ function renderHoles() {
     const isPar3 = (d.par || 4) <= 3;
     const midLabel = isPar3 ? 'GIR' : 'FW';
     if (d.fw.total === 0) {
-      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
-                          border-bottom:1px solid #f0f0f0;background:#fff">
-        <div style="width:32px;font-size:14px;font-weight:800;color:#374151;flex-shrink:0">H${n}</div>
-        <div style="width:26px;font-size:12px;color:#94a3b8;flex-shrink:0">p${d.par}</div>
-        <div style="font-size:12px;color:#cbd5e1">no direction data yet</div>
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 10px 10px 8px;
+                          border-bottom:1px solid #f0f0f0;background:#fff;border-left:4px solid transparent">
+        <div style="flex-shrink:0">
+          <div style="font-size:14px;font-weight:800;color:#374151">H${n}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:1px">p${d.par}</div>
+        </div>
+        <div style="font-size:13px;color:#cbd5e1">no direction data yet</div>
       </div>`;
     }
     const tot  = d.fw.total;
@@ -6669,24 +6674,24 @@ function renderHoles() {
     const MISS = '#3b82f6';
     const seg = (flex, bg, label, justify) => {
       if (!flex) return '';
-      const inner = flex >= 10 ? label : flex >= 5 ? label.replace(/ \d+%/, '') : '';
+      const inner = flex >= 12 ? label : flex >= 6 ? label.replace(/ \d+%/, '') : '';
       return `<div style="flex:${flex};background:${bg};display:flex;align-items:center;
-           justify-content:${justify};font-size:11px;font-weight:800;color:#fff;
-           padding:0 6px;overflow:hidden;white-space:nowrap">${inner}</div>`;
+           justify-content:${justify};font-size:14px;font-weight:800;color:#fff;
+           padding:0 8px;overflow:hidden;white-space:nowrap">${inner}</div>`;
     };
     const penAnnotRow = (penL || penR) ? `
-      <div style="display:flex;margin:2px 10px 6px;gap:1px">
-        ${lPct ? `<div style="flex:${lPct};font-size:10px;font-weight:700;color:${penL?'#dc2626':'transparent'};text-align:left">${penL?'⚠ Pen '+penL+'%':''}</div>` : ''}
+      <div style="display:flex;margin:3px 10px 7px;gap:1px">
+        ${lPct ? `<div style="flex:${lPct};font-size:12px;font-weight:700;color:${penL?'#dc2626':'transparent'};text-align:left">${penL?'⚠ Pen '+penL+'%':''}</div>` : ''}
         ${fwPct ? `<div style="flex:${fwPct}"></div>` : ''}
         ${sPct ? `<div style="flex:${sPct}"></div>` : ''}
-        ${rPct ? `<div style="flex:${rPct};font-size:10px;font-weight:700;color:${penR?'#dc2626':'transparent'};text-align:right">${penR?'⚠ Pen '+penR+'%':''}</div>` : ''}
+        ${rPct ? `<div style="flex:${rPct};font-size:12px;font-weight:700;color:${penR?'#dc2626':'transparent'};text-align:right">${penR?'⚠ Pen '+penR+'%':''}</div>` : ''}
       </div>` : '';
-    return `<div style="border-bottom:1px solid #f0f0f0;background:#fff">
-      <div style="display:flex;align-items:center;gap:6px;padding:8px 10px 4px">
-        <div style="width:32px;font-size:14px;font-weight:800;color:#374151;flex-shrink:0">H${n}</div>
-        <div style="width:26px;font-size:12px;color:#94a3b8;flex-shrink:0">p${d.par}</div>
+    return `<div style="border-bottom:1px solid #f0f0f0;background:#fff;border-left:4px solid transparent">
+      <div style="padding:9px 10px 4px 8px">
+        <span style="font-size:14px;font-weight:800;color:#374151">H${n}</span>
+        <span style="font-size:11px;color:#94a3b8;margin-left:6px">p${d.par}</span>
       </div>
-      <div style="display:flex;height:38px;margin:0 10px 4px;border-radius:4px;overflow:hidden;gap:1px">
+      <div style="display:flex;height:52px;margin:0 10px 4px;border-radius:4px;overflow:hidden;gap:1px">
         ${seg(lPct,  MISS,      '◀ '+lPct+'%',            'flex-start')}
         ${seg(fwPct, '#16a34a', midLabel+' '+fwPct+'%',   'center')}
         ${seg(sPct,  '#d97706', '⛱ '+sPct+'%',            'center')}
@@ -6732,20 +6737,27 @@ function renderHoles() {
 
     ${secHdr('Score by Hole')}
     <div style="border-radius:0 0 6px 6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:5px">
-      <div style="display:grid;grid-template-columns:32px 26px 58px 1fr 1fr 1fr;align-items:center;padding:6px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+      <div style="display:grid;grid-template-columns:44px 68px 1fr 1fr 1fr;align-items:center;
+                  padding:6px 10px 6px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;
+                  border-left:4px solid transparent">
         <div></div>
-        <div></div>
-        <div style="font-size:11px;font-weight:700;color:#374151">avg</div>
-        <div style="text-align:right;font-size:11px;font-weight:700;color:#15803d">Birdie</div>
-        <div style="text-align:right;font-size:11px;font-weight:700;color:#dc2626">Double+</div>
-        <div style="text-align:right;font-size:11px;font-weight:700;color:#b45309">Penalty</div>
+        <div style="font-size:13px;font-weight:700;color:#374151">avg</div>
+        <div style="text-align:right;font-size:13px;font-weight:700;color:#15803d">Birdie</div>
+        <div style="text-align:right;font-size:13px;font-weight:700;color:#dc2626">Double+</div>
+        <div style="text-align:right;font-size:13px;font-weight:700;color:#b45309">Penalty</div>
       </div>
       ${hNums.map(n => scoreRow(n)).join('')}
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px;font-size:11px;color:#64748b;flex-wrap:wrap;justify-content:center">
-      <span style="background:#86efac;border:1px solid #4ade80;border-radius:3px;padding:2px 8px">■ best ${third}</span>
-      <span style="background:#fca5a5;border:1px solid #f87171;border-radius:3px;padding:2px 8px">■ worst ${third}</span>
-      <span style="color:#94a3b8">Penalty = rounds with penalty ÷ rounds played</span>
+    <div style="display:flex;gap:14px;margin-bottom:16px;font-size:12px;color:#64748b;flex-wrap:wrap;justify-content:center;align-items:center">
+      <span style="display:flex;align-items:center;gap:5px">
+        <span style="width:4px;height:18px;background:#16a34a;border-radius:2px;display:inline-block;flex-shrink:0"></span>
+        <span style="color:#374151;font-weight:600">Best ${third} holes</span>
+      </span>
+      <span style="display:flex;align-items:center;gap:5px">
+        <span style="width:4px;height:18px;background:#dc2626;border-radius:2px;display:inline-block;flex-shrink:0"></span>
+        <span style="color:#374151;font-weight:600">Worst ${third} holes</span>
+      </span>
+      <span style="color:#94a3b8;font-size:11px">Penalty = rounds with ≥1 penalty ÷ rounds played</span>
     </div>
 
     ${secHdr(`Tee Shot Direction — ${usedRounds} round${usedRounds!==1?'s':''}`, '#0f766e')}
