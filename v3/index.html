@@ -617,6 +617,15 @@
     /* derived from the fairway you entered — visibly an assumption, not a choice */
     .chip.derived{background:#eef4ff;border-color:#93c5fd;color:#1d4ed8;border-style:dashed}
     .chip.fixed{background:#f1f4f8;border-color:#e3e9f0;color:#94a3b8;cursor:default}
+    .club-chip-row{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+                   padding:4px 10px 6px;scrollbar-width:none}
+    .club-chip-row::-webkit-scrollbar{display:none}
+    .club-chip{border:1px solid #475569;border-radius:7px;padding:6px 14px;
+               font-size:11px;font-weight:700;color:#94a3b8;background:#334155;
+               cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;
+               flex-shrink:0}
+    .club-chip.on{background:#3b82f6;border-color:#3b82f6;color:#fff}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
     /* FINISH as a plan view. No gaps between cells — it has to read as one
        continuous piece of ground, not nine buttons. The axes are drawn
        behind, so a selected cell covers them rather than being cut by them. */
@@ -742,6 +751,7 @@
   <div class="ntab"    id="tab-insights"  onclick="showMain('insights')">Insights</div>
   <div class="ntab"    id="tab-holes"     onclick="showMain('holes')">Holes</div>
   <div class="ntab"    id="tab-training"  onclick="showMain('training')">Practice</div>
+  <div class="ntab"    id="tab-setup"     onclick="showMain('setup')">Setup</div>
 </div>
 
 <!-- ════════════════════════════════════
@@ -754,6 +764,9 @@
 
   <!-- HOLES -->
   <div id="view-holes" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))"></div>
+
+  <!-- SETUP -->
+  <div id="view-setup" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))"></div>
 
   <!-- DASHBOARD -->
   <div id="view-dashboard" style="display:none; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom))">
@@ -1382,6 +1395,31 @@ const COURSE_KEY = 'scratch_courses';
 const STD_PARS = [4,4,3,4,5,4,3,4,5, 4,5,4,3,4,4,3,5,4];   // a conventional 72
 function loadCourses()  { try { return JSON.parse(localStorage.getItem(COURSE_KEY)) || {}; } catch { return {}; } }
 function saveCourses(c) { localStorage.setItem(COURSE_KEY, JSON.stringify(c)); }
+
+// ── Clubs: which clubs appear in scoring chip rows ───────────────────────
+const CLUB_KEY = 'scratch_clubs';
+const DEFAULT_CLUBS = [
+  {name:'Dr', tee:true,appr:true,custom:false},
+  {name:'3W', tee:true,appr:true,custom:false},
+  {name:'3H', tee:true,appr:true,custom:false},
+  {name:'4i', tee:true,appr:true,custom:false},
+  {name:'5i', tee:true,appr:true,custom:false},
+  {name:'6i', tee:true,appr:true,custom:false},
+  {name:'7i', tee:true,appr:true,custom:false},
+  {name:'8i', tee:true,appr:true,custom:false},
+  {name:'9i', tee:true,appr:true,custom:false},
+  {name:'PW', tee:true,appr:true,custom:false},
+  {name:'GW', tee:true,appr:true,custom:false},
+  {name:'52°',tee:true,appr:true,custom:false},
+  {name:'54°',tee:true,appr:true,custom:false},
+  {name:'60°',tee:true,appr:true,custom:false},
+];
+function loadClubs() {
+  try { return JSON.parse(localStorage.getItem(CLUB_KEY)) || DEFAULT_CLUBS; }
+  catch { return DEFAULT_CLUBS; }
+}
+function saveClubs(c) { localStorage.setItem(CLUB_KEY, JSON.stringify(c)); }
+
 function courseKey(name){ return (name||'').trim().toLowerCase(); }
 function getCoursePars(name) {
   const c = loadCourses()[courseKey(name)];
@@ -1414,6 +1452,7 @@ function blankHole(n, par) {
   // being saved. It is never required for a hole to count as logged.
   return { n, par: par || 4, score:null, scoreSet:false, fairway:null, penalty:0,
            sand:0,
+           teeClub:null, apprClub:null,
            apprDist:null, apprDepth:null, apprSide:null, apprLie:null,
            distance:null, slope:null, direction:null, numPutts:null,
            variance:null, missDirection:null, gir:null };
@@ -1516,7 +1555,7 @@ function missIcon(v) {
 //  MAIN VIEW ROUTING
 // ═══════════════════════════════════════
 function showMain(name) {
-  const scrollViews = ['dashboard','history','training','holes'];
+  const scrollViews = ['dashboard','history','training','holes','setup'];
   document.getElementById('scroll-main').style.display  = scrollViews.includes(name) ? 'block' : 'none';
   document.getElementById('round-shell').style.display  = (name==='round') ? 'flex' : 'none';
   document.getElementById('view-dashboard').style.display = (name==='dashboard') ? 'block' : 'none';
@@ -1524,7 +1563,8 @@ function showMain(name) {
   document.getElementById('view-insights').style.display  = (name==='insights') ? 'flex' : 'none';
   document.getElementById('view-training').style.display  = (name==='training') ? 'block' : 'none';
   document.getElementById('view-holes').style.display     = (name==='holes') ? 'block' : 'none';
-  ['dashboard','round','history','insights','holes','training'].forEach(v => {
+  document.getElementById('view-setup').style.display     = (name==='setup') ? 'block' : 'none';
+  ['dashboard','round','history','insights','holes','training','setup'].forEach(v => {
     document.getElementById('tab-'+v).classList.toggle('on', v===name);
   });
   if (name==='dashboard') renderDashboard();
@@ -1532,6 +1572,7 @@ function showMain(name) {
   if (name==='insights')  renderInsights();
   if (name==='training')  renderTraining();
   if (name==='holes')     renderHoles();
+  if (name==='setup')     renderSetup();
   if (name==='round' && !AR) {
     const draft = loadDraft();
     if (draft?.AR) {
@@ -1761,7 +1802,7 @@ function renderPills() {
     let cls = i===AH ? 'hp cur' : isHoleDone(h) ? 'hp done' : 'hp';
     // everything filled but the score never confirmed — the one thing left
     if (isHoleLogged(h) && scoreAssumed(h)) cls += ' unsure';
-    return `<div class="${cls}" onclick="jumpHole(${i})" id="pill-${i}">${h.n}</div>`;
+    return `<div class="${cls}" onclick="jumpHole(${i});showHoleStats(${h.n})" id="pill-${i}">${h.n}</div>`;
   }).join('');
   // scroll active pill into view
   setTimeout(()=>{
@@ -1783,6 +1824,38 @@ function renderAccordion() {
   updateBottomNav();
   initDrums(AH);
   area.scrollTop = 0;   // form always starts at the top of the viewport
+}
+
+function showHoleStats(hNum) {
+  const course = AR && AR.course;
+  if (!course) return;
+  const courseRounds = loadRounds()
+    .filter(r => r.course === course && r.holes.some(h => h.score != null && h.par))
+    .sort((a,b) => b.date.localeCompare(a.date));
+  const cardHTML = buildHoleCardHTML(hNum, courseRounds);
+  let sheet = document.getElementById('hole-stats-sheet');
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'hole-stats-sheet';
+    document.body.appendChild(sheet);
+  }
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:200;display:block';
+  sheet.innerHTML = `
+    <div onclick="closeHoleStats()" style="position:absolute;inset:0;background:rgba(0,0,0,.5)"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;background:#f8fafc;
+         border-radius:16px 16px 0 0;max-height:85vh;overflow-y:auto;
+         animation:slideUp .25s ease-out;-webkit-overflow-scrolling:touch">
+      <div style="text-align:center;padding:10px 0 2px;position:sticky;top:0;background:#f8fafc;z-index:1">
+        <div style="width:36px;height:4px;background:#cbd5e1;border-radius:2px;margin:0 auto"></div>
+      </div>
+      <div style="padding:4px 14px 28px">
+        ${cardHTML || '<p style="text-align:center;color:#9ca3af;padding:24px 0">No data yet for Hole '+hNum+' at '+course+'.</p>'}
+      </div>
+    </div>`;
+}
+function closeHoleStats() {
+  const s = document.getElementById('hole-stats-sheet');
+  if (s) s.style.display = 'none';
 }
 
 function buildCurrentHoleHTML(i) {
@@ -1815,6 +1888,182 @@ function subHead(text, infoId, appr) {
 }
 function flInfo(infoId, text) {
   return `<div class="fl-info" id="${infoId}" style="display:none">${text}</div>`;
+}
+
+// ── Club chip row helper ─────────────────────────────────────────────────
+function clubChipRowHTML(h, i, kind) {
+  const clubs = loadClubs().filter(c => kind === 'tee' ? c.tee : c.appr);
+  if (!clubs.length) return '';
+  const sel = kind === 'tee' ? h.teeClub : h.apprClub;
+  return clubs.map(c => {
+    const nm = c.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="club-chip${sel===c.name?' on':''}" onclick="onClubChip(${i},'${kind}','${nm}')">${c.name}</div>`;
+  }).join('');
+}
+function onClubChip(i, kind, name) {
+  const h = AR.holes[i];
+  const cur = kind === 'tee' ? h.teeClub : h.apprClub;
+  if (kind === 'tee') h.teeClub = cur === name ? null : name;
+  else h.apprClub = cur === name ? null : name;
+  saveDraft();
+  const rowEl = document.getElementById('club-chip-' + kind + '-' + i);
+  if (rowEl) rowEl.innerHTML = clubChipRowHTML(h, i, kind);
+}
+
+// ── Per-hole stats card (used by Holes tab and in-round bottom sheet) ────
+function buildHoleCardHTML(hNum, courseRounds) {
+  let att=0, scoreSum=0, birdies=0, blowups=0, penRounds=0, par=4;
+  const fw={left:0,hit:0,right:0,total:0};
+  const penFw={left:0,right:0};
+  const clubDir={};   // tee club → {left,hit,right,total,penLeft,penRight}
+  const clubScore={}; // appr club → {att,scoreSum,birdies,blowups,penRounds}
+
+  courseRounds.forEach(r => {
+    const h = r.holes.find(hh => hh.n === hNum && hh.score != null && hh.par);
+    if (!h) return;
+    par = h.par;
+    att++; scoreSum += h.score;
+    if (h.score < h.par) birdies++;
+    if (h.score >= h.par + 2) blowups++;
+    if (h.penalty > 0) penRounds++;
+
+    // Aggregate tee direction
+    let dirKey = null;
+    if (fairwayApplies(h) && h.fairway) dirKey = h.fairway;
+    else if (!fairwayApplies(h) && h.apprSide) dirKey = h.apprSide === 'on' ? 'hit' : h.apprSide;
+    if (dirKey) {
+      fw[dirKey] = (fw[dirKey]||0)+1; fw.total++;
+      if (h.penalty>0) penFw[dirKey] = (penFw[dirKey]||0)+1;
+    }
+
+    // By tee club direction
+    if (h.teeClub && dirKey) {
+      if (!clubDir[h.teeClub]) clubDir[h.teeClub]={left:0,hit:0,right:0,total:0,penLeft:0,penRight:0};
+      const cd=clubDir[h.teeClub];
+      cd[dirKey]=(cd[dirKey]||0)+1; cd.total++;
+      if (h.penalty>0){ if(dirKey==='left') cd.penLeft++; else if(dirKey==='right') cd.penRight++; }
+    }
+
+    // By approach club score (par 3 uses teeClub as approach)
+    const ac = h.par===3 ? h.teeClub : h.apprClub;
+    if (ac) {
+      if (!clubScore[ac]) clubScore[ac]={att:0,scoreSum:0,birdies:0,blowups:0,penRounds:0};
+      const cs=clubScore[ac];
+      cs.att++; cs.scoreSum+=h.score;
+      if (h.score<h.par) cs.birdies++;
+      if (h.score>=h.par+2) cs.blowups++;
+      if (h.penalty>0) cs.penRounds++;
+    }
+  });
+
+  if (!att) return null;
+
+  const scoreColor = v => {
+    if (v===null) return '#9ca3af';
+    if (v<=0) return '#16a34a'; if (v<=0.5) return '#ca8a04';
+    if (v<=1.0) return '#ea580c'; return '#dc2626';
+  };
+  const fmtV = v => v===null?'—':(v>0?'+':'')+v.toFixed(1);
+
+  const dirBar = (fwD, penD) => {
+    const dt = (fwD.left||0)+(fwD.hit||0)+(fwD.right||0);
+    if (!dt) return '<div style="font-size:12px;color:#cbd5e1;padding:4px 0">no direction data</div>';
+    const pct = k => Math.round((fwD[k]||0)/dt*100);
+    const penP = k => fwD[k] ? Math.round((penD[k]||0)/fwD[k]*100) : 0;
+    const lP=pct('left'), fwP=pct('hit'), rP=pct('right');
+    const penL=penP('left'), penR=penP('right');
+    const seg=(flex,bg,lbl,jus)=>{
+      if(!flex) return '';
+      const inner=flex>=12?lbl:flex>=6?lbl.replace(/ ?\d+%/,''):'';
+      return `<div style="flex:${flex};background:${bg};display:flex;align-items:center;justify-content:${jus};font-size:12px;font-weight:800;color:#fff;padding:0 6px;overflow:hidden;white-space:nowrap;border-radius:3px">${inner}</div>`;
+    };
+    const pa=(penL||penR)?`<div style="display:flex;margin-top:3px">
+      ${lP?`<div style="flex:${lP};text-align:left;font-size:11px;font-weight:600;color:${penL?'#dc2626':'transparent'}">${penL?'P: '+penL+'%':''}</div>`:''}
+      ${fwP?`<div style="flex:${fwP}"></div>`:''}
+      ${rP?`<div style="flex:${rP};text-align:right;font-size:11px;font-weight:600;color:${penR?'#dc2626':'transparent'}">${penR?'P: '+penR+'%':''}</div>`:''}
+    </div>`:'';
+    return `<div style="display:flex;gap:3px;height:34px">${seg(lP,'#3b82f6','◀ '+lP+'%','flex-start')}${seg(fwP,'#16a34a',fwP+'%','center')}${seg(rP,'#3b82f6',rP+'% ▶','flex-end')}</div>${pa}`;
+  };
+
+  const avgV = +((scoreSum - att*par)/att).toFixed(2);
+  const bPct = Math.round(birdies/att*100);
+  const dPct = Math.round(blowups/att*100);
+  const pPct = Math.round(penRounds/att*100);
+
+  const clubDirRows = Object.entries(clubDir)
+    .filter(([,cd])=>cd.total>0)
+    .sort((a,b)=>b[1].total-a[1].total)
+    .map(([club,cd])=>`
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 12px;border-top:1px solid #f1f5f9">
+        <div style="width:50px;flex-shrink:0;padding-top:8px">
+          <div style="font-size:13px;font-weight:700;color:#374151">${club}</div>
+          <div style="font-size:11px;color:#9ca3af;font-style:italic">(${cd.total})</div>
+        </div>
+        <div style="flex:1">${dirBar(cd,{left:cd.penLeft,right:cd.penRight})}</div>
+      </div>`).join('');
+
+  const clubScoreRows = Object.entries(clubScore)
+    .filter(([,cs])=>cs.att>0)
+    .sort((a,b)=>b[1].att-a[1].att)
+    .map(([club,cs])=>{
+      const av=+((cs.scoreSum-cs.att*par)/cs.att).toFixed(2);
+      const bp=Math.round(cs.birdies/cs.att*100);
+      const dp=Math.round(cs.blowups/cs.att*100);
+      const pp=Math.round(cs.penRounds/cs.att*100);
+      return `<div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr 1fr;align-items:center;padding:7px 12px;border-top:1px solid #e5e7eb">
+        <div><span style="font-size:13px;font-weight:700;color:#374151">${club}</span><span style="font-size:11px;color:#9ca3af;font-weight:400"> (${cs.att})</span></div>
+        <div style="text-align:center;font-size:12px;font-weight:700;color:${scoreColor(av)}">${fmtV(av)}</div>
+        <div style="text-align:center;font-size:12px;font-weight:700;color:${bp?'#15803d':'#d1d5db'}">${bp?bp+'%':'—'}</div>
+        <div style="text-align:center;font-size:12px;font-weight:700;color:${dp?'#dc2626':'#d1d5db'}">${dp?dp+'%':'—'}</div>
+        <div style="text-align:center;font-size:12px;font-weight:700;color:${pp?'#b45309':'#d1d5db'}">${pp?pp+'%':'—'}</div>
+      </div>`;
+    }).join('');
+
+  const hasClubDir   = Object.values(clubDir).some(cd=>cd.total>0);
+  const hasClubScore = Object.values(clubScore).some(cs=>cs.att>0);
+
+  return `<div style="background:#fff;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden">
+    <div style="background:#0f766e;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:800;color:#fff">Hole ${hNum} [par ${par}]</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.7)">(${att} round${att!==1?'s':''})</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:7px 12px;background:#f1f5f9;border-bottom:1px solid #e2e8f0">
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#374151">Average</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#15803d">Birdie</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#dc2626">Double+</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#b45309">Penalty</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:9px 12px;background:#fff;border-left:4px solid #16a34a">
+      <div style="text-align:center;font-size:13px;font-weight:700;color:${scoreColor(avgV)}">${fmtV(avgV)}</div>
+      <div style="text-align:center;font-size:13px;font-weight:700;color:${bPct?'#15803d':'#d1d5db'}">${bPct?bPct+'%':'—'}</div>
+      <div style="text-align:center;font-size:13px;font-weight:700;color:${dPct?'#dc2626':'#d1d5db'}">${dPct?dPct+'%':'—'}</div>
+      <div style="text-align:center;font-size:13px;font-weight:700;color:${pPct?'#b45309':'#d1d5db'}">${pPct?pPct+'%':'—'}</div>
+    </div>
+    <div style="background:#0f766e;text-align:center;padding:7px 12px;margin-top:6px;font-size:12px;font-weight:800;color:#fff;letter-spacing:.06em">
+      TEE SHOT DIRECTION
+    </div>
+    <div style="padding:10px 12px;background:#fff">${dirBar(fw,penFw)}</div>
+    ${hasClubDir?`
+    <div style="background:#e5e7eb;padding:6px 12px;display:flex;align-items:center;justify-content:center;gap:6px">
+      <span style="font-size:12px;font-weight:700;color:#374151">By Club</span>
+      <span onclick="var t=document.getElementById('hcd-tip-${hNum}');t.style.display=t.style.display==='none'?'block':'none'"
+            style="width:16px;height:16px;border-radius:50%;background:#9ca3af;color:#fff;font-size:10px;font-weight:700;font-style:italic;
+                   display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">i</span>
+    </div>
+    <div id="hcd-tip-${hNum}" style="display:none;font-size:11px;color:#4b5563;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:8px 12px;margin:4px 12px">
+      Direction breakdown by the club you used off the tee on this hole.
+    </div>
+    <div>${clubDirRows}</div>`:''}
+    ${hasClubScore?`
+    <div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr 1fr;padding:6px 12px;background:#e5e7eb;align-items:center;margin-top:6px">
+      <div style="font-size:12px;font-weight:700;color:#374151">Club</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#374151">Avg</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#15803d">Birdie</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#dc2626">Dbl+</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#b45309">Pen</div>
+    </div>
+    ${clubScoreRows}`:''}
+  </div>`;
 }
 function toggleInfo(id) {
   const el = document.getElementById(id);
@@ -1907,6 +2156,7 @@ function buildHoleFormHTML(h, i) {
       <button class="hbtn" onclick="bumpScore(${i},1)" aria-label="One more">+</button>
     </div>
     ${fairwayApplies(h) ? `
+    <div id="club-chip-tee-${i}" class="club-chip-row">${clubChipRowHTML(h, i, 'tee')}</div>
     <div class="fw3" id="fw-${i}" style="grid-template-columns:1fr 1fr 1fr 1fr">
       <button class="fwb${fwU}${fw==='left' ?' on':''}" onclick="setFairway(${i},'left')">◀ Left</button>
       <button class="fwb${fwU}${fw==='hit'  ?' on':''}" onclick="setFairway(${i},'hit')">Fairway</button>
@@ -1973,6 +2223,8 @@ function buildHoleFormHTML(h, i) {
                          id="gl-${i}-${v}" onclick="onApprLie(${i},'${v}')">${l}</div>`;
           }).join('')}
     </div>
+
+    <div id="club-chip-${isPar3?'tee':'appr'}-${i}" class="club-chip-row">${clubChipRowHTML(h, i, isPar3 ? 'tee' : 'appr')}</div>
 
     <div class="arow" style="grid-template-columns:52px 1fr">
       <div class="arow-l">YARDS</div>
@@ -6535,160 +6787,9 @@ function renderHoles() {
   if (HOLES_FILTER === 'last10') courseRounds = courseRounds.slice(0, 10);
   const usedRounds = courseRounds.length;
 
-  // Aggregate per hole
-  const hd = {};
-  courseRounds.forEach(r => {
-    r.holes.forEach(h => {
-      if (h.score == null || !h.par) return;
-      if (!hd[h.n]) hd[h.n] = {
-        par:h.par, att:0, scoreSum:0, birdies:0, blowups:0, penRounds:0,
-        fw:{ hit:0, left:0, right:0, sand:0, total:0 },
-        penFw:{ hit:0, left:0, right:0, sand:0 }
-      };
-      const d = hd[h.n];
-      d.att++; d.scoreSum += h.score;
-      if (h.score < h.par)      d.birdies++;
-      if (h.score >= h.par + 2) d.blowups++;
-      if (h.penalty > 0)        d.penRounds++;
-      if (h.fairway && fairwayApplies(h)) {
-        d.fw[h.fairway] = (d.fw[h.fairway] || 0) + 1;
-        d.fw.total++;
-        if (h.penalty > 0) d.penFw[h.fairway] = (d.penFw[h.fairway] || 0) + 1;
-      } else if (!fairwayApplies(h) && h.apprSide) {
-        // For par 3s, the tee shot IS the approach: use approach side as direction
-        const key = h.apprSide === 'on' ? 'hit' : h.apprSide;
-        d.fw[key] = (d.fw[key] || 0) + 1;
-        d.fw.total++;
-        if (h.penalty > 0) d.penFw[key] = (d.penFw[key] || 0) + 1;
-      }
-    });
-  });
-
-  const hNums = Object.keys(hd).map(Number).sort((a,b) => a-b);
-  const maxH  = hNums.length ? Math.max(...hNums) : 0;
-
-  const avgVP = n => {
-    const d = hd[n];
-    return d.att ? +((d.scoreSum - d.att * d.par) / d.att).toFixed(2) : null;
-  };
-  const scoreCol = v => {
-    if (v === null) return '#9ca3af';
-    if (v <= 0)   return '#16a34a';
-    if (v <= 0.5) return '#ca8a04';
-    if (v <= 1.0) return '#ea580c';
-    return '#dc2626';
-  };
-  const fmtV = v => v === null ? '—' : (v > 0 ? '+' : '') + v.toFixed(1);
-
-  // Best / worst third highlighted with a left border accent (no background fill)
-  const sorted   = [...hNums].sort((a,b) => avgVP(a) - avgVP(b));
-  const third    = Math.ceil(sorted.length / 3);
-  const bestSet  = new Set(sorted.slice(0, third));
-  const worstSet = new Set(sorted.slice(-third));
-  const rowAccent = n => bestSet.has(n) ? '#16a34a' : worstSet.has(n) ? '#dc2626' : 'transparent';
-
-  // Front / back nine summary
-  let fbHTML = '';
-  if (maxH >= 10) {
-    const nineAvg = nArr => {
-      let sum = 0, cnt = 0;
-      courseRounds.forEach(r => {
-        let s = 0, ct = 0;
-        r.holes.forEach(h => {
-          if (h.score == null || !h.par) return;
-          if (nArr.includes(h.n)) { s += h.score - h.par; ct++; }
-        });
-        if (ct > 0) { sum += s; cnt++; }
-      });
-      return cnt ? +(sum / cnt).toFixed(1) : null;
-    };
-    const fa = nineAvg(hNums.filter(n => n <= 9));
-    const ba = nineAvg(hNums.filter(n => n >= 10));
-    if (fa !== null && ba !== null) {
-      fbHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <div style="background:#fff;border-radius:6px;padding:12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
-          <div style="font-size:22px;font-weight:800;color:${scoreCol(fa/9)}">${fa>0?'+':''}${fa}</div>
-          <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:2px">FRONT 9 vs par</div>
-          <div style="font-size:11px;color:#94a3b8">avg / round</div>
-        </div>
-        <div style="background:#fff;border-radius:6px;padding:12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07)">
-          <div style="font-size:22px;font-weight:800;color:${scoreCol(ba/9)}">${ba>0?'+':''}${ba}</div>
-          <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:2px">BACK 9 vs par</div>
-          <div style="font-size:11px;color:#94a3b8">avg / round</div>
-        </div>
-      </div>`;
-    }
-  }
-
-  // Score row: H# + par inline, 12px bold values, centered, gap:3px between rows via flex container
-  const scoreRow = n => {
-    const d   = hd[n];
-    const v   = avgVP(n);
-    const bPct = d.att ? Math.round(d.birdies  / d.att * 100) : 0;
-    const dPct = d.att ? Math.round(d.blowups  / d.att * 100) : 0;
-    const pPct = d.att ? Math.round(d.penRounds / d.att * 100) : 0;
-    return `<div style="display:grid;grid-template-columns:56px 1fr 1fr 1fr 1fr;
-                        align-items:center;padding:7px 10px 7px 8px;
-                        background:#fff;border-left:4px solid ${rowAccent(n)}">
-      <div style="display:flex;align-items:baseline;gap:4px">
-        <span style="font-size:14px;font-weight:800;color:#374151">H${n}</span>
-        <span style="font-size:12px;color:#94a3b8">p${d.par}</span>
-      </div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:${scoreCol(v)}">${fmtV(v)}</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#15803d">
-        ${bPct ? bPct+'%' : '<span style="color:#d1d5db">—</span>'}</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#dc2626">
-        ${dPct ? dPct+'%' : '<span style="color:#d1d5db">—</span>'}</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:${pPct?'#b45309':'#d1d5db'}">
-        ${pPct ? pPct+'%' : '—'}</div>
-    </div>`;
-  };
-
-  // Direction row: hole info left (44px), bar right, bunker excluded so L+FW+R=100%
-  const fwRow = n => {
-    const d = hd[n];
-    const dirTotal = (d.fw.left||0) + (d.fw.hit||0) + (d.fw.right||0);
-    if (dirTotal === 0) {
-      return `<div style="background:#fff;padding:8px 10px;display:flex;align-items:center;gap:8px">
-        <div style="width:44px;flex-shrink:0">
-          <div style="font-size:14px;font-weight:800;color:#374151">H${n}</div>
-          <div style="font-size:12px;color:#94a3b8">p${d.par}</div>
-        </div>
-        <div style="font-size:13px;color:#cbd5e1">no direction data yet</div>
-      </div>`;
-    }
-    const pct  = k => Math.round((d.fw[k]||0) / dirTotal * 100);
-    const penP = k => d.fw[k] ? Math.round((d.penFw[k]||0) / d.fw[k] * 100) : 0;
-    const lPct = pct('left'), fwPct = pct('hit'), rPct = pct('right');
-    const penL = penP('left'), penR = penP('right');
-    const seg = (flex, bg, label, justify) => {
-      if (!flex) return '';
-      const inner = flex >= 12 ? label : flex >= 6 ? label.replace(/ ?\d+%/, '') : '';
-      return `<div style="flex:${flex};background:${bg};display:flex;align-items:center;
-           justify-content:${justify};font-size:12px;font-weight:800;color:#fff;
-           padding:0 6px;overflow:hidden;white-space:nowrap;border-radius:3px">${inner}</div>`;
-    };
-    const penAnnot = (penL || penR) ? `
-      <div style="display:flex;margin-top:3px">
-        ${lPct ? `<div style="flex:${lPct};text-align:left;font-size:11px;font-weight:600;color:${penL?'#dc2626':'transparent'};white-space:nowrap">${penL?'P: '+penL+'%':''}</div>` : ''}
-        ${fwPct ? `<div style="flex:${fwPct}"></div>` : ''}
-        ${rPct ? `<div style="flex:${rPct};text-align:right;font-size:11px;font-weight:600;color:${penR?'#dc2626':'transparent'};white-space:nowrap">${penR?'P: '+penR+'%':''}</div>` : ''}
-      </div>` : '';
-    return `<div style="background:#fff;padding:7px 10px;display:flex;align-items:flex-start;gap:8px">
-      <div style="width:44px;flex-shrink:0">
-        <div style="font-size:14px;font-weight:800;color:#374151">H${n}</div>
-        <div style="font-size:12px;color:#94a3b8">p${d.par}</div>
-      </div>
-      <div style="flex:1">
-        <div style="display:flex;gap:3px;height:34px">
-          ${seg(lPct,  '#3b82f6', '◀ '+lPct+'%', 'flex-start')}
-          ${seg(fwPct, '#16a34a', fwPct+'%',       'center')}
-          ${seg(rPct,  '#3b82f6', rPct+'% ▶',      'flex-end')}
-        </div>
-        ${penAnnot}
-      </div>
-    </div>`;
-  };
+  const hNums = [...new Set(courseRounds.flatMap(r =>
+    r.holes.filter(h => h.score != null && h.par).map(h => h.n)
+  ))].sort((a,b) => a-b);
 
   const dropdown = `<select onchange="setHolesCourse(this.value)"
       style="border:1.5px solid #e2e8f0;border-radius:6px;padding:4px 8px;
@@ -6707,7 +6808,6 @@ function renderHoles() {
 
   el.innerHTML = `
     <div style="font-size:16px;font-weight:800;color:#1f2937;margin-bottom:8px">Performance by Hole</div>
-
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px">
       ${dropdown}
       ${pill('last5','Last 5')}
@@ -6715,74 +6815,131 @@ function renderHoles() {
       ${pill('all','All Time')}
       <span style="font-size:12px;color:#94a3b8;margin-left:2px">${usedRounds} round${usedRounds!==1?'s':''}</span>
     </div>
-
     ${usedRounds < 3 ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;
         padding:10px 12px;font-size:13px;color:#92400e;margin-bottom:12px">
         Only ${usedRounds} round${usedRounds!==1?'s':''} — patterns will sharpen with more data.</div>` : ''}
-
-    ${fbHTML}
-
-    <div style="background:#1d4ed8;border-radius:6px 6px 0 0;padding:9px 10px;text-align:center;
-        font-size:13px;font-weight:800;color:#fff;letter-spacing:.07em;text-transform:uppercase">
-      Score by Hole
-    </div>
-    <div style="display:grid;grid-template-columns:56px 1fr 1fr 1fr 1fr;
-        padding:6px 10px 6px 12px;background:#f1f5f9;border-bottom:1px solid #e2e8f0">
-      <div></div>
-      <div style="text-align:center;font-size:13px;font-weight:700;color:#374151">Average</div>
-      <div style="text-align:center;font-size:13px;font-weight:700;color:#15803d">Birdie</div>
-      <div style="text-align:center;font-size:13px;font-weight:700;color:#dc2626">Double+</div>
-      <div style="text-align:center;font-size:13px;font-weight:700;color:#b45309">Penalty</div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:3px;background:#fff;
-        border-radius:0 0 6px 6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:6px">
-      ${hNums.map(n => scoreRow(n)).join('')}
-    </div>
-    <div style="display:flex;gap:14px;margin-bottom:16px;font-size:12px;flex-wrap:wrap;justify-content:center;align-items:center">
-      <span style="display:flex;align-items:center;gap:5px">
-        <span style="width:4px;height:18px;background:#16a34a;border-radius:2px;display:inline-block;flex-shrink:0"></span>
-        <span style="color:#374151;font-weight:600">Best ${third} holes</span>
-      </span>
-      <span style="display:flex;align-items:center;gap:5px">
-        <span style="width:4px;height:18px;background:#dc2626;border-radius:2px;display:inline-block;flex-shrink:0"></span>
-        <span style="color:#374151;font-weight:600">Worst ${third} holes</span>
-      </span>
-      <span style="color:#94a3b8;font-size:11px">Penalty = rounds with ≥1 penalty ÷ rounds played</span>
-    </div>
-
-    <div style="background:#0f766e;border-radius:6px 6px 0 0">
-      <div style="text-align:center;font-size:13px;font-weight:800;color:#fff;
-          letter-spacing:.07em;text-transform:uppercase;padding:9px 10px">
-        Tee Shot Direction — ${usedRounds} round${usedRounds!==1?'s':''}
-      </div>
-      <div style="display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;
-          justify-content:center;align-items:center;background:#e5e7eb">
-        <span style="border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;
-            color:#fff;background:#3b82f6">◀ MISS LEFT</span>
-        <span style="border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;
-            color:#fff;background:#16a34a">FW / GIR</span>
-        <span style="border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;
-            color:#fff;background:#3b82f6">MISS RIGHT ▶</span>
-        <div style="position:relative;display:inline-flex;align-items:center;gap:4px">
-          <span style="font-size:11px;color:#6b7280;font-weight:600">P: penalty rate</span>
-          <button onclick="var t=document.getElementById('holes-pen-tip');t.style.display=t.style.display==='block'?'none':'block'"
-              style="width:16px;height:16px;border-radius:50%;background:#9ca3af;color:#fff;
-                     font-size:10px;font-weight:700;border:none;cursor:pointer;
-                     display:inline-flex;align-items:center;justify-content:center;padding:0">i</button>
-          <div id="holes-pen-tip" style="display:none;position:absolute;bottom:22px;right:0;
-              width:210px;background:#1f2937;color:#fff;font-size:11px;border-radius:6px;
-              padding:8px 10px;line-height:1.5;z-index:99">
-            P: % of rounds on that side where a penalty stroke was taken.
-            e.g. P: 50% = penalty in 1 out of 2 rounds hit there.
-          </div>
-        </div>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column;background:#fff;
-        border-radius:0 0 6px 6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1)">
-      ${hNums.map(n => fwRow(n)).join('')}
-    </div>
+    ${hNums.map(n => buildHoleCardHTML(n, courseRounds)).filter(Boolean).join('')}
   `;
+}
+
+// ═══════════════════════════════════════
+//  SETUP SCREEN
+// ═══════════════════════════════════════
+let SETUP_TAB = 'clubs';
+
+function renderSetup() {
+  const el = document.getElementById('view-setup');
+  const clubs = loadClubs();
+
+  const tabBtn = (id, lbl) =>
+    `<button onclick="SETUP_TAB='${id}';renderSetup()"
+       style="flex:1;padding:7px 0;font-size:13px;font-weight:700;cursor:pointer;
+              background:${SETUP_TAB===id?'#2563eb':'#fff'};color:${SETUP_TAB===id?'#fff':'#374151'};
+              border:1.5px solid ${SETUP_TAB===id?'#2563eb':'#e2e8f0'};
+              border-radius:${id==='courses'?'6px 0 0 6px':'0 6px 6px 0'}">${lbl}</button>`;
+
+  const clubRows = clubs.map((c, idx) => `
+    <div style="display:grid;grid-template-columns:1fr 44px 44px ${c.custom?'32px':'0px'};
+         align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9;gap:8px">
+      <div style="font-size:14px;font-weight:600;color:#1f2937">${c.name}</div>
+      <div style="text-align:center">
+        <input type="checkbox" ${c.tee?'checked':''} onchange="toggleClubField(${idx},'tee',this.checked)"
+               style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb">
+      </div>
+      <div style="text-align:center">
+        <input type="checkbox" ${c.appr?'checked':''} onchange="toggleClubField(${idx},'appr',this.checked)"
+               style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb">
+      </div>
+      ${c.custom ? `<div style="text-align:center">
+        <button onclick="deleteClub(${idx})"
+                style="width:24px;height:24px;border-radius:50%;background:#fee2e2;border:none;
+                       color:#dc2626;font-size:14px;font-weight:800;cursor:pointer;
+                       display:inline-flex;align-items:center;justify-content:center">×</button>
+      </div>` : '<div></div>'}
+    </div>`).join('');
+
+  const coursesContent = (() => {
+    const all = loadCourses();
+    const names = Object.values(all).map(c => c.name).filter(Boolean).sort();
+    if (!names.length) return `<p style="font-size:14px;color:#9ca3af;text-align:center;padding:24px 0">No courses saved yet. Start a round to add one.</p>`;
+    return names.map(n => {
+      const pars = getCoursePars(n) || [];
+      const total = pars.reduce((s,p) => s + (p||0), 0);
+      return `<div style="padding:10px 12px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;font-weight:700;color:#1f2937">${n}</div>
+        <div style="font-size:12px;color:#6b7280">Par ${total||'—'}</div>
+      </div>`;
+    }).join('');
+  })();
+
+  el.innerHTML = `
+    <div style="font-size:16px;font-weight:800;color:#1f2937;margin-bottom:12px">Setup</div>
+    <div style="display:flex;margin-bottom:16px">${tabBtn('courses','Courses')}${tabBtn('clubs','Clubs')}</div>
+
+    ${SETUP_TAB === 'courses' ? `
+      <div style="background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
+        ${coursesContent}
+      </div>` : `
+
+      <div style="background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:12px">
+        <div style="display:grid;grid-template-columns:1fr 44px 44px 32px;
+             padding:7px 12px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;gap:8px">
+          <div style="font-size:12px;font-weight:700;color:#374151">Club</div>
+          <div style="text-align:center;font-size:12px;font-weight:700;color:#374151">Tee</div>
+          <div style="text-align:center;font-size:12px;font-weight:700;color:#374151">Approach</div>
+          <div></div>
+        </div>
+        ${clubRows}
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:12px;font-style:italic">
+        On par 3s, only the Tee column is shown. The Approach row is hidden.
+      </div>
+      <div id="add-club-form" style="background:#fff;border-radius:8px;border:1.5px dashed #cbd5e1;
+           padding:12px 14px;display:flex;gap:8px;align-items:center;cursor:pointer"
+           onclick="showAddClubInput()">
+        <span style="font-size:18px;color:#94a3b8">+</span>
+        <span id="add-club-label" style="font-size:14px;font-weight:600;color:#9ca3af">Add club</span>
+        <div id="add-club-input-wrap" style="display:none;flex:1;display:none">
+          <input id="add-club-name" type="text" placeholder="Club name (e.g. 2i)"
+                 style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;
+                        font-size:14px;color:#1f2937" maxlength="8"
+                 onkeydown="if(event.key==='Enter')saveNewClub()">
+        </div>
+        <button id="add-club-save" style="display:none;background:#2563eb;color:#fff;border:none;
+                border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer"
+                onclick="event.stopPropagation();saveNewClub()">Save</button>
+      </div>`}
+  `;
+}
+
+function showAddClubInput() {
+  document.getElementById('add-club-label').style.display = 'none';
+  const wrap = document.getElementById('add-club-input-wrap');
+  wrap.style.display = 'flex';
+  document.getElementById('add-club-save').style.display = 'inline-block';
+  document.getElementById('add-club-form').style.cursor = 'default';
+  document.getElementById('add-club-form').removeAttribute('onclick');
+  document.getElementById('add-club-name').focus();
+}
+function saveNewClub() {
+  const inp = document.getElementById('add-club-name');
+  const name = (inp?.value || '').trim();
+  if (!name) return;
+  const clubs = loadClubs();
+  if (clubs.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+    inp.style.borderColor = '#dc2626'; return;
+  }
+  clubs.push({name, tee:true, appr:true, custom:true});
+  saveClubs(clubs);
+  renderSetup();
+}
+function toggleClubField(idx, field, val) {
+  const clubs = loadClubs();
+  if (clubs[idx]) { clubs[idx][field] = val; saveClubs(clubs); }
+}
+function deleteClub(idx) {
+  const clubs = loadClubs();
+  if (clubs[idx] && clubs[idx].custom) { clubs.splice(idx, 1); saveClubs(clubs); renderSetup(); }
 }
 
 // ═══════════════════════════════════════
