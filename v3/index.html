@@ -677,7 +677,7 @@
             border:1px solid rgba(255,255,255,.45);color:#fff;font-size:9px;font-weight:800;
             font-style:italic;line-height:1;cursor:pointer;padding:0;letter-spacing:0;
             display:flex;align-items:center;justify-content:center}
-    .sect-h{text-align:center;margin:8px 0;background:#475569;border-radius:4px;padding:2px 0;
+    .sect-h{text-align:center;margin:8px 0;background:#475569;border-radius:4px;padding:6px 0;
             font-size:10px;font-weight:800;color:#fff;text-transform:uppercase;
             /* spaced out letters; the padding offsets the trailing space so
                the word stays optically centred */
@@ -2219,8 +2219,7 @@ function buildHoleFormHTML(h, i) {
          onclick="toggleInfo('ia-${i}')" aria-label="What goes here?">i</button></div>
     ${flInfo(`ia-${i}`, 'Your FIRST real attempt at the green, from more than about 30 yards — the second on most par 4s, the third on most par 5s, and on a par 3 the tee shot itself (the lie shows Tee). If it misses, the shot you play next is short game, not another approach: log the first one and leave it. A punch-out or a layup is not an attempt at the green, so the approach is the first proper go you have after it. All of this is optional; tap the highlighted distance again to clear it.<br><br>LIE is where you played it from. Bunker means a fairway bunker — the greenside one is the Sand toggle on the scorecard. On a par 4 it follows the fairway you already entered and is shown outlined; tap to correct it. On a par 5 it starts blank, because nothing in the app knows where your layup finished.<br><br>FINISH is where the ball came to rest relative to the flag, with about 10 feet of tolerance on each axis — so ON LINE is within roughly 10 feet left or right, PIN HIGH within roughly 10 feet nearer or past. The centre cell is not a hole-out; it is any shot close on both. How close is already in the putt distance.')}
 
-    <div class="arow" style="grid-template-columns:52px repeat(3,1fr)">
-      <div class="arow-l">LIE</div>
+    <div class="arow" style="grid-template-columns:repeat(3,1fr)">
       ${isPar3
         ? `<div class="chip fixed" style="grid-column:span 3">Tee shot</div>`
         : LIES.map(([v,l]) => {
@@ -2233,8 +2232,7 @@ function buildHoleFormHTML(h, i) {
 
     <div id="club-chip-${isPar3?'tee':'appr'}-${i}" class="club-chip-row light" style="margin-bottom:8px">${clubChipRowHTML(h, i, isPar3 ? 'tee' : 'appr')}</div>
 
-    <div class="arow" style="grid-template-columns:52px 1fr">
-      <div class="arow-l">YARDS</div>
+    <div class="arow">
       <div class="hd-outer${h.apprDist>0?'':' unset'} appr" id="hdoA-${i}">
         <div class="hd-wrap">
           <div class="hd-band"></div>
@@ -2246,8 +2244,7 @@ function buildHoleFormHTML(h, i) {
       </div>
     </div>
 
-    <div class="arow" style="grid-template-columns:46px 1fr">
-      <div class="arow-l">FINISH</div>
+    <div class="arow">
       <div class="fgraph" id="grida-${i}">${finishGraphHTML(h, i)}</div>
     </div>
   </div>`;
