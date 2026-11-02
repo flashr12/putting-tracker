@@ -618,7 +618,7 @@
     .chip.derived{background:#eef4ff;border-color:#93c5fd;color:#1d4ed8;border-style:dashed}
     .chip.fixed{background:#f1f4f8;border-color:#e3e9f0;color:#94a3b8;cursor:default}
     .club-chip-row{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;
-                   padding:4px 0 6px;scrollbar-width:none}
+                   padding:2px 0;scrollbar-width:none}
     .club-chip-row::-webkit-scrollbar{display:none}
     .club-chip{border:1px solid #475569;border-radius:4px;padding:6px 14px;
                font-size:11px;font-weight:700;color:#94a3b8;background:#334155;
@@ -2231,7 +2231,7 @@ function buildHoleFormHTML(h, i) {
           }).join('')}
     </div>
 
-    <div id="club-chip-${isPar3?'tee':'appr'}-${i}" class="club-chip-row light">${clubChipRowHTML(h, i, isPar3 ? 'tee' : 'appr')}</div>
+    <div id="club-chip-${isPar3?'tee':'appr'}-${i}" class="club-chip-row light" style="margin-bottom:8px">${clubChipRowHTML(h, i, isPar3 ? 'tee' : 'appr')}</div>
 
     <div class="arow" style="grid-template-columns:52px 1fr">
       <div class="arow-l">YARDS</div>
