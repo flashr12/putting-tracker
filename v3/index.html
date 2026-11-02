@@ -618,13 +618,15 @@
     .chip.derived{background:#eef4ff;border-color:#93c5fd;color:#1d4ed8;border-style:dashed}
     .chip.fixed{background:#f1f4f8;border-color:#e3e9f0;color:#94a3b8;cursor:default}
     .club-chip-row{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;
-                   padding:4px 10px 6px;scrollbar-width:none}
+                   padding:4px 0 6px;scrollbar-width:none}
     .club-chip-row::-webkit-scrollbar{display:none}
-    .club-chip{border:1px solid #475569;border-radius:7px;padding:6px 14px;
+    .club-chip{border:1px solid #475569;border-radius:4px;padding:6px 14px;
                font-size:11px;font-weight:700;color:#94a3b8;background:#334155;
                cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;
                flex-shrink:0}
     .club-chip.on{background:#3b82f6;border-color:#3b82f6;color:#fff}
+    .club-chip-row.light .club-chip{background:#f1f5f9;border-color:#cbd5e1;color:#374151}
+    .club-chip-row.light .club-chip.on{background:#3b82f6;border-color:#3b82f6;color:#fff}
     @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
     /* FINISH as a plan view. No gaps between cells — it has to read as one
        continuous piece of ground, not nine buttons. The axes are drawn
@@ -750,7 +752,6 @@
   <div class="ntab"    id="tab-history"   onclick="showMain('history')">History</div>
   <div class="ntab"    id="tab-insights"  onclick="showMain('insights')">Insights</div>
   <div class="ntab"    id="tab-holes"     onclick="showMain('holes')">Holes</div>
-  <div class="ntab"    id="tab-training"  onclick="showMain('training')">Practice</div>
   <div class="ntab"    id="tab-setup"     onclick="showMain('setup')">Setup</div>
 </div>
 
@@ -1564,8 +1565,10 @@ function showMain(name) {
   document.getElementById('view-training').style.display  = (name==='training') ? 'block' : 'none';
   document.getElementById('view-holes').style.display     = (name==='holes') ? 'block' : 'none';
   document.getElementById('view-setup').style.display     = (name==='setup') ? 'block' : 'none';
-  ['dashboard','round','history','insights','holes','training','setup'].forEach(v => {
-    document.getElementById('tab-'+v).classList.toggle('on', v===name);
+  // 'training' no longer has its own tab — it lives under Setup
+  const navTabs = ['dashboard','round','history','insights','holes','setup'];
+  navTabs.forEach(v => {
+    document.getElementById('tab-'+v).classList.toggle('on', v===name || (v==='setup' && name==='training'));
   });
   if (name==='dashboard') renderDashboard();
   if (name==='history')   renderHistory();
@@ -1908,6 +1911,10 @@ function onClubChip(i, kind, name) {
   saveDraft();
   const rowEl = document.getElementById('club-chip-' + kind + '-' + i);
   if (rowEl) rowEl.innerHTML = clubChipRowHTML(h, i, kind);
+  // Re-apply light class for approach rows (approach section has white background)
+  if (rowEl && kind === 'appr') rowEl.classList.add('light');
+  // Par-3 tee row is also in the light approach section
+  if (rowEl && kind === 'tee' && (h.par||4) === 3) rowEl.classList.add('light');
 }
 
 // ── Per-hole stats card (used by Holes tab and in-round bottom sheet) ────
@@ -2224,7 +2231,7 @@ function buildHoleFormHTML(h, i) {
           }).join('')}
     </div>
 
-    <div id="club-chip-${isPar3?'tee':'appr'}-${i}" class="club-chip-row">${clubChipRowHTML(h, i, isPar3 ? 'tee' : 'appr')}</div>
+    <div id="club-chip-${isPar3?'tee':'appr'}-${i}" class="club-chip-row light">${clubChipRowHTML(h, i, isPar3 ? 'tee' : 'appr')}</div>
 
     <div class="arow" style="grid-template-columns:52px 1fr">
       <div class="arow-l">YARDS</div>
@@ -6110,8 +6117,8 @@ function drillCardHTML(d, flagged) {
   </div>`;
 }
 
-function renderTraining() {
-  const el = document.getElementById('view-training');
+function renderTraining(targetEl) {
+  const el = targetEl || document.getElementById('view-training');
   const plan = practicePlan();
   const flagged = new Set(plan.recs.flatMap(r => r.ids));
   const byId = Object.fromEntries(DRILLS.map(d => [d.id, d]));
@@ -6826,61 +6833,97 @@ function renderHoles() {
 //  SETUP SCREEN
 // ═══════════════════════════════════════
 let SETUP_TAB = 'clubs';
+let SETUP_EDIT_COURSE = null;
 
 function renderSetup() {
   const el = document.getElementById('view-setup');
-  const clubs = loadClubs();
 
-  const tabBtn = (id, lbl) =>
-    `<button onclick="SETUP_TAB='${id}';renderSetup()"
-       style="flex:1;padding:7px 0;font-size:13px;font-weight:700;cursor:pointer;
-              background:${SETUP_TAB===id?'#2563eb':'#fff'};color:${SETUP_TAB===id?'#fff':'#374151'};
-              border:1.5px solid ${SETUP_TAB===id?'#2563eb':'#e2e8f0'};
-              border-radius:${id==='courses'?'6px 0 0 6px':'0 6px 6px 0'}">${lbl}</button>`;
-
-  const clubRows = clubs.map((c, idx) => `
-    <div style="display:grid;grid-template-columns:1fr 44px 44px ${c.custom?'32px':'0px'};
-         align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9;gap:8px">
-      <div style="font-size:14px;font-weight:600;color:#1f2937">${c.name}</div>
-      <div style="text-align:center">
-        <input type="checkbox" ${c.tee?'checked':''} onchange="toggleClubField(${idx},'tee',this.checked)"
-               style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb">
-      </div>
-      <div style="text-align:center">
-        <input type="checkbox" ${c.appr?'checked':''} onchange="toggleClubField(${idx},'appr',this.checked)"
-               style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb">
-      </div>
-      ${c.custom ? `<div style="text-align:center">
-        <button onclick="deleteClub(${idx})"
-                style="width:24px;height:24px;border-radius:50%;background:#fee2e2;border:none;
-                       color:#dc2626;font-size:14px;font-weight:800;cursor:pointer;
-                       display:inline-flex;align-items:center;justify-content:center">×</button>
-      </div>` : '<div></div>'}
-    </div>`).join('');
-
-  const coursesContent = (() => {
-    const all = loadCourses();
-    const names = Object.values(all).map(c => c.name).filter(Boolean).sort();
-    if (!names.length) return `<p style="font-size:14px;color:#9ca3af;text-align:center;padding:24px 0">No courses saved yet. Start a round to add one.</p>`;
-    return names.map(n => {
-      const pars = getCoursePars(n) || [];
-      const total = pars.reduce((s,p) => s + (p||0), 0);
-      return `<div style="padding:10px 12px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:14px;font-weight:700;color:#1f2937">${n}</div>
-        <div style="font-size:12px;color:#6b7280">Par ${total||'—'}</div>
-      </div>`;
-    }).join('');
-  })();
+  const tabBtn = (id, lbl) => {
+    const isOn = SETUP_TAB === id;
+    const radius = id==='courses'?'6px 0 0 6px':id==='practice'?'0 6px 6px 0':'0';
+    return `<button onclick="SETUP_TAB='${id}';renderSetup()"
+       style="flex:1;padding:7px 0;font-size:12px;font-weight:700;cursor:pointer;
+              background:${isOn?'#2563eb':'#fff'};color:${isOn?'#fff':'#374151'};
+              border:1.5px solid ${isOn?'#2563eb':'#e2e8f0'};border-radius:${radius}">${lbl}</button>`;
+  };
 
   el.innerHTML = `
     <div style="font-size:16px;font-weight:800;color:#1f2937;margin-bottom:12px">Setup</div>
-    <div style="display:flex;margin-bottom:16px">${tabBtn('courses','Courses')}${tabBtn('clubs','Clubs')}</div>
+    <div style="display:flex;margin-bottom:16px">
+      ${tabBtn('courses','Courses')}${tabBtn('clubs','Clubs')}${tabBtn('practice','Practice')}
+    </div>
+    <div id="setup-content"></div>`;
 
-    ${SETUP_TAB === 'courses' ? `
-      <div style="background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
-        ${coursesContent}
-      </div>` : `
+  const content = document.getElementById('setup-content');
 
+  if (SETUP_TAB === 'courses') {
+    const all = loadCourses();
+    const names = Object.values(all).map(c => c.name).filter(Boolean).sort();
+    if (!names.length) {
+      content.innerHTML = `<div style="background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
+        <p style="font-size:14px;color:#9ca3af;text-align:center;padding:24px 0">No courses saved yet. Start a round to add one.</p>
+      </div>`;
+      return;
+    }
+    const rows = names.map(n => {
+      const isEditing = SETUP_EDIT_COURSE === n;
+      const pars = getCoursePars(n) || Array(18).fill(4);
+      const total = pars.slice(0,18).reduce((s,p) => s+(p||0), 0);
+      const holePars = isEditing ? `
+        <div style="padding:10px 12px;background:#f8fafc;border-top:1px solid #e2e8f0">
+          <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:8px;letter-spacing:.04em">
+            Tap a hole's par to toggle it
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px">
+            ${Array.from({length:18},(_,i)=>{
+              const hp = pars[i]||4;
+              return `<div style="text-align:center">
+                <div style="font-size:9px;color:#9ca3af;margin-bottom:2px">H${i+1}</div>
+                <div style="display:flex;gap:2px;justify-content:center">
+                  ${[3,4,5].map(v=>`<button onclick="setupSetPar('${n.replace(/'/g,"\\'")}',${i},${v});event.stopPropagation()"
+                    style="width:20px;height:20px;font-size:9px;font-weight:700;border-radius:3px;border:none;cursor:pointer;
+                           background:${hp===v?'#2563eb':'#e5e7eb'};color:${hp===v?'#fff':'#374151'}">${v}</button>`).join('')}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : '';
+      return `<div style="border-bottom:1px solid #f1f5f9">
+        <div onclick="SETUP_EDIT_COURSE=SETUP_EDIT_COURSE==='${n.replace(/'/g,"\\'")}' ? null : '${n.replace(/'/g,"\\'")}';renderSetup()"
+             style="padding:11px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <div style="font-size:14px;font-weight:700;color:#1f2937">${n}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:12px;color:#6b7280">Par ${total||'—'}</div>
+            <div style="font-size:11px;color:#9ca3af">${isEditing?'▲':'▼'}</div>
+          </div>
+        </div>
+        ${holePars}
+      </div>`;
+    }).join('');
+    content.innerHTML = `<div style="background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">${rows}</div>`;
+
+  } else if (SETUP_TAB === 'clubs') {
+    const clubs = loadClubs();
+    const clubRows = clubs.map((c, idx) => `
+      <div style="display:grid;grid-template-columns:1fr 44px 44px ${c.custom?'32px':'32px'};
+           align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9;gap:8px">
+        <div style="font-size:14px;font-weight:600;color:#1f2937">${c.name}</div>
+        <div style="text-align:center">
+          <input type="checkbox" ${c.tee?'checked':''} onchange="toggleClubField(${idx},'tee',this.checked)"
+                 style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb">
+        </div>
+        <div style="text-align:center">
+          <input type="checkbox" ${c.appr?'checked':''} onchange="toggleClubField(${idx},'appr',this.checked)"
+                 style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb">
+        </div>
+        <div style="text-align:center">
+          ${c.custom ? `<button onclick="deleteClub(${idx})"
+            style="width:24px;height:24px;border-radius:50%;background:#fee2e2;border:none;
+                   color:#dc2626;font-size:14px;font-weight:800;cursor:pointer;
+                   display:inline-flex;align-items:center;justify-content:center">×</button>` : ''}
+        </div>
+      </div>`).join('');
+    content.innerHTML = `
       <div style="background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:12px">
         <div style="display:grid;grid-template-columns:1fr 44px 44px 32px;
              padding:7px 12px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;gap:8px">
@@ -6892,14 +6935,14 @@ function renderSetup() {
         ${clubRows}
       </div>
       <div style="font-size:11px;color:#9ca3af;margin-bottom:12px;font-style:italic">
-        On par 3s, only the Tee column is shown. The Approach row is hidden.
+        On par 3s, only the Tee column is shown.
       </div>
       <div id="add-club-form" style="background:#fff;border-radius:8px;border:1.5px dashed #cbd5e1;
            padding:12px 14px;display:flex;gap:8px;align-items:center;cursor:pointer"
            onclick="showAddClubInput()">
         <span style="font-size:18px;color:#94a3b8">+</span>
         <span id="add-club-label" style="font-size:14px;font-weight:600;color:#9ca3af">Add club</span>
-        <div id="add-club-input-wrap" style="display:none;flex:1;display:none">
+        <div id="add-club-input-wrap" style="display:none;flex:1">
           <input id="add-club-name" type="text" placeholder="Club name (e.g. 2i)"
                  style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;
                         font-size:14px;color:#1f2937" maxlength="8"
@@ -6908,8 +6951,18 @@ function renderSetup() {
         <button id="add-club-save" style="display:none;background:#2563eb;color:#fff;border:none;
                 border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer"
                 onclick="event.stopPropagation();saveNewClub()">Save</button>
-      </div>`}
-  `;
+      </div>`;
+
+  } else if (SETUP_TAB === 'practice') {
+    renderTraining(content);
+  }
+}
+
+function setupSetPar(courseName, holeIdx, par) {
+  const pars = getCoursePars(courseName) || Array(18).fill(4);
+  pars[holeIdx] = par;
+  setCoursePars(courseName, pars);
+  renderSetup();
 }
 
 function showAddClubInput() {
