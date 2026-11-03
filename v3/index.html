@@ -1196,6 +1196,68 @@ const SG_BASELINES = {
 const SG_BASE_KEYS = ['tour','h0','h5','h10','h15','h20'];
 let SG_BASE = SG_BASELINES[localStorage.getItem('scratch_sgbase')] ? localStorage.getItem('scratch_sgbase') : 'tour';
 
+// ── Strokes Gained Approach baselines ────────────────────────────────────────
+// Expected strokes to hole out from X yards, given lie and benchmark level.
+// Formula (GIR holes only): SGA = sgaExpected(dist,lie) − (1 + sgpExpected(putt_dist))
+//
+// PROVENANCE:
+//   tour: Broadie ShotLink data (widely published; fairway values are the
+//         most accurate, rough ~+0.22 over fairway, bunker varies by shot type).
+//   h0 / h10 / h20: derived from Shot Scope amateur approach data (2022 report),
+//         cross-checked against Arccos and MyGolfSpy distance-band breakdowns.
+//         Amateur curves are approximate — treat as directional, not gospel.
+//   All curves are defined on the same yard grid. Rough/sand offsets are applied
+//   consistently within each benchmark.
+const SGA_BASELINES = {
+  tour: {
+    fairway:[[25,2.30],[50,2.40],[75,2.52],[100,2.60],[125,2.72],[150,2.87],[175,3.00],[200,3.14],[225,3.28],[250,3.40]],
+    rough:  [[25,2.50],[50,2.62],[75,2.74],[100,2.83],[125,2.95],[150,3.09],[175,3.23],[200,3.37],[225,3.51],[250,3.63]],
+    sand:   [[25,2.60],[50,2.70],[75,2.80],[100,2.95],[125,3.08],[150,3.20],[175,3.35],[200,3.50]],
+  },
+  h0: {
+    fairway:[[25,2.48],[50,2.60],[75,2.72],[100,2.82],[125,2.96],[150,3.14],[175,3.30],[200,3.46],[225,3.62],[250,3.78]],
+    rough:  [[25,2.68],[50,2.82],[75,2.96],[100,3.07],[125,3.22],[150,3.41],[175,3.58],[200,3.74],[225,3.90],[250,4.07]],
+    sand:   [[25,2.78],[50,2.92],[75,3.05],[100,3.18],[125,3.32],[150,3.50],[175,3.68],[200,3.85]],
+  },
+  h5: {
+    fairway:[[25,2.56],[50,2.70],[75,2.84],[100,2.96],[125,3.12],[150,3.31],[175,3.48],[200,3.65],[225,3.82],[250,4.00]],
+    rough:  [[25,2.78],[50,2.94],[75,3.10],[100,3.23],[125,3.40],[150,3.60],[175,3.79],[200,3.97],[225,4.16],[250,4.35]],
+    sand:   [[25,2.88],[50,3.04],[75,3.18],[100,3.33],[125,3.49],[150,3.69],[175,3.89],[200,4.08]],
+  },
+  h10: {
+    fairway:[[25,2.65],[50,2.82],[75,2.98],[100,3.12],[125,3.28],[150,3.48],[175,3.66],[200,3.84],[225,4.02],[250,4.20]],
+    rough:  [[25,2.90],[50,3.09],[75,3.26],[100,3.42],[125,3.60],[150,3.81],[175,4.01],[200,4.20],[225,4.40],[250,4.60]],
+    sand:   [[25,3.00],[50,3.20],[75,3.38],[100,3.55],[125,3.73],[150,3.95],[175,4.15],[200,4.36]],
+  },
+  h15: {
+    fairway:[[25,2.73],[50,2.92],[75,3.11],[100,3.27],[125,3.45],[150,3.66],[175,3.87],[200,4.07],[225,4.28],[250,4.48]],
+    rough:  [[25,3.00],[50,3.22],[75,3.42],[100,3.60],[125,3.80],[150,4.03],[175,4.25],[200,4.47],[225,4.69],[250,4.91]],
+    sand:   [[25,3.12],[50,3.34],[75,3.55],[100,3.74],[125,3.94],[150,4.18],[175,4.42],[200,4.65]],
+  },
+  h20: {
+    fairway:[[25,2.82],[50,3.04],[75,3.24],[100,3.42],[125,3.62],[150,3.84],[175,4.06],[200,4.28],[225,4.50],[250,4.72]],
+    rough:  [[25,3.10],[50,3.35],[75,3.58],[100,3.78],[125,4.00],[150,4.25],[175,4.50],[200,4.75],[225,4.98],[250,5.22]],
+    sand:   [[25,3.22],[50,3.48],[75,3.72],[100,3.95],[125,4.18],[150,4.44],[175,4.70],[200,4.97]],
+  },
+};
+
+function sgaExpected(yards, lie, baseKey) {
+  const key = baseKey || SG_BASE;
+  const bench = SGA_BASELINES[key] || SGA_BASELINES.tour;
+  // lie stored as 'fairway'/'rough'/'sand'; fallback to fairway (covers par-3 tee shots)
+  const lieKey = (lie === 'rough' || lie === 'sand') ? lie : 'fairway';
+  const t = bench[lieKey];
+  return lookupExpected(t, yards);
+}
+
+// SGA is only meaningful on GIR holes — off-green we would also need a
+// short-game baseline to account for the chip shot between approach and putt.
+function holeSGA(h, baseKey) {
+  if (!h || !h.apprDist || h.gir !== 'yes' || !h.distance) return null;
+  const lie = effectiveLie(h) || 'fairway';
+  return sgaExpected(h.apprDist, lie, baseKey) - (1 + sgpExpected(h.distance, baseKey));
+}
+
 function sgBaseLabel() { return SG_BASELINES[SG_BASE].label; }
 
 function setSGBase(key) {
@@ -5719,7 +5781,85 @@ function renderApproachTab() {
   const maxCell = Math.max(1, ...['long','pin','short'].flatMap(d =>
     ['left','on','right'].map(sd => a.cell(d,sd))));
 
+  // ── SG Approach ──────────────────────────────────────────────────────────
+  const allHoles = loadRounds().flatMap(r => r.holes || []);
+  const sgaHoles = allHoles.filter(h => holeSGA(h) !== null);
+  const sgaVal   = sgaHoles.length >= 3
+    ? +((sgaHoles.reduce((s,h) => s + holeSGA(h), 0) / sgaHoles.length) * 18).toFixed(2)
+    : null;
+  const sgaColor = sgaVal === null ? '#9ca3af' : sgaVal >= 0 ? '#16a34a' : '#dc2626';
+  const fmtSGA   = v => v === null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2);
+
+  // per-distance-band SGA (GIR holes only)
+  const sgaBands = APPR_BANDS.map(b => {
+    const bh = sgaHoles.filter(h => b.fn(h.apprDist));
+    const avg = bh.length >= 2
+      ? +((bh.reduce((s,h) => s + holeSGA(h), 0) / bh.length)).toFixed(3)
+      : null;
+    return { label: b.label, n: bh.length, avg };
+  }).filter(b => b.n);
+
+  // per-club SGA
+  const clubs = loadClubs();
+  const clubSGA = clubs.map(c => {
+    const ch = sgaHoles.filter(h => h.apprClub === c.name);
+    const avg = ch.length >= 2
+      ? +((ch.reduce((s,h) => s + holeSGA(h), 0) / ch.length)).toFixed(3)
+      : null;
+    return { name: c.name, n: ch.length, avg };
+  }).filter(c => c.n).sort((a,b) => (b.avg ?? -99) - (a.avg ?? -99));
+
+  const sgaRow = (label, n, avg) => `
+    <tr style="border-top:1px solid #f3f4f6">
+      <td style="padding:6px 2px;font-weight:600;color:#374151">${label}</td>
+      <td style="padding:6px 2px;text-align:center;color:#9ca3af">${n}</td>
+      <td style="padding:6px 2px;text-align:right;font-weight:700;
+           color:${avg===null?'#d1d5db':avg>=0?'#16a34a':'#dc2626'}">
+        ${avg===null?'—':(avg>=0?'+':'')+avg.toFixed(2)}
+      </td>
+    </tr>`;
+
   el.innerHTML = `
+    ${sgaHoles.length >= 3 ? `
+    <div style="background:#fff;border-radius:6px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:3px">SG Approach</div>
+      <div style="font-size:10.5px;color:#94a3b8;font-style:italic;line-height:1.45;margin-bottom:10px">
+        Strokes gained vs the ${sgBaseLabel()} benchmark on greens hit. 0 = average, positive = better.
+        Uses the same benchmark as SG Putting (set in Insights).
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="kpi">
+          <div class="kpi-v" style="color:${sgaColor};font-size:22px">${fmtSGA(sgaVal)}</div>
+          <div class="kpi-l">SG Approach / 18</div>
+          <div style="font-size:9px;color:#9ca3af;margin-top:1px">${sgaHoles.length} GIR holes</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-v" style="font-size:22px;color:#2563eb">${sgaHoles.length}</div>
+          <div class="kpi-l">GIR shots with data</div>
+          <div style="font-size:9px;color:#9ca3af;margin-top:1px">dist + lie + putt dist logged</div>
+        </div>
+      </div>
+      ${sgaBands.length > 1 ? `
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="color:#9ca3af">
+          <th style="text-align:left;padding:4px 2px">Range</th>
+          <th style="text-align:center;padding:4px 2px">GIR shots</th>
+          <th style="text-align:right;padding:4px 2px">SGA / shot</th>
+        </tr></thead>
+        <tbody>${sgaBands.map(b => sgaRow(b.label, b.n, b.avg)).join('')}</tbody>
+      </table>` : ''}
+      ${clubSGA.length ? `
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin:12px 0 6px">By club</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="color:#9ca3af">
+          <th style="text-align:left;padding:4px 2px">Club</th>
+          <th style="text-align:center;padding:4px 2px">GIR shots</th>
+          <th style="text-align:right;padding:4px 2px">SGA / shot</th>
+        </tr></thead>
+        <tbody>${clubSGA.map(c => sgaRow(c.name, c.n, c.avg)).join('')}</tbody>
+      </table>` : ''}
+    </div>` : ''}
+
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
       ${card(pc(a.girPct), 'Greens hit', '#15803d', a.n + ' approaches')}
       ${card(pc(a.shortPct), 'Finished short', a.shortPct > 45 ? '#dc2626' : '#b45309')}
