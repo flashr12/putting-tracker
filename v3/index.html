@@ -3577,6 +3577,7 @@ function setPuttingFilter(btn, n) {
   PUTTING_FILTER = n;
   [...btn.parentElement.children].forEach(b => b.classList.toggle('on', b === btn));
   renderDashboard();
+  if (activeStab === 'trend') drawPuttTrend();
 }
 
 function setTrendMetric(btn, m) {
@@ -6906,8 +6907,14 @@ function renderSetup() {
   } else if (SETUP_TAB === 'clubs') {
     const clubs = loadClubs();
     const clubRows = clubs.map((c, idx) => `
-      <div style="display:grid;grid-template-columns:1fr 44px 44px ${c.custom?'32px':'32px'};
+      <div style="display:grid;grid-template-columns:28px 1fr 44px 44px 32px;
            align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9;gap:8px">
+        <div style="display:flex;flex-direction:column;gap:1px;align-items:center">
+          <button onclick="moveClub(${idx},-1)" ${idx===0?'disabled':''}
+            style="background:none;border:none;padding:1px 4px;cursor:pointer;color:${idx===0?'#d1d5db':'#6b7280'};font-size:11px;line-height:1">▲</button>
+          <button onclick="moveClub(${idx},1)" ${idx===clubs.length-1?'disabled':''}
+            style="background:none;border:none;padding:1px 4px;cursor:pointer;color:${idx===clubs.length-1?'#d1d5db':'#6b7280'};font-size:11px;line-height:1">▼</button>
+        </div>
         <div style="font-size:14px;font-weight:600;color:#1f2937">${c.name}</div>
         <div style="text-align:center">
           <input type="checkbox" ${c.tee?'checked':''} onchange="toggleClubField(${idx},'tee',this.checked)"
@@ -6926,8 +6933,9 @@ function renderSetup() {
       </div>`).join('');
     content.innerHTML = `
       <div style="background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:12px">
-        <div style="display:grid;grid-template-columns:1fr 44px 44px 32px;
+        <div style="display:grid;grid-template-columns:28px 1fr 44px 44px 32px;
              padding:7px 12px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;gap:8px">
+          <div></div>
           <div style="font-size:12px;font-weight:700;color:#374151">Club</div>
           <div style="text-align:center;font-size:12px;font-weight:700;color:#374151">Tee</div>
           <div style="text-align:center;font-size:12px;font-weight:700;color:#374151">Approach</div>
@@ -6984,6 +6992,14 @@ function saveNewClub() {
     inp.style.borderColor = '#dc2626'; return;
   }
   clubs.push({name, tee:true, appr:true, custom:true});
+  saveClubs(clubs);
+  renderSetup();
+}
+function moveClub(idx, dir) {
+  const clubs = loadClubs();
+  const to = idx + dir;
+  if (to < 0 || to >= clubs.length) return;
+  [clubs[idx], clubs[to]] = [clubs[to], clubs[idx]];
   saveClubs(clubs);
   renderSetup();
 }
